@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid">
+    <section class="card">
+        <div class="section-header">
+            <h1>Rediger adresse</h1>
+            <button type="button" class="ghost-button" data-toggle-panel="address-details">Vis/skjul</button>
+        </div>
+        <div data-panel="address-details">
+            <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+            <div class="action-row" style="margin-bottom: 1rem;">
+                <a class="ghost-button" href="/admin/addresses/{{ address.id }}/edit/address">Rediger vej/hus/postnr/by</a>
+                {% if letter_available %}
+                    <a class="ghost-button" href="/admin/letters/address/{{ address.id }}">Brev</a>
+                {% endif %}
+            </div>
+            <form method="post" action="/admin/addresses/{{ address.id }}/edit" class="form-grid">
+                <label>Kontakt navn<input type="text" name="customer_name" value="{{ address.customer_name or '' }}" /></label>
+                <label>Kontakt email<input type="text" name="customer_email" value="{{ address.customer_email or '' }}" /></label>
+                <label>Kontakt telefon<input type="text" name="customer_phone" value="{{ address.customer_phone or '' }}" /></label>
+                <label class="checkbox-field">
+                    <input type="checkbox" name="buffer_flag" {% if address.buffer_flag %}checked{% endif %} />
+                    Har Målerbrønd
+                </label>
+                <label>Placering af målerbrønd<input type="text" name="buffer_note" value="{{ address.buffer_note or '' }}" /></label>
+                <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ address.old_meter_no or '' }}" /></label>
+                <label>Ny målernr<input type="text" name="new_meter_no" value="{{ address.new_meter_no or '' }}" /></label>
+                <label class="checkbox-field">
+                    <input type="checkbox" name="blocked_flag" {% if address.blocked_reason %}checked{% endif %} />
+                    Fejl ved stophane
+                </label>
+                <label>Stophane note<input type="text" name="blocked_note" value="{{ address.blocked_reason or '' }}" /></label>
+                <button type="submit" class="primary-button">Gem</button>
+                <a href="/admin/addresses" class="ghost-button">Tilbage</a>
+            </form>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="section-header">
+            <h2>Ikke tilgængelig</h2>
+            <button type="button" class="ghost-button" data-toggle-panel="address-unavailable">Vis/skjul</button>
+        </div>
+        <div data-panel="address-unavailable">
+            <form method="post" action="/admin/addresses/{{ address.id }}/unavailable" class="form-grid">
+                <label>Start<input type="datetime-local" name="starts_at" required /></label>
+                <label>Slut<input type="datetime-local" name="ends_at" required /></label>
+                <label>Note<input type="text" name="note" placeholder="Valgfrit" /></label>
+                <button type="submit" class="primary-button">Tilføj periode</button>
+            </form>
+            {% if unavailable_periods %}
+                <div class="table-wrapper" style="margin-top: 1rem;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Start</th>
+                                <th>Slut</th>
+                                <th>Note</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for period in unavailable_periods %}
+                                <tr>
+                                    <td>{{ period.starts_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>{{ period.ends_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>{{ period.note or '-' }}</td>
+                                    <td>
+                                        <form method="post" action="/admin/addresses/{{ address.id }}/unavailable/{{ period.id }}/delete">
+                                            <button type="submit" class="ghost-button">Slet</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="hint" style="margin-top: 1rem;">Ingen perioder registreret endnu.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="section-header">
+            <h2>Ikke hjemme historik</h2>
+            <button type="button" class="ghost-button" data-toggle-panel="address-not-home">Vis/skjul</button>
+        </div>
+        <div data-panel="address-not-home">
+            {% if not_home_history %}
+                <div class="table-wrapper" style="margin-top: 1rem;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Dato</th>
+                                <th>VVS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in not_home_history %}
+                                <tr>
+                                    <td>{{ row.appointment.starts_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>{{ row.contractor.username }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="hint" style="margin-top: 1rem;">Ingen ikke hjemme registreringer endnu.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="section-header">
+            <h2>Fotos</h2>
+            <button type="button" class="ghost-button" data-toggle-panel="address-photos">Vis/skjul</button>
+        </div>
+        <div data-panel="address-photos">
+            {% if photos %}
+                <div class="photo-grid" style="margin-top: 1rem;">
+                    {% for photo in photos %}
+                        <div class="photo-item">
+                            <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" data-lightbox />
+                            <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="hint" style="margin-top: 1rem;">Ingen fotos registreret endnu.</p>
+            {% endif %}
+        </div>
+    </section>
+</div>
+<script src="/static/admin_address_edit.js" defer></script>
+{% endblock %}

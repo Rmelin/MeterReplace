@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p>Overblik over arbejdsdage og planlagte adresser.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Arbejdsdage</h2>
+    {% if availability_dates %}
+        <form method="get" action="/user/dashboard" class="form-grid">
+            <label>
+                Dato
+                <select name="date_query" required>
+                    {% for day in availability_dates %}
+                        <option value="{{ day.isoformat() }}" {% if selected_date and day == selected_date %}selected{% endif %}>
+                            {{ day.strftime('%d/%m/%Y') }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="primary-button">Vælg dag</button>
+        </form>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Planlagte adresser</h2>
+    {% if selected_date %}
+        {% if scheduled_addresses %}
+            <ul class="list">
+                {% for address in scheduled_addresses %}
+                    <li>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="hint">Ingen planlagte adresser på den valgte dag.</p>
+        {% endif %}
+    {% else %}
+        <p class="hint">Vælg en arbejdsdag for at se planlagte adresser.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Genveje</h2>
+    <div class="action-row">
+        <a class="ghost-button" href="/admin/addresses">Adresser</a>
+        <a class="ghost-button" href="/admin/appointments">Opgaver</a>
+        <a class="ghost-button" href="/admin/availability">Arbejdsdage</a>
+    </div>
+</section>
+{% endblock %}

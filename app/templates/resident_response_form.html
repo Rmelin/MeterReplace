@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card narrow">
+    <h1>Besked til os</h1>
+    <p class="hint">Adresse: {{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+    {% if appointment %}
+        <p class="hint">Planlagt tid: {{ appointment.starts_at.strftime('%d/%m %H:%M') }}</p>
+    {% endif %}
+    <form method="post" action="/r/{{ token }}" class="form-grid">
+        <label>
+            Vælg svar
+            <select name="response_type" required>
+                <option value="">Vælg</option>
+                <option value="buffer_note">Jeg har målerbrønd</option>
+                <option value="reschedule_request">Tidspunkt passer ikke</option>
+            </select>
+        </label>
+        <label>
+            Placering / besked
+            <textarea name="message" rows="5" class="textarea" placeholder="Placering af målerbrønd eller besked"></textarea>
+        </label>
+        <label>Telefon<input type="text" name="phone" /></label>
+        <label>Email<input type="text" name="email" /></label>
+        <button type="submit" class="primary-button">Send svar</button>
+    </form>
+</section>
+{% endblock %}

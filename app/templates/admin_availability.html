@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Arbejdsdage</h1>
+        <p>Opret eller justér arbejdsdage.</p>
+    </div>
+</section>
+
+{% if current_user.role.value in ['admin', 'user'] %}
+<section class="card">
+    <h2>Ny arbejdsdag</h2>
+    <form method="post" action="/admin/availability" class="form-grid">
+        <label>
+            VVS
+            <select name="user_id" required>
+                <option value="">Vælg VVS</option>
+                {% for vvs in vvs_users %}
+                    <option value="{{ vvs.id }}">{{ vvs.username }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Dato<input type="date" name="date_raw" required /></label>
+        <label>Start<input type="time" name="start_raw" value="08:00" required /></label>
+        <label>Slut<input type="time" name="end_raw" value="16:00" required /></label>
+        <label>Note<input type="text" name="note" placeholder="Valgfrit" /></label>
+        <button type="submit" class="primary-button">Gem</button>
+    </form>
+    <p class="hint">Tilladte tidsrum: 06:00–18:00</p>
+</section>
+{% endif %}
+
+<section class="card">
+    <h2>Seneste arbejdsdage</h2>
+    {% if entries %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>VVS</th>
+                        <th>Dato</th>
+                        <th>Start</th>
+                        <th>Slut</th>
+                        <th>Note</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in entries %}
+                        <tr>
+                            <td>{{ row.username }}</td>
+                            <td>{{ row.entry.date.strftime('%d-%m-%Y') }}</td>
+                            <td>{{ row.entry.start_time.strftime('%H:%M') }}</td>
+                            <td>{{ row.entry.end_time.strftime('%H:%M') }}</td>
+                            <td>{{ row.entry.note or '-' }}</td>
+                            <td>
+                                {% if current_user.role.value in ['admin', 'user'] %}
+                                    <a class="link" href="/admin/availability/{{ row.entry.id }}/edit">Rediger</a>
+                                {% else %}
+                                    <span class="hint">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+</section>
+{% endblock %}

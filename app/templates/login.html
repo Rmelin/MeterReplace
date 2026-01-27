@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card narrow">
+    <h1>Log ind</h1>
+    <form method="post" action="/login" class="form-grid">
+        <label>
+            Brugernavn
+            <input type="text" name="username" required />
+        </label>
+        <label>
+            Adgangskode
+            <input type="password" name="password" required />
+        </label>
+        <button type="submit" class="primary-button">Log ind</button>
+    </form>
+    <p class="hint">Standard admin: admin / admin123</p>
+</section>
+{% endblock %}

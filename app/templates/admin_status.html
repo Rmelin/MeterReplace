@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Status dashboard</h1>
+        <p>Overblik over fremdrift på vandmålerudskiftninger.</p>
+    </div>
+</section>
+
+<section class="grid">
+    <a class="card card-link" href="/admin/addresses?status=planned">
+        <h2>Planlagt</h2>
+        <p class="metric">{{ planned }}</p>
+    </a>
+    <a class="card card-link" href="/admin/addresses?status=informed">
+        <h2>Beboer/kunde informeret</h2>
+        <p class="metric">{{ informed }}</p>
+    </a>
+    <a class="card card-link" href="/admin/addresses?status=completed">
+        <h2>Skiftet</h2>
+        <p class="metric">{{ completed }}</p>
+    </a>
+    <a class="card card-link" href="/admin/addresses?status=closed">
+        <h2>Afsluttet</h2>
+        <p class="metric">{{ closed }}</p>
+    </a>
+    <a class="card card-link" href="/admin/addresses?status=not_home_history">
+        <h2>Ikke hjemme</h2>
+        <p class="metric">{{ not_home }}</p>
+    </a>
+    <a class="card card-link" href="/admin/addresses?status=needs_reschedule">
+        <h2>Behov for ny dato</h2>
+        <p class="metric">{{ needs_reschedule }}</p>
+    </a>
+    <a class="card card-link" href="/admin/addresses?status=unplanned">
+        <h2>Ikke planlagt</h2>
+        <p class="metric">{{ remaining }}</p>
+    </a>
+    <a class="card card-link" href="/admin/addresses">
+        <h2>Total</h2>
+        <p class="metric">{{ total }}</p>
+    </a>
+    <a class="card card-link" href="/admin/inventory">
+        <h2>Aktuelt lager</h2>
+        <p class="metric">{{ stock }}</p>
+    </a>
+</section>
+
+<section class="card">
+    <h2>Arbejdsdage status</h2>
+    {% if day_status %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dato</th>
+                        <th>Beboer informeret</th>
+                        <th>Skiftet</th>
+                        <th>Afsluttet</th>
+                        <th>Ikke hjemme</th>
+                        <th>I alt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in day_status %}
+                        <tr>
+                            <td>{{ row.date.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ row.informed }}</td>
+                            <td>{{ row.completed }}</td>
+                            <td>{{ row.closed }}</td>
+                            <td>{{ row.not_home }}</td>
+                            <td>{{ row.total }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Fremdrift pr. vej</h2>
+    {% if street_progress %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vej</th>
+                        <th>Skiftet / total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in street_progress %}
+                        <tr>
+                            <td>{{ row.street }}</td>
+                            <td>{{ row.completed }}/{{ row.total }}{% if row.is_complete %} ✅{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen adresser registreret endnu.</p>
+    {% endif %}
+</section>
+{% endblock %}

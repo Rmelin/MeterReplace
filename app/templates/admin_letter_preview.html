@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Brev preview</h1>
+        <p>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+    </div>
+    <div>
+        <a class="ghost-button" href="/admin/letters/address/{{ address.id }}/pdf">Download PDF</a>
+    </div>
+</section>
+
+{% if include_resident_link %}
+<section class="card">
+    <h2>Beboerlink</h2>
+    <p><a href="{{ response_url }}">{{ response_url }}</a></p>
+    {% if not link_active %}
+        <p class="hint">Linket er allerede brugt.</p>
+    {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+    {% if logo_url %}
+        <div class="logo-preview">
+            <img src="{{ logo_url }}" alt="Logo" />
+        </div>
+    {% endif %}
+    <p><strong>Dato:</strong> {{ visit_date }}</p>
+    <p><strong>Tidsrum:</strong> {{ visit_window }}</p>
+    <div class="letter-body">{{ body_html | safe }}</div>
+</section>
+{% endblock %}

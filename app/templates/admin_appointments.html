@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Opgaver & fotos</h1>
+        <p>To do og Done pr. arbejdsdag.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Arbejdsdag</h2>
+    {% if availability_dates %}
+        <form method="get" action="/admin/appointments" class="form-grid">
+            <label>
+                Dato
+                <select name="date_query" required>
+                    {% for day in availability_dates %}
+                        <option value="{{ day.isoformat() }}" {% if selected_date and day == selected_date %}selected{% endif %}>
+                            {{ day.strftime('%d/%m/%Y') }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="primary-button">Vælg dag</button>
+        </form>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>To do</h2>
+    {% if todo %}
+        {% for appointment in todo %}
+            {% set address = addresses.get(appointment.id) %}
+            {% set contractor = contractors.get(appointment.id) %}
+            <div class="card">
+                <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
+                <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
+                {% if appointment.old_meter_no or appointment.new_meter_no %}
+                    <p class="hint">Målernr: {{ appointment.old_meter_no or '-' }} → {{ appointment.new_meter_no or '-' }}</p>
+                {% endif %}
+                <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
+                <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
+                <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
+                    {% if selected_date %}
+                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                    {% endif %}
+                    <label>
+                        Fototype
+                        <select name="photo_type" required>
+                            <option value="">Vælg type</option>
+                            <option value="both">Begge målere i ét foto</option>
+                            <option value="new">Ny måler</option>
+                            <option value="old">Gammel måler</option>
+                        </select>
+                    </label>
+                    <label>Foto<input type="file" name="file" accept="image/*" required /></label>
+                    <button type="submit" class="primary-button">Upload</button>
+                </form>
+                {% if photos.get(appointment.id) %}
+                    <div class="photo-grid">
+                        {% for photo in photos.get(appointment.id) %}
+                            <div class="photo-item">
+                                <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
+                                <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="hint">Ingen opgaver på dagen.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Done</h2>
+    {% if done %}
+        {% for appointment in done %}
+            {% set address = addresses.get(appointment.id) %}
+            {% set contractor = contractors.get(appointment.id) %}
+            <div class="card">
+                <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
+                <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
+                <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
+                {% if appointment.old_meter_no or appointment.new_meter_no %}
+                    <p class="hint">Målernr: {{ appointment.old_meter_no or '-' }} → {{ appointment.new_meter_no or '-' }}</p>
+                {% endif %}
+                <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
+                <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
+                <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
+                    {% if selected_date %}
+                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                    {% endif %}
+                    <label>
+                        Fototype
+                        <select name="photo_type" required>
+                            <option value="">Vælg type</option>
+                            <option value="both">Begge målere i ét foto</option>
+                            <option value="new">Ny måler</option>
+                            <option value="old">Gammel måler</option>
+                        </select>
+                    </label>
+                    <label>Foto<input type="file" name="file" accept="image/*" required /></label>
+                    <button type="submit" class="primary-button">Upload</button>
+                </form>
+                {% if photos.get(appointment.id) %}
+                    <div class="photo-grid">
+                        {% for photo in photos.get(appointment.id) %}
+                            <div class="photo-item">
+                                <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
+                                <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="hint">Ingen færdige opgaver endnu.</p>
+    {% endif %}
+</section>
+
+<script src="/static/appointments.js" defer></script>
+{% endblock %}

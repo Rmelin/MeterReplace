@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card narrow">
+    <h1>Rediger arbejdsdag</h1>
+    {% if has_conflict %}
+        <p class="hint">Advarsel: Der er allerede planlagte opgaver på denne dato.</p>
+    {% endif %}
+    <form method="post" action="/vvs/{{ entry.id }}/edit" class="form-grid">
+        <label>Dato<input type="date" name="date_raw" value="{{ entry.date }}" required /></label>
+        <label>Start<input type="time" name="start_raw" value="{{ entry.start_time.strftime('%H:%M') }}" required /></label>
+        <label>Slut<input type="time" name="end_raw" value="{{ entry.end_time.strftime('%H:%M') }}" required /></label>
+        <label>Note<input type="text" name="note" value="{{ entry.note or '' }}" /></label>
+        <button type="submit" class="primary-button">Gem</button>
+        <a href="/vvs" class="ghost-button">Tilbage</a>
+    </form>
+</section>
+{% endblock %}

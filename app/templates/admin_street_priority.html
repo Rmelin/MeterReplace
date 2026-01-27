@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Vejprioritet</h1>
+        <p>Definér rækkefølgen på veje til auto-planlægning.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Tilføj/Opdater prioritet</h2>
+    <div class="page-header" style="margin-bottom: 1rem;">
+        <a class="ghost-button" href="/admin/street-priority/export">Eksportér CSV</a>
+    </div>
+    {% if not streets %}
+        <p class="hint">Ingen veje tilgængelige endnu.</p>
+    {% else %}
+        <form method="post" action="/admin/street-priority" class="form-grid">
+            <label>
+                Vej
+                <select name="street" required>
+                    <option value="">Vælg vej</option>
+                    {% for street in streets %}
+                        <option value="{{ street }}">{{ street }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Prioritet (højere = tidligere)<input type="number" name="priority" min="0" value="0" required /></label>
+            <button type="submit" class="primary-button">Gem prioritet</button>
+        </form>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Importer CSV</h2>
+    <form method="post" action="/admin/street-priority/import" enctype="multipart/form-data" class="form-grid">
+        <label>Fil<input type="file" name="file" accept=".csv" required /></label>
+        <button type="submit" class="primary-button">Importer</button>
+    </form>
+    <p class="hint">CSV felter: street, priority</p>
+</section>
+
+<section class="card">
+    <h2>Aktive prioriteter</h2>
+    {% if priorities %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vej</th>
+                        <th>Prioritet</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in priorities %}
+                        <tr>
+                            <td>{{ entry.street }}</td>
+                            <td>
+                                <form method="post" action="/admin/street-priority" class="form-grid" style="grid-template-columns: 1fr auto; gap: 0.5rem;">
+                                    <input type="hidden" name="street" value="{{ entry.street }}" />
+                                    <input type="number" name="priority" min="0" value="{{ entry.priority }}" />
+                                    <button type="submit" class="primary-button">Opdater</button>
+                                </form>
+                            </td>
+                            <td>
+                                <form method="post" action="/admin/street-priority/{{ entry.id }}/delete" class="inline-form">
+                                    <button type="submit" class="ghost-button">Slet</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen prioriteter oprettet endnu.</p>
+    {% endif %}
+</section>
+{% endblock %}

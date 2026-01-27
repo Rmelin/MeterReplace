@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Auto-planlægning</h1>
+        <p>Planlæg udskiftninger for valgt dato.</p>
+    </div>
+    <div>
+        <a class="ghost-button" href="/admin/planning/manual">Manuel planlægning</a>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Vælg dato</h2>
+    {% if not date_options %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+    <form method="post" action="/admin/planning/preview" class="form-grid">
+        <label>
+            Dato
+            <select name="date_raw" required>
+                <option value="">Vælg dato</option>
+                {% for option in date_options %}
+                    <option value="{{ option.value }}" {% if plan_date and option.value == plan_date.isoformat() %}selected{% endif %}>
+                        {{ option.label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit" class="primary-button">Preview</button>
+    </form>
+    <form method="post" action="/admin/planning/commit" class="form-grid" style="margin-top: 1rem;">
+        <input type="hidden" name="date_raw" value="{{ plan_date.isoformat() if plan_date else '' }}" />
+        <input type="hidden" name="address_order" value="" data-address-order />
+        <button type="submit" class="ghost-button">Commit plan</button>
+    </form>
+    {% if plan_date and scheduled_addresses %}
+        <div style="margin-top: 1rem;">
+            <p class="hint">Planlagte adresser (committed):</p>
+            <ul class="list">
+                {% for address in scheduled_addresses %}
+                    <li>{{ address.street }} {{ address.house_no }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+</section>
+
+{% if plan_date %}
+<section class="card">
+    <h2>Resultat (udkast)</h2>
+    <p class="hint">Udkastet bliver først planlagt ved commit.</p>
+    <p class="hint">Planlagt {{ planned|length }} af {{ total_addresses }} adresser. Slots: {{ slot_count }}. Lager: {{ stock }}.</p>
+    {% if stock == 0 %}
+        <p class="hint">Ingen lager tilbage. Vent på nyt indkøb.</p>
+    {% endif %}
+    {% if slot_count == 0 %}
+        <p class="hint">Ingen arbejdsdage på denne dato.</p>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if unavailable_entries %}
+<section class="card">
+    <h2>Ikke tilgængelig</h2>
+    <ul class="list">
+        {% for entry in unavailable_entries %}
+            <li class="status-error">
+                {{ entry.address.street }} {{ entry.address.house_no }}, {{ entry.address.zip }} {{ entry.address.city }}
+                {% if entry.starts_at and entry.ends_at %}
+                    <span class="hint">({{ entry.starts_at.strftime('%d/%m/%Y %H:%M') }} – {{ entry.ends_at.strftime('%d/%m/%Y %H:%M') }})</span>
+                    {% if entry.note %}
+                        <span class="hint">{{ entry.note }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="hint">({{ entry.note or 'Fejl ved stophane' }})</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if skipped_buffer %}
+<section class="card">
+    <h2>Hoppet over</h2>
+    <ul class="list">
+        {% for address in skipped_buffer %}
+            <li class="status-warning">
+                {{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}
+                {% if address.buffer_note %}
+                    <span class="hint">(Målerbrønd: {{ address.buffer_note }})</span>
+                {% else %}
+                    <span class="hint">(Målerbrønd)</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if planned %}
+<section class="card">
+    <h2>Planlagte adresser (udkast)</h2>
+    <div class="table-wrapper">
+        <table data-planned-table>
+            <thead>
+                <tr>
+                    <th>Adresse</th>
+                    <th>Dato</th>
+                    <th>VVS</th>
+                    <th>Start</th>
+                    <th>Slut</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in planned %}
+                    <tr data-plan-row data-address-id="{{ item.address.id }}" data-address-search="{{ item.address.street }} {{ item.address.house_no }} {{ item.address.zip }} {{ item.address.city }}" draggable="true">
+                        <td data-plan-address>{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}</td>
+                        <td>{{ plan_date.strftime('%d/%m') }}</td>
+                        <td>{{ item.contractor.username }}</td>
+                        <td>{{ item.starts_at.strftime('%H:%M') }}</td>
+                        <td>{{ item.ends_at.strftime('%H:%M') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+{% if unplanned %}
+<section class="card">
+    <div class="section-header">
+        <h2>Ikke planlagte adresser</h2>
+        <button type="button" class="ghost-button" data-toggle-panel="unplanned-addresses">Vis/skjul</button>
+    </div>
+    <div class="is-hidden" data-panel="unplanned-addresses">
+        <ul class="list">
+            {% for address in unplanned %}
+                <li data-address-search="{{ address.street }} {{ address.house_no }} {{ address.zip }} {{ address.city }}">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</section>
+{% endif %}
+
+{% if ordered_addresses %}
+<section class="card">
+    <div class="section-header">
+        <h2>Planlægningsrækkefølge</h2>
+        <button type="button" class="ghost-button" data-toggle-panel="ordered-addresses">Vis/skjul</button>
+    </div>
+    <div class="is-hidden" data-panel="ordered-addresses">
+        <label class="search-field">
+            Søg adresse
+            <input type="text" placeholder="Vej, nr, postnr" data-address-filter />
+        </label>
+        <ol class="list" data-order-list>
+            {% for address in ordered_addresses %}
+                <li draggable="true" data-address-id="{{ address.id }}" data-address-label="{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}" data-address-search="{{ address.street }} {{ address.house_no }} {{ address.zip }} {{ address.city }}">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</li>
+            {% endfor %}
+        </ol>
+    </div>
+</section>
+{% endif %}
+<script src="/static/admin_planning.js" defer></script>
+{% endblock %}

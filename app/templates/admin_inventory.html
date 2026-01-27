@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Lager & indkøb</h1>
+        <p>Indkøb af målere og overblik over lagerstatus.</p>
+    </div>
+    <div class="badge">Aktuelt lager: {{ stock }}</div>
+</section>
+
+<div class="action-row">
+    <button type="button" class="ghost-button" data-toggle-panel="adjust-stock">Juster lager</button>
+</div>
+<div class="panel-stack">
+    <div class="card is-hidden" data-panel="adjust-stock">
+        <h2>Juster lager</h2>
+        <form method="post" action="/admin/inventory/adjust" class="form-grid">
+            <label>Antal<input type="number" name="quantity" min="1" required /></label>
+            <label>Note<input type="text" name="note" placeholder="Årsag til justering" required /></label>
+            <button type="submit" class="primary-button">Gem justering</button>
+        </form>
+        <p class="hint">Justering fratrækker fra lageret.</p>
+    </div>
+</div>
+
+<section class="grid">
+    <div class="card">
+        <h2>Registrér indkøb</h2>
+        <form method="post" action="/admin/inventory" class="form-grid">
+            <label>Antal<input type="number" name="quantity" min="1" required /></label>
+            <label>Reference<input type="text" name="reference" placeholder="fx Faktura 2026-01" /></label>
+            <label>Vandmålertype<input type="text" name="meter_type" placeholder="Valgfrit" /></label>
+            <label>Note<input type="text" name="note" placeholder="Valgfrit" /></label>
+            <button type="submit" class="primary-button">Gem batch</button>
+        </form>
+    </div>
+    <div class="card">
+        <h2>Seneste batches</h2>
+        {% if batches %}
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Dato</th>
+                            <th>Antal</th>
+                            <th>Reference</th>
+                            <th>Vandmålertype</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in batches %}
+                            <tr>
+                                <td>{{ batch.purchased_at.strftime('%d-%m-%Y %H:%M') }}</td>
+                                <td>{{ batch.quantity }}</td>
+                                <td>{{ batch.reference or '-' }}</td>
+                                <td>{{ batch.meter_type or '-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="hint">Ingen indkøb registreret endnu.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card">
+    <h2>Lagerbevægelser</h2>
+    {% if movements %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dato</th>
+                        <th>Type</th>
+                        <th>Antal</th>
+                        <th>Note</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movement in movements %}
+                        <tr>
+                            <td>{{ movement.created_at.strftime('%d-%m-%Y %H:%M') }}</td>
+                            <td>{{ movement_labels.get(movement.movement_type, movement.movement_type.value) }}</td>
+                            <td>{{ movement.quantity }}</td>
+                            <td>{{ movement.note or '-' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen lagerbevægelser registreret endnu.</p>
+    {% endif %}
+</section>
+<script src="/static/admin_inventory.js" defer></script>
+{% endblock %}

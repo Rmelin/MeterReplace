@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Adresser</h1>
+        <p>Administrer adresser og importer CSV.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Adresseoversigt</h2>
+    <form method="get" action="/admin/addresses" class="form-grid" style="margin-bottom: 1rem;">
+        <label>
+            Søg
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Vej, postnr, kunde..." />
+        </label>
+        {% if selected_status and selected_status != 'all' %}
+            <input type="hidden" name="status" value="{{ selected_status }}" />
+        {% endif %}
+        <button type="submit" class="primary-button">Søg</button>
+        {% if search_query or (selected_status and selected_status != 'all') %}
+            <a class="ghost-button" href="/admin/addresses">Nulstil</a>
+        {% endif %}
+    </form>
+    <div class="action-row">
+        <button type="button" class="ghost-button" data-toggle-panel="new-address">Ny adresse</button>
+        <button type="button" class="ghost-button" data-toggle-panel="csv-import">CSV-import</button>
+    </div>
+    <div class="panel-stack">
+        <div class="card is-hidden" data-panel="new-address">
+            <h2>Ny adresse</h2>
+            <form method="post" action="/admin/addresses" class="form-grid">
+                <label>Vej<input type="text" name="street" required /></label>
+                <label>Husnr<input type="text" name="house_no" required /></label>
+                <label>Postnr<input type="text" name="zip" required /></label>
+                <label>By<input type="text" name="city" required /></label>
+                <label>Kontakt navn<input type="text" name="customer_name" /></label>
+                <label>Kontakt email<input type="text" name="customer_email" /></label>
+                <label>Kontakt telefon<input type="text" name="customer_phone" /></label>
+                <label class="checkbox-field">
+                    <input type="checkbox" name="buffer_flag" />
+                    Har Målerbrønd
+                </label>
+                <label>Placering af målerbrønd<input type="text" name="buffer_note" /></label>
+                <label class="checkbox-field">
+                    <input type="checkbox" name="blocked_flag" />
+                    Fejl ved stophane
+                </label>
+                <label>Stophane note<input type="text" name="blocked_note" /></label>
+                <button type="submit" class="primary-button">Opret</button>
+            </form>
+        </div>
+        <div class="card is-hidden" data-panel="csv-import">
+            <h2>CSV-import</h2>
+            <form method="post" action="/admin/addresses/import" enctype="multipart/form-data" class="form-grid">
+                <label>Fil<input type="file" name="file" accept=".csv" required /></label>
+                <button type="submit" class="primary-button">Importer</button>
+            </form>
+            <p class="hint">CSV felter: street, house_no, zip, city, customer_name, customer_email, customer_phone</p>
+        </div>
+    </div>
+    <div class="filter-chips">
+        {% for item in status_filters %}
+            {% if item.value == 'all' %}
+                <a class="chip {% if selected_status == 'all' %}is-active{% endif %}" href="/admin/addresses{% if search_query %}?q={{ search_query }}{% endif %}">{{ item.label }}</a>
+            {% else %}
+                <a class="chip {% if selected_status == item.value %}is-active{% endif %}" href="/admin/addresses?status={{ item.value }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ item.label }}</a>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <script src="/static/admin_addresses.js" defer></script>
+    {% if addresses %}
+        {% set query_parts = [] %}
+        {% if selected_status and selected_status != 'all' %}
+            {% set _ = query_parts.append('status=' ~ selected_status) %}
+        {% endif %}
+        {% if search_query %}
+            {% set _ = query_parts.append('q=' ~ search_query) %}
+        {% endif %}
+        {% set redirect_url = '/admin/addresses' ~ ('?' ~ '&'.join(query_parts) if query_parts else '') %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vej</th>
+                        <th>Husnr</th>
+                        <th>Postnr</th>
+                        <th>By</th>
+                        <th>Status</th>
+                        <th>Kontakt</th>
+                        <th>Noter</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for address in addresses %}
+                        <tr>
+                            <td>{{ address.street }}</td>
+                            <td>{{ address.house_no }}</td>
+                            <td>{{ address.zip }}</td>
+                            <td>{{ address.city }}</td>
+                            <td>{{ status_map.get(address.id, 'Ikke planlagt') }}</td>
+                            <td>
+                                {% if address.customer_name or address.customer_email or address.customer_phone %}
+                                    <div>{{ address.customer_name or '-' }}</div>
+                                    <div class="hint">{{ address.customer_email or address.customer_phone or '-' }}</div>
+                                {% else %}
+                                    <span class="hint">Ingen kontakt</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set show_letter = status_status_map.get(address.id) in (AppointmentStatus.SCHEDULED, AppointmentStatus.INFORMED) %}
+                                {% set not_home_count = not_home_history_map.get(address.id, 0) %}
+                                {% set photo_count = photo_map.get(address.id, 0) %}
+                                {% if show_letter %}
+                                    <a class="chip" href="/admin/letters/address/{{ address.id }}">Brev</a>
+                                {% endif %}
+                                {% if address.buffer_flag %}
+                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Målerbrønd</a>
+                                {% endif %}
+                                {% if address.blocked_reason %}
+                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Stophane</a>
+                                {% endif %}
+                                {% if not_home_count %}
+                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Ikke hjemme</a>
+                                {% endif %}
+                                {% if photo_count %}
+                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">📷</a>
+                                {% endif %}
+                                {% if not (show_letter or address.buffer_flag or address.blocked_reason or not_home_count or photo_count) %}
+                                    <span class="hint">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a class="link" href="/admin/addresses/{{ address.id }}/edit">Detaljer</a>
+                                {% if status_status_map.get(address.id) and status_status_map.get(address.id) != AppointmentStatus.NEEDS_RESCHEDULE %}
+                                    <form method="post" action="/admin/addresses/{{ address.id }}/needs-reschedule" class="inline-status-form">
+                                        <input type="hidden" name="redirect" value="{{ redirect_url }}" />
+                                        <input type="text" name="note" placeholder="Note til behov for ny dato" required />
+                                        <button type="submit" class="ghost-button">Behov for ny dato</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen adresser endnu.</p>
+    {% endif %}
+</section>
+{% endblock %}

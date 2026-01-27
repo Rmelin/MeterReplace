@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Import af allerede skiftet</h1>
+        <p>Importer afsluttede sager med VVS-navn og billeder.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Upload CSV + ZIP</h2>
+    <a class="ghost-button" href="/admin/import/completed/export">Download CSV + ZIP</a>
+    <form method="post" action="/admin/import/completed" enctype="multipart/form-data" class="form-grid">
+        <label>CSV<input type="file" name="csv_file" accept=".csv" required /></label>
+        <label>ZIP med billeder (valgfrit)<input type="file" name="zip_file" accept=".zip" /></label>
+        <button type="submit" class="primary-button">Importer</button>
+    </form>
+    <p class="hint">CSV felter: street, house_no, zip, city, changed_date (YYYY-MM-DD), vvs_name, status (valgfri), photo_both, photo_new, photo_old</p>
+    <p class="hint">Foto-felter kan indeholde flere filnavne separeret med semikolon.</p>
+</section>
+{% endblock %}

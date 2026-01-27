@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card narrow">
+    <h1>Rediger bruger</h1>
+    <form method="post" action="/admin/users/{{ target_user.id }}/edit" class="form-grid">
+        <label>Brugernavn<input type="text" name="username" value="{{ target_user.username }}" required /></label>
+        <label>
+            Rolle
+            <select name="role" required>
+                {% for role in roles %}
+                    <option value="{{ role }}" {% if role == target_user.role.value %}selected{% endif %}>{{ role|capitalize }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Ny adgangskode<input type="password" name="password" placeholder="Efterlad tom for uændret" /></label>
+        <button type="submit" class="primary-button">Gem</button>
+        <a href="/admin/users" class="ghost-button">Tilbage</a>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card narrow">
+    <h1>Fejl {{ status_code }}</h1>
+    <p>{{ message }}</p>
+    <a href="/" class="primary-button">Til forsiden</a>
+</section>
+{% endblock %}

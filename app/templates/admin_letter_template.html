@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Brevskabelon</h1>
+        <p>Redigér standardtekst og logo til PDF-breve.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Standardtekst</h2>
+    <form method="post" action="/admin/letters/template" enctype="multipart/form-data" class="form-grid">
+        <label>
+            Tekst (Markdown)
+            <textarea name="body_markdown" rows="10" class="textarea" required>{{ template.body_markdown }}</textarea>
+        </label>
+        <label>Logo (valgfrit)<input type="file" name="logo" accept="image/*" /></label>
+        <label class="checkbox-field">
+            <input type="checkbox" name="include_resident_link" {% if template.include_resident_link %}checked{% endif %} />
+            Medtag beboerlink i brevet
+        </label>
+        <button type="submit" class="primary-button">Gem skabelon</button>
+    </form>
+    <p class="hint">Understøtter linjeskift, lister og fed tekst.</p>
+    {% if logo_url %}
+        <div class="logo-preview">
+            <img src="{{ logo_url }}" alt="Logo" />
+        </div>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Batch PDF pr. dag</h2>
+    {% if planned_dates %}
+        <form method="get" action="/admin/letters/batch/pdf" class="form-grid">
+            <label>
+                Dato
+                <select name="date" required>
+                    <option value="">Vælg dato</option>
+                    {% for day in planned_dates %}
+                        <option value="{{ day }}">{{ day }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="primary-button">Download batch PDF</button>
+        </form>
+    {% else %}
+        <p class="hint">Ingen planlagte dage endnu.</p>
+    {% endif %}
+    <p class="hint">Batch genereres ud fra planlagte opgaver på datoen.</p>
+</section>
+{% endblock %}

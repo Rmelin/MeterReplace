@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Manuel planlægning</h1>
+        <p>Planlæg enkeltadresser manuelt.</p>
+    </div>
+    <div>
+        <a class="ghost-button" href="/admin/planning">Auto-planlægning</a>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Vælg dato</h2>
+    {% if not date_options %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+    <form method="get" action="/admin/planning/manual" class="form-grid">
+        <label>
+            Dato
+            <select name="date_query" required>
+                <option value="">Vælg dato</option>
+                {% for option in date_options %}
+                    <option value="{{ option.value }}" {% if plan_date and option.value == plan_date.isoformat() %}selected{% endif %}>
+                        {{ option.label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit" class="primary-button">Vælg dato</button>
+    </form>
+</section>
+
+{% if plan_date %}
+<section class="card">
+    <h2>Planlæg adresse</h2>
+    {% if not addresses %}
+        <p class="hint">Ingen adresser klar til planlægning.</p>
+    {% else %}
+        <form method="post" action="/admin/planning/manual" class="form-grid">
+            <input type="hidden" name="date_raw" value="{{ plan_date.isoformat() }}" />
+            <label class="search-field">
+                Søg adresse
+                <input type="text" placeholder="Vej, nr, postnr" data-address-filter />
+            </label>
+            <label>
+                Adresse
+                <select name="address_id" required data-address-select>
+                    <option value="">Vælg adresse</option>
+                    {% for address in addresses %}
+                        <option value="{{ address.id }}" data-address-option data-address-search="{{ address.street }} {{ address.house_no }} {{ address.zip }} {{ address.city }}">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                VVS
+                <select name="contractor_id" required>
+                    <option value="">Vælg VVS</option>
+                    {% for vvs_user in vvs_users %}
+                        <option value="{{ vvs_user.id }}">{{ vvs_user.username }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Starttid<input type="time" name="start_raw" step="1800" required /></label>
+            <button type="submit" class="primary-button">Planlæg</button>
+        </form>
+        <p class="hint">VVS skal være tilgængelig på datoen. Varighed: 30 min.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Planlagte tider pr. VVS</h2>
+    {% if vvs_users %}
+        {% for vvs_user in vvs_users %}
+            <h3>{{ vvs_user.username }}</h3>
+            {% if scheduled_map.get(vvs_user.id) %}
+                <ul class="list">
+                    {% for appt in scheduled_map.get(vvs_user.id) %}
+                        <li>{{ appt.starts_at.strftime('%H:%M') }}-{{ appt.ends_at.strftime('%H:%M') }} — {{ appt.address }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="hint">Ingen planlagte tider.</p>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        <p class="hint">Ingen VVS valgt endnu.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Ikke planlagte adresser</h2>
+    {% if addresses %}
+        <ul class="list">
+            {% for address in addresses %}
+                <li data-address-search="{{ address.street }} {{ address.house_no }} {{ address.zip }} {{ address.city }}">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="hint">Ingen adresser klar til planlægning.</p>
+    {% endif %}
+</section>
+{% endif %}
+<script src="/static/admin_manual_planning.js" defer></script>
+{% endblock %}

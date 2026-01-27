@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card narrow">
+    <h1>Rediger adressefelter</h1>
+    <form method="post" action="/admin/addresses/{{ address.id }}/edit/address" class="form-grid">
+        <label>Vej<input type="text" name="street" value="{{ address.street }}" required /></label>
+        <label>Husnr<input type="text" name="house_no" value="{{ address.house_no }}" required /></label>
+        <label>Postnr<input type="text" name="zip" value="{{ address.zip }}" required /></label>
+        <label>By<input type="text" name="city" value="{{ address.city }}" required /></label>
+        <button type="submit" class="primary-button">Gem</button>
+        <a href="/admin/addresses/{{ address.id }}/edit" class="ghost-button">Tilbage</a>
+    </form>
+</section>
+{% endblock %}

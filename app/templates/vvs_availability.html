@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Mine arbejdsdage</h1>
+        <p>Angiv hvornår du kan udføre udskiftninger.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Ny arbejdsdag</h2>
+    <form method="post" action="/vvs" class="form-grid">
+        <label>Dato<input type="date" name="date_raw" required /></label>
+        <label>Start<input type="time" name="start_raw" value="08:00" required /></label>
+        <label>Slut<input type="time" name="end_raw" value="16:00" required /></label>
+        <label>Note<input type="text" name="note" placeholder="Valgfrit" /></label>
+        <button type="submit" class="primary-button">Gem</button>
+    </form>
+    <p class="hint">Tilladte tidsrum: 06:00–18:00</p>
+</section>
+
+<section class="card">
+    <h2>Seneste arbejdsdage</h2>
+    {% if entries %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dato</th>
+                        <th>Start</th>
+                        <th>Slut</th>
+                        <th>Note</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                        <tr>
+                            <td>{{ entry.date.strftime('%d-%m-%Y') }}</td>
+                            <td>{{ entry.start_time.strftime('%H:%M') }}</td>
+                            <td>{{ entry.end_time.strftime('%H:%M') }}</td>
+                            <td>{{ entry.note or '-' }}</td>
+                            <td><a class="link" href="/vvs/{{ entry.id }}/edit">Rediger</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+</section>
+{% endblock %}

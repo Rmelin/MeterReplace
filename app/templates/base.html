@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or 'Vandmåler Planlægning' }}</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/menu.js" defer></script>
+    <script src="/static/lightbox.js" defer></script>
+</head>
+<body data-role="{{ current_user.role.value if current_user else 'guest' }}">
+    <header class="site-header">
+        <div class="brand">
+            <span class="brand-dot"></span>
+            Vandmåler Planlægning
+        </div>
+        <nav class="nav">
+            {% if current_user %}
+                {% if current_user.role.value == 'admin' %}
+                    <a href="/admin/status">Status</a>
+                    <a href="/admin/addresses">Adresser</a>
+                    <a href="/admin/appointments">Opgaver</a>
+                        <div class="nav-group">
+                            <button class="nav-toggle nav-accent" type="button" data-nav-toggle="planning" aria-expanded="false" style="color: #f97316;">Planlægning</button>
+                            <div class="nav-links is-hidden" data-nav-section="planning">
+                                <a href="/admin/planning">Planlægning</a>
+                                <a href="/admin/availability">Arbejdsdage</a>
+                                <a href="/admin/letters/template">Breve</a>
+                            </div>
+                        </div>
+                        <div class="nav-group">
+                            <button class="nav-toggle nav-accent" type="button" data-nav-toggle="setup" aria-expanded="false" style="color: #f97316;">Opsætning</button>
+                            <div class="nav-links is-hidden" data-nav-section="setup">
+                                <a href="/admin/inventory">Lager</a>
+                                <a href="/admin/users">Brugere</a>
+                                <a href="/admin/street-priority">Vejprioritet</a>
+                                <a href="/admin/import/completed">Import afsluttet</a>
+                                <a href="/admin/missing-photos">Mangler fotos</a>
+                            </div>
+                        </div>
+
+                {% elif current_user.role.value == 'vvs' %}
+                    <a href="/vvs/tasks">Opgaver</a>
+                    <a href="/vvs">Arbejdsdage</a>
+                {% elif current_user.role.value == 'user' %}
+                    <a href="/user/dashboard">Dashboard</a>
+                    <a href="/admin/addresses">Adresser</a>
+                    <a href="/admin/appointments">Opgaver</a>
+                    <a href="/admin/availability">Arbejdsdage</a>
+                {% endif %}
+                <form action="/logout" method="post" class="inline-form">
+                    <button type="submit" class="ghost-button">Log ud</button>
+                </form>
+            {% else %}
+                <a href="/login">Log ind</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main class="container">
+        {% if flashes %}
+            <div class="flash-stack">
+                {% for flash in flashes %}
+                    <div class="flash flash-{{ flash.category }}">{{ flash.message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <span>© {{ year }} Vandmåler</span>
+    </footer>
+</body>
+</html>

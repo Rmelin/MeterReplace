@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Mangler fotos</h1>
+        <p>Adresser med status skiftet/afsluttet uden billeder.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Adresser uden fotos</h2>
+    {% if rows %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Adresse</th>
+                        <th>Status</th>
+                        <th>VVS</th>
+                        <th>Skiftedato</th>
+                        <th>Upload</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        {% set appointment = row.appointment %}
+                        {% set address = row.address %}
+                        {% set contractor = row.contractor %}
+                        <tr>
+                            <td>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</td>
+                            <td>{{ status_labels.get(appointment.status, appointment.status.value) }}</td>
+                            <td>{{ contractor.username }}</td>
+                            <td>{{ appointment.starts_at.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
+                                    <input type="hidden" name="redirect" value="/admin/missing-photos" />
+                                    <label>
+                                        Fototype
+                                        <select name="photo_type" required>
+                                            <option value="">Vælg type</option>
+                                            <option value="both">Begge målere i ét foto</option>
+                                            <option value="new">Ny måler</option>
+                                            <option value="old">Gammel måler</option>
+                                        </select>
+                                    </label>
+                                    <label>Foto<input type="file" name="file" accept="image/*" required /></label>
+                                    <button type="submit" class="primary-button">Upload</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen adresser uden fotos lige nu.</p>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="utf-8" />
+    <style>
+        body { font-family: "Helvetica", Arial, sans-serif; font-size: 12pt; color: #111; }
+        .letter { padding: 24px; }
+        .logo img { max-height: 80px; margin-bottom: 16px; }
+        .address { font-weight: 600; margin-bottom: 8px; }
+        .meta { margin-bottom: 16px; }
+        .response { margin-top: 16px; font-size: 11pt; }
+        .qr { margin-top: 8px; }
+        .qr img { width: 120px; height: 120px; }
+        .page-break { page-break-after: always; }
+    </style>
+</head>
+<body>
+    {% for letter in letters %}
+        <section class="letter">
+            {% if letter.logo_file %}
+                <div class="logo"><img src="{{ letter.logo_file }}" alt="Logo" /></div>
+            {% endif %}
+            <div class="address">{{ letter.address.street }} {{ letter.address.house_no }}, {{ letter.address.zip }} {{ letter.address.city }}</div>
+            <div class="meta">Dato: {{ letter.visit_date }} · {{ letter.visit_window }}</div>
+            <div class="body">{{ letter.body_html | safe }}</div>
+            {% if letter.include_resident_link %}
+                <div class="response">
+                    <div>Giv os besked om målerbrønd eller behov for nyt tidspunkt:</div>
+                    <div><a href="{{ letter.response_url }}">{{ letter.response_url }}</a></div>
+                    <div class="qr"><img src="{{ letter.qr_data }}" alt="QR" /></div>
+                    {% if not letter.link_active %}
+                        <div>Linket er allerede brugt.</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </section>
+        {% if not loop.last %}
+            <div class="page-break"></div>
+        {% endif %}
+    {% endfor %}
+</body>
+</html>
