@@ -89,26 +89,30 @@ Dashboard
 Filtre
 Adresseoversigt
 Historik
-📅 Auto-planlægning
+
+### 📅 Auto-planlægning
 Planlægning sker i udkast
 Intet gemmes før Commit
 Rækkefølgen styrer tidslommer
 Adresser kan omrokeres
 Unavailable-perioder respekteres
 “Hoppet over” bruges kun som buffer (fx målerbrønd)
-📦 Lagerstyring
+
+### 📦 Lagerstyring
 Lager kan justeres manuelt
 Kun fratræk (forbrug)
 Note er påkrævet
 Lager må gerne gå i minus
 Alle bevægelser logges som Justering
-📄 Breve & PDF
+
+### 📄 Breve & PDF
 PDF genereres server-side
 Base URL styres via PUBLIC_BASE_URL
 Beboerlink/QR kan slås fra globalt
 Når PDF genereres, sættes status automatisk til INFORMED
 Preview matcher endeligt output
-🎨 UI & Tema
+
+### 🎨 UI & Tema
 Dark / Light mode
 Valgbar accent-farve
 Farver kan adskilles pr. rolle
@@ -116,8 +120,9 @@ Standardfarver:
 Admin: Grøn #22c55e
 VVS: Blå #4da3ff
 Default: Orange #f97316
-🤝 Bidrag
-Bidrag er meget velkomne:
+
+
+🤝 Bidrag Bidrag er meget velkomne:
 Bug reports
 Feature-forslag
 Pull requests
@@ -127,7 +132,8 @@ Simpelt > smart
 Læsbart > magisk
 Tydelige flows
 Opret gerne et issue før større ændringer.
-📦 Produktion & ansvar
+
+### 📦 Produktion & ansvar
 Projektet er designet til selvhosting.
 Der ydes ingen garanti for drift, datasikkerhed eller compliance.
 Brug sker på eget ansvar.
