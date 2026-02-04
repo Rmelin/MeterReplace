@@ -116,10 +116,11 @@ Preview matcher endeligt output
 Dark / Light mode
 Valgbar accent-farve
 Farver kan adskilles pr. rolle
-Standardfarver:
-Admin: Grøn #22c55e
-VVS: Blå #4da3ff
-Default: Orange #f97316
+
+#### Standardfarver:
+- Admin: Grøn #22c55e
+- VVS: Blå #4da3ff
+- Default: Orange #f97316
 
 
 🤝 Bidrag Bidrag er meget velkomne:
