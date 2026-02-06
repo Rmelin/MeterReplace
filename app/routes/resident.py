@@ -22,7 +22,12 @@ def scheduled_appointment(db: Session, address_id: int) -> models.Appointment | 
         db.query(models.Appointment)
         .filter(
             models.Appointment.address_id == address_id,
-            models.Appointment.status == models.AppointmentStatus.SCHEDULED,
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                ]
+            ),
         )
         .order_by(models.Appointment.starts_at.desc())
         .first()

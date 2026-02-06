@@ -136,7 +136,9 @@ def list_addresses(
             elif appointment.status == models.AppointmentStatus.NOT_HOME:
                 status_map[appointment.address_id] = "Ikke hjemme"
             elif appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
-                status_map[appointment.address_id] = "Behov for ny dato"
+                status_map[appointment.address_id] = (
+                    "Planlagt til " + status_date + " • Behov for ny dato"
+                )
             else:
                 status_map[appointment.address_id] = "Planlagt " + status_date
 
