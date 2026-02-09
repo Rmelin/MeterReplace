@@ -89,10 +89,11 @@ def resident_form(
 def resident_submit(
     request: Request,
     token: str,
-    response_type: str = Form(""),
-    message: str = Form(""),
-    phone: str = Form(""),
-    email: str = Form(""),
+    buffer_answer: str = Form(""),
+    time_answer: str = Form(""),
+    message: str | None = Form(""),
+    phone: str | None = Form(""),
+    email: str | None = Form(""),
     db: Session = Depends(get_db),
 ):
     link = find_link(db, token)
@@ -106,46 +107,69 @@ def resident_submit(
     if not link.active:
         return RedirectResponse(f"/r/{token}", status_code=303)
 
-    response_type = response_type.strip()
-    message = message.strip() or None
-    phone = phone.strip() or None
-    email = email.strip() or None
+    buffer_answer = buffer_answer.strip().lower()
+    time_answer = time_answer.strip().lower()
+    message = (message or "").strip() or None
+    phone = (phone or "").strip() or None
+    email = (email or "").strip() or None
     if phone:
         address.customer_phone = phone
     if email:
         address.customer_email = email
 
-    if response_type not in {"buffer_note", "reschedule_request"}:
-        flash(request, "Vælg en gyldig type", "error")
+    if buffer_answer not in {"yes", "no"} or time_answer not in {"yes", "no"}:
+        flash(request, "Vælg et svar til begge spørgsmål", "error")
         return RedirectResponse(f"/r/{token}", status_code=303)
 
     appointment = scheduled_appointment(db, address.id)
 
-    if response_type == "buffer_note":
+    if buffer_answer == "yes":
         if not message:
             flash(request, "Angiv placering af målerbrønd", "error")
             return RedirectResponse(f"/r/{token}", status_code=303)
         address.buffer_flag = True
         address.buffer_note = message
+        db.add(
+            models.ResidentResponse(
+                address_id=address.id,
+                appointment_id=appointment.id if appointment else None,
+                response_type="buffer_note",
+                message=message,
+                phone=phone,
+                email=email,
+                created_at=datetime.utcnow(),
+            )
+        )
 
-    if response_type == "reschedule_request":
+    if time_answer == "yes":
+        db.add(
+            models.ResidentResponse(
+                address_id=address.id,
+                appointment_id=appointment.id if appointment else None,
+                response_type="confirm_time",
+                message=None,
+                phone=phone,
+                email=email,
+                created_at=datetime.utcnow(),
+            )
+        )
+    else:
         if appointment:
             appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
             appointment.changed_date = datetime.utcnow()
             appointment.changed_by_user_id = None
             release_stock(db, f"Beboer ønsker nyt tidspunkt {address.street} {address.house_no}")
-
-    db.add(
-        models.ResidentResponse(
-            address_id=address.id,
-            appointment_id=appointment.id if appointment else None,
-            response_type=response_type,
-            message=message,
-            phone=phone,
-            email=email,
-            created_at=datetime.utcnow(),
+        db.add(
+            models.ResidentResponse(
+                address_id=address.id,
+                appointment_id=appointment.id if appointment else None,
+                response_type="reschedule_request",
+                message=None,
+                phone=phone,
+                email=email,
+                created_at=datetime.utcnow(),
+            )
         )
-    )
 
     link.active = False
     db.commit()

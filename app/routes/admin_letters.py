@@ -105,7 +105,11 @@ def logo_paths(template: models.LetterTemplate | None) -> tuple[str | None, str 
 def get_or_create_link(db: Session, address: models.Address) -> models.ResidentLink:
     link = (
         db.query(models.ResidentLink)
-        .filter(models.ResidentLink.address_id == address.id)
+        .filter(
+            models.ResidentLink.address_id == address.id,
+            models.ResidentLink.active.is_(True),
+        )
+        .order_by(models.ResidentLink.created_at.desc())
         .first()
     )
     if link:
@@ -117,13 +121,22 @@ def get_or_create_link(db: Session, address: models.Address) -> models.ResidentL
     return link
 
 
+def response_label(response_type: str) -> str:
+    labels = {
+        "reschedule_request": "Tidspunkt passer ikke",
+        "buffer_note": "Målerbrønd angivet",
+        "confirm_time": "Tidspunkt bekræftet",
+    }
+    return labels.get(response_type, "Svar modtaget")
+
+
 def qr_image(url: str) -> str:
     qr = qrcode.QRCode(box_size=4, border=2)
     qr.add_data(url)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
+    img.save(buffer, "PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
 
@@ -164,7 +177,8 @@ def letter_context(
 
 def render_pdf(html: str) -> bytes:
     base_url = str(Path(".").resolve())
-    return HTML(string=html, base_url=base_url).write_pdf()
+    pdf_bytes = HTML(string=html, base_url=base_url).write_pdf()
+    return pdf_bytes if pdf_bytes is not None else b""
 
 
 def planned_dates(db: Session) -> list[str]:
@@ -278,6 +292,18 @@ def letter_preview(
     template = latest_template(db) or models.LetterTemplate(body_markdown=DEFAULT_BODY, include_resident_link=True)
     base_url = public_base_url(request)
     context = letter_context(address, appointment, template, base_url, db)
+    latest_response = (
+        db.query(models.ResidentResponse)
+        .filter(models.ResidentResponse.address_id == address.id)
+        .order_by(models.ResidentResponse.created_at.desc())
+        .first()
+    )
+    response_meta = None
+    if latest_response:
+        response_meta = {
+            "label": response_label(latest_response.response_type),
+            "date": latest_response.created_at.strftime("%d/%m/%Y"),
+        }
 
     return request.app.state.templates.TemplateResponse(
         "admin_letter_preview.html",
@@ -285,6 +311,7 @@ def letter_preview(
             "request": request,
             "current_user": user,
             "flashes": consume_flashes(request),
+            "resident_response": response_meta,
             **context,
         },
     )

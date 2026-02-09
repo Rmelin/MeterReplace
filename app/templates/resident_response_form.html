@@ -7,18 +7,32 @@
         <p class="hint">Planlagt tid: {{ appointment.starts_at.strftime('%d/%m %H:%M') }}</p>
     {% endif %}
     <form method="post" action="/r/{{ token }}" class="form-grid">
+        <fieldset class="form-fieldset">
+            <legend>Er der målerbrønd på adresse?</legend>
+            <label class="radio-field">
+                <input type="radio" name="buffer_answer" value="yes" required />
+                <span>Ja</span>
+            </label>
+            <label class="radio-field">
+                <input type="radio" name="buffer_answer" value="no" />
+                <span>Nej</span>
+            </label>
+        </fieldset>
         <label>
-            Vælg svar
-            <select name="response_type" required>
-                <option value="">Vælg</option>
-                <option value="buffer_note">Jeg har målerbrønd</option>
-                <option value="reschedule_request">Tidspunkt passer ikke</option>
-            </select>
+            Hvis ja, placering af målerbrønd er:
+            <textarea name="message" rows="4" class="textarea" placeholder="Angiv placering"></textarea>
         </label>
-        <label>
-            Placering / besked
-            <textarea name="message" rows="5" class="textarea" placeholder="Placering af målerbrønd eller besked"></textarea>
-        </label>
+        <fieldset class="form-fieldset">
+            <legend>Tidspunkt</legend>
+            <label class="radio-field">
+                <input type="radio" name="time_answer" value="yes" required />
+                <span>Tidspunkt passer mig</span>
+            </label>
+            <label class="radio-field">
+                <input type="radio" name="time_answer" value="no" />
+                <span>De forslået tidspunker passer ikke, der er behov for en ny dato</span>
+            </label>
+        </fieldset>
         <label>Telefon<input type="text" name="phone" /></label>
         <label>Email<input type="text" name="email" /></label>
         <button type="submit" class="primary-button">Send svar</button>

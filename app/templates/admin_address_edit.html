@@ -8,6 +8,9 @@
         </div>
         <div data-panel="address-details">
             <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+            {% if resident_response %}
+                <p class="hint">Seneste beboersvar: {{ resident_response.label }} · {{ resident_response.date }}</p>
+            {% endif %}
             <div class="action-row" style="margin-bottom: 1rem;">
                 <a class="ghost-button" href="/admin/addresses/{{ address.id }}/edit/address">Rediger vej/hus/postnr/by</a>
                 {% if letter_available %}
