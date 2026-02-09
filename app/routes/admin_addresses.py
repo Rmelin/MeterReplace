@@ -21,6 +21,12 @@ PHOTO_LABELS = {
     "old": "Gammel måler",
 }
 
+RESPONSE_LABELS = {
+    "reschedule_request": "Tidspunkt passer ikke",
+    "buffer_note": "Målerbrønd angivet",
+    "confirm_time": "Tidspunkt bekræftet",
+}
+
 router = APIRouter(prefix="/admin/addresses", tags=["admin"])
 
 
@@ -100,6 +106,7 @@ def list_addresses(
 
     not_home_history_map: dict[int, int] = {}
     photo_map: dict[int, int] = {}
+    resident_response_map: dict[int, dict[str, str]] = {}
     current_year = datetime.utcnow().year
     if address_ids:
         appointments = (
@@ -161,6 +168,20 @@ def list_addresses(
         )
         photo_map = {address_id: count for address_id, count in photo_rows}
 
+        responses = (
+            db.query(models.ResidentResponse)
+            .filter(models.ResidentResponse.address_id.in_(address_ids))
+            .order_by(models.ResidentResponse.created_at.desc())
+            .all()
+        )
+        for response in responses:
+            if response.address_id in resident_response_map:
+                continue
+            resident_response_map[response.address_id] = {
+                "label": RESPONSE_LABELS.get(response.response_type, "Svar modtaget"),
+                "date": response.created_at.strftime("%d/%m/%Y"),
+            }
+
 
     if selected_status != "all":
         filter_map = {
@@ -202,6 +223,7 @@ def list_addresses(
             "AppointmentStatus": models.AppointmentStatus,
             "not_home_history_map": not_home_history_map,
             "photo_map": photo_map,
+            "resident_response_map": resident_response_map,
         },
     )
 
@@ -305,6 +327,18 @@ def edit_address_form(
         .order_by(models.AppointmentPhoto.created_at.desc())
         .all()
     )
+    latest_response = (
+        db.query(models.ResidentResponse)
+        .filter(models.ResidentResponse.address_id == address_id)
+        .order_by(models.ResidentResponse.created_at.desc())
+        .first()
+    )
+    resident_response = None
+    if latest_response:
+        resident_response = {
+            "label": RESPONSE_LABELS.get(latest_response.response_type, "Svar modtaget"),
+            "date": latest_response.created_at.strftime("%d/%m/%Y"),
+        }
     return request.app.state.templates.TemplateResponse(
         "admin_address_edit.html",
         {
@@ -317,6 +351,7 @@ def edit_address_form(
             "letter_available": bool(letter_appointment),
             "photos": photos,
             "photo_labels": PHOTO_LABELS,
+            "resident_response": resident_response,
         },
     )
 

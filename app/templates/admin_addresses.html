@@ -112,8 +112,12 @@
                                 {% set show_letter = status_status_map.get(address.id) in (AppointmentStatus.SCHEDULED, AppointmentStatus.INFORMED) %}
                                 {% set not_home_count = not_home_history_map.get(address.id, 0) %}
                                 {% set photo_count = photo_map.get(address.id, 0) %}
+                                {% set resident_response = resident_response_map.get(address.id) %}
                                 {% if show_letter %}
                                     <a class="chip" href="/admin/letters/address/{{ address.id }}">Brev</a>
+                                {% endif %}
+                                {% if resident_response %}
+                                    <span class="chip">Svar: {{ resident_response.label }} · {{ resident_response.date }}</span>
                                 {% endif %}
                                 {% if address.buffer_flag %}
                                     <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Målerbrønd</a>
@@ -127,7 +131,7 @@
                                 {% if photo_count %}
                                     <a class="chip" href="/admin/addresses/{{ address.id }}/edit">📷</a>
                                 {% endif %}
-                                {% if not (show_letter or address.buffer_flag or address.blocked_reason or not_home_count or photo_count) %}
+                                {% if not (show_letter or resident_response or address.buffer_flag or address.blocked_reason or not_home_count or photo_count) %}
                                     <span class="hint">-</span>
                                 {% endif %}
                             </td>

@@ -14,6 +14,9 @@
 <section class="card">
     <h2>Beboerlink</h2>
     <p><a href="{{ response_url }}">{{ response_url }}</a></p>
+    {% if resident_response %}
+        <p class="hint">Svar: {{ resident_response.label }} · {{ resident_response.date }}</p>
+    {% endif %}
     {% if not link_active %}
         <p class="hint">Linket er allerede brugt.</p>
     {% endif %}
