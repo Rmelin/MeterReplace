@@ -111,6 +111,35 @@ body {
     margin-bottom: 1.5rem;
 }
 
+.task-card {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.task-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.task-flag {
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: rgba(250, 204, 21, 0.12);
+    border: 1px solid rgba(250, 204, 21, 0.6);
+    color: #fde68a;
+}
+
+.task-no-address {
+    border-color: rgba(250, 204, 21, 0.65);
+    background: linear-gradient(180deg, rgba(250, 204, 21, 0.08), rgba(15, 17, 21, 0.2));
+}
+
 .card.narrow {
     max-width: 420px;
     margin: 0 auto;

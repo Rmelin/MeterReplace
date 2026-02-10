@@ -1,7 +1,11 @@
 {% if inline %}
     <div class="inline-edit-panel">
         <h3>Rediger opgave</h3>
-        <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+        {% if address %}
+            <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+        {% else %}
+            <p class="hint">Opgave uden adresse</p>
+        {% endif %}
         <p class="hint">VVS: {{ contractor.username }}</p>
         {% if errors %}
             <div class="inline-errors">
@@ -25,8 +29,14 @@
             </label>
             <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required /></label>
             <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required /></label>
-            <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
-            <label>Ny målernr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
+            <label>
+                Opgave
+                <textarea name="notes" rows="3">{{ appointment.notes or '' }}</textarea>
+            </label>
+            {% if address %}
+                <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
+                <label>Ny målernr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
+            {% endif %}
             <div class="inline-edit-actions">
                 <button type="submit" class="primary-button">Gem</button>
                 <button type="button" class="ghost-button" data-inline-edit-close>Skjul</button>
@@ -40,7 +50,11 @@
     </div>
 {% else %}
     <h1>Rediger opgave</h1>
-    <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+    {% if address %}
+        <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+    {% else %}
+        <p class="hint">Opgave uden adresse</p>
+    {% endif %}
     <p class="hint">VVS: {{ contractor.username }}</p>
     <form method="post" action="/admin/appointments/{{ appointment.id }}/edit" class="form-grid">
         <label>
@@ -56,8 +70,14 @@
         </label>
         <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required /></label>
         <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required /></label>
-        <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
-        <label>Ny målernr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
+        <label>
+            Opgave
+            <textarea name="notes" rows="3">{{ appointment.notes or '' }}</textarea>
+        </label>
+        {% if address %}
+            <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
+            <label>Ny målernr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
+        {% endif %}
         <button type="submit" class="primary-button">Gem</button>
         <a href="/admin/appointments" class="ghost-button">Tilbage</a>
     </form>

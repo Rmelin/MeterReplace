@@ -171,7 +171,7 @@ def vvs_tasks(
     if selected_date:
         rows = (
             db.query(models.Appointment, models.Address)
-            .join(models.Address, models.Address.id == models.Appointment.address_id)
+            .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
             .join(
                 models.VvsAvailability,
                 models.VvsAvailability.user_id == models.Appointment.contractor_id,
@@ -264,6 +264,10 @@ def upload_photo(
     if date_query:
         redirect_url = f"{redirect_url}?date_query={date_query}"
 
+    if appointment.address_id is None:
+        flash(request, "Opgave uden adresse kan ikke få fotos", "error")
+        return RedirectResponse(redirect_url, status_code=303)
+
     allowed_types = {"both", "new", "old"}
     if photo_type not in allowed_types:
         flash(request, "Vælg fototype", "error")
@@ -330,7 +334,7 @@ def task_edit_context(
 ) -> dict[str, object] | None:
     row = (
         db.query(models.Appointment, models.Address)
-        .join(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
         .filter(
             models.Appointment.id == appointment_id,
             models.Appointment.contractor_id == user_id,
@@ -480,3 +484,35 @@ def update_task(
 
     flash(request, "Opgave opdateret", "success")
     return RedirectResponse("/vvs/tasks", status_code=303)
+
+
+@router.post("/{appointment_id}/close")
+def close_task(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id == appointment_id,
+            models.Appointment.contractor_id == user.id,
+        )
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    appointment.status = models.AppointmentStatus.CLOSED
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/vvs/tasks"
+    if date_query:
+        redirect_target = f"/vvs/tasks?date_query={date_query}"
+
+    flash(request, "Opgave afsluttet", "success")
+    return RedirectResponse(redirect_target, status_code=303)

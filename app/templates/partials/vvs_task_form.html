@@ -1,9 +1,16 @@
 {% if inline %}
     <div class="inline-edit-panel">
         <h3>Rediger opgave</h3>
-        <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
-        {% if address.buffer_flag and address.buffer_note %}
-            <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+        {% if address %}
+            <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+            {% if address.buffer_flag and address.buffer_note %}
+                <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+            {% endif %}
+        {% else %}
+            <p class="hint">Opgave uden adresse</p>
+        {% endif %}
+        {% if appointment.notes %}
+            <p class="hint">Opgave: {{ appointment.notes }}</p>
         {% endif %}
         {% if errors %}
             <div class="inline-errors">
@@ -40,9 +47,16 @@
     </div>
 {% else %}
     <h1>Rediger opgave</h1>
-    <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
-    {% if address.buffer_flag and address.buffer_note %}
-        <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+    {% if address %}
+        <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+        {% if address.buffer_flag and address.buffer_note %}
+            <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+        {% endif %}
+    {% else %}
+        <p class="hint">Opgave uden adresse</p>
+    {% endif %}
+    {% if appointment.notes %}
+        <p class="hint">Opgave: {{ appointment.notes }}</p>
     {% endif %}
     <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid">
         <label>

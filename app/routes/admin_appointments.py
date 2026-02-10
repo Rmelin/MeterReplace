@@ -122,6 +122,19 @@ def availability_for_user(
     )
 
 
+def available_vvs_for_date(db: Session, plan_date: date) -> list[models.User]:
+    return (
+        db.query(models.User)
+        .join(models.VvsAvailability, models.VvsAvailability.user_id == models.User.id)
+        .filter(
+            models.User.role == models.UserRole.VVS,
+            models.VvsAvailability.date == plan_date,
+        )
+        .order_by(models.User.username)
+        .all()
+    )
+
+
 def has_conflict(
     db: Session,
     appointment_id: int,
@@ -133,6 +146,25 @@ def has_conflict(
         db.query(models.Appointment)
         .filter(
             models.Appointment.id != appointment_id,
+            models.Appointment.contractor_id == contractor_id,
+            models.Appointment.status == models.AppointmentStatus.SCHEDULED,
+            models.Appointment.starts_at < ends_at,
+            models.Appointment.ends_at > starts_at,
+        )
+        .first()
+        is not None
+    )
+
+
+def has_conflict_for_user(
+    db: Session,
+    contractor_id: int,
+    starts_at: datetime,
+    ends_at: datetime,
+) -> bool:
+    return (
+        db.query(models.Appointment)
+        .filter(
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status == models.AppointmentStatus.SCHEDULED,
             models.Appointment.starts_at < ends_at,
@@ -169,7 +201,7 @@ def appointment_overview(
     if selected_date:
         rows = (
             db.query(models.Appointment, models.Address, models.User)
-            .join(models.Address, models.Address.id == models.Appointment.address_id)
+            .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
             .join(models.User, models.User.id == models.Appointment.contractor_id)
             .join(
                 models.VvsAvailability,
@@ -197,6 +229,7 @@ def appointment_overview(
     addresses = {row[0].id: row[1] for row in rows}
     contractors = {row[0].id: row[2] for row in rows}
     photos = appointment_photos(db, [appointment.id for appointment in appointments])
+    vvs_users = available_vvs_for_date(db, selected_date) if selected_date else []
     todo = [
         appt
         for appt in appointments
@@ -222,9 +255,109 @@ def appointment_overview(
             "done": done,
             "availability_dates": dates,
             "selected_date": selected_date,
+            "vvs_users": vvs_users,
             "photo_labels": PHOTO_LABELS,
             "status_labels": STATUS_LABELS,
         },
+    )
+
+
+@router.post("/manual-task")
+def create_manual_task(
+    request: Request,
+    date_raw: str = Form(""),
+    contractor_id: int = Form(0),
+    start_raw: str = Form(""),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    if not date_raw:
+        flash(request, "Vælg en dato", "error")
+        return RedirectResponse("/admin/appointments", status_code=303)
+
+    try:
+        plan_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+        start_time = parse_time(start_raw)
+    except ValueError:
+        flash(request, "Dato eller tid er ugyldig", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    note_value = notes.strip()
+    if not note_value:
+        flash(request, "Skriv en opgave", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    if contractor_id <= 0:
+        flash(request, "Vælg VVS", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    contractor = db.query(models.User).filter(models.User.id == contractor_id).first()
+    if not contractor or contractor.role != models.UserRole.VVS:
+        flash(request, "Ugyldig VVS", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    availability = availability_for_user(db, contractor_id, plan_date)
+    if not availability:
+        flash(request, "VVS har ingen arbejdsdag på datoen", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    slot_start = datetime.combine(plan_date, start_time)
+    slot_end = slot_start + timedelta(minutes=30)
+    window_start = time(8, 0)
+    window_end = time(16, 0)
+
+    if not (window_start <= start_time < window_end):
+        flash(request, "Tid skal være mellem 08:00 og 16:00", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    if not (availability.start_time <= start_time < availability.end_time):
+        flash(request, "Tid ligger udenfor arbejdsdag", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    if slot_end.time() > availability.end_time:
+        flash(request, "Slot slutter udenfor arbejdsdag", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    if has_conflict_for_user(db, contractor_id, slot_start, slot_end):
+        flash(request, "VVS er allerede planlagt på dette tidspunkt", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    db.add(
+        models.Appointment(
+            address_id=None,
+            contractor_id=contractor.id,
+            starts_at=slot_start,
+            ends_at=slot_end,
+            status=models.AppointmentStatus.SCHEDULED,
+            notes=note_value,
+            changed_date=datetime.utcnow(),
+            changed_by_user_id=user.id,
+        )
+    )
+    db.commit()
+
+    flash(request, "Opgave oprettet", "success")
+    return RedirectResponse(
+        f"/admin/appointments?date_query={plan_date.isoformat()}", status_code=303
     )
 
 
@@ -248,6 +381,10 @@ def upload_photo(
         redirect_target = redirect
     elif date_query:
         redirect_target = f"/admin/appointments?date_query={date_query}"
+
+    if appointment.address_id is None:
+        flash(request, "Opgave uden adresse kan ikke få fotos", "error")
+        return RedirectResponse(redirect_target, status_code=303)
 
     allowed_types = {"both", "new", "old"}
     if photo_type not in allowed_types:
@@ -315,7 +452,7 @@ def appointment_edit_context(
 ) -> dict[str, object] | None:
     row = (
         db.query(models.Appointment, models.Address, models.User)
-        .join(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
         .join(models.User, models.User.id == models.Appointment.contractor_id)
         .filter(models.Appointment.id == appointment_id)
         .first()
@@ -375,6 +512,7 @@ def update_appointment(
     end_raw: str = Form(""),
     old_meter_no: str = Form(""),
     new_meter_no: str = Form(""),
+    notes: str = Form(""),
     inline: bool = Form(False),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
@@ -455,6 +593,7 @@ def update_appointment(
     appointment.ends_at = ends_at
     appointment.old_meter_no = old_meter_no.strip() or None
     appointment.new_meter_no = new_meter_no.strip() or None
+    appointment.notes = notes.strip() or None
     appointment.changed_date = datetime.utcnow()
     appointment.changed_by_user_id = user.id
     db.commit()
@@ -464,3 +603,28 @@ def update_appointment(
 
     flash(request, "Opgave opdateret", "success")
     return RedirectResponse("/admin/appointments", status_code=303)
+
+
+@router.post("/{appointment_id}/close")
+def close_appointment(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    appointment.status = models.AppointmentStatus.CLOSED
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/admin/appointments"
+    if date_query:
+        redirect_target = f"/admin/appointments?date_query={date_query}"
+
+    flash(request, "Opgave afsluttet", "success")
+    return RedirectResponse(redirect_target, status_code=303)
