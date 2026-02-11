@@ -51,7 +51,9 @@ class AddressUnavailablePeriod(Base):
     __tablename__ = "address_unavailable_periods"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    address_id: Mapped[int] = mapped_column(Integer, ForeignKey("addresses.id"), nullable=False)
+    address_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("addresses.id"), nullable=True
+    )
     starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)

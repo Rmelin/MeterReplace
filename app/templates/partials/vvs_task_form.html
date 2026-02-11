@@ -1,9 +1,16 @@
 {% if inline %}
     <div class="inline-edit-panel">
         <h3>Rediger opgave</h3>
-        <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
-        {% if address.buffer_flag and address.buffer_note %}
-            <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+        {% if address %}
+            <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+            {% if address.buffer_flag and address.buffer_note %}
+                <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+            {% endif %}
+        {% else %}
+            <p class="hint">Opgave uden adresse</p>
+        {% endif %}
+        {% if appointment.notes %}
+            <p class="hint">Opgave: {{ appointment.notes }}</p>
         {% endif %}
         {% if errors %}
             <div class="inline-errors">
@@ -12,7 +19,7 @@
                 {% endfor %}
             </div>
         {% endif %}
-        <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid" data-inline-edit-form>
+        <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid" data-inline-edit-form data-duration-form>
             <input type="hidden" name="inline" value="1" />
             <label>
                 Status
@@ -25,8 +32,9 @@
                     <option value="needs_reschedule" {% if appointment.status.value == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
                 </select>
             </label>
-            <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required /></label>
-            <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required /></label>
+            <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
+            <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
+            <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
             <div class="inline-edit-actions">
                 <button type="submit" class="primary-button">Gem</button>
                 <button type="button" class="ghost-button" data-inline-edit-close>Skjul</button>
@@ -40,11 +48,18 @@
     </div>
 {% else %}
     <h1>Rediger opgave</h1>
-    <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
-    {% if address.buffer_flag and address.buffer_note %}
-        <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+    {% if address %}
+        <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+        {% if address.buffer_flag and address.buffer_note %}
+            <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
+        {% endif %}
+    {% else %}
+        <p class="hint">Opgave uden adresse</p>
     {% endif %}
-    <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid">
+    {% if appointment.notes %}
+        <p class="hint">Opgave: {{ appointment.notes }}</p>
+    {% endif %}
+    <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid" data-duration-form>
         <label>
             Status
             <select name="status" required>
@@ -56,8 +71,9 @@
                 <option value="needs_reschedule" {% if appointment.status.value == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
             </select>
         </label>
-        <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required /></label>
-        <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required /></label>
+        <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
+        <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
+        <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
         <button type="submit" class="primary-button">Gem</button>
         <a href="/vvs/tasks" class="ghost-button">Tilbage</a>
     </form>

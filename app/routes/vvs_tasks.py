@@ -110,6 +110,10 @@ def parse_time(raw: str) -> time:
     return datetime.strptime(raw, "%H:%M").time()
 
 
+def duration_minutes_between(starts_at: datetime, ends_at: datetime) -> int:
+    return int((ends_at - starts_at).total_seconds() // 60)
+
+
 def availability_for_date(
     db: Session, user_id: int, plan_date: date
 ) -> models.VvsAvailability | None:
@@ -171,7 +175,7 @@ def vvs_tasks(
     if selected_date:
         rows = (
             db.query(models.Appointment, models.Address)
-            .join(models.Address, models.Address.id == models.Appointment.address_id)
+            .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
             .join(
                 models.VvsAvailability,
                 models.VvsAvailability.user_id == models.Appointment.contractor_id,
@@ -264,6 +268,10 @@ def upload_photo(
     if date_query:
         redirect_url = f"{redirect_url}?date_query={date_query}"
 
+    if appointment.address_id is None:
+        flash(request, "Opgave uden adresse kan ikke få fotos", "error")
+        return RedirectResponse(redirect_url, status_code=303)
+
     allowed_types = {"both", "new", "old"}
     if photo_type not in allowed_types:
         flash(request, "Vælg fototype", "error")
@@ -330,7 +338,7 @@ def task_edit_context(
 ) -> dict[str, object] | None:
     row = (
         db.query(models.Appointment, models.Address)
-        .join(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
         .filter(
             models.Appointment.id == appointment_id,
             models.Appointment.contractor_id == user_id,
@@ -345,6 +353,7 @@ def task_edit_context(
         "appointment": appointment,
         "address": address,
         "availability": availability,
+        "duration_minutes": duration_minutes_between(appointment.starts_at, appointment.ends_at),
     }
 
 
@@ -367,6 +376,7 @@ def edit_task(
         "appointment": context["appointment"],
         "address": context["address"],
         "availability": context["availability"],
+        "duration_minutes": context["duration_minutes"],
         "inline": bool(inline),
         "errors": [],
     }
@@ -386,6 +396,7 @@ def update_task(
     status: str = Form(""),
     start_raw: str = Form(""),
     end_raw: str = Form(""),
+    duration_minutes: int = Form(0),
     inline: bool = Form(False),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.VVS)),
@@ -415,6 +426,7 @@ def update_task(
                 "appointment": context["appointment"],
                 "address": context["address"],
                 "availability": context["availability"],
+                "duration_minutes": context["duration_minutes"],
                 "inline": True,
                 "errors": messages,
             },
@@ -440,22 +452,41 @@ def update_task(
 
     try:
         start_time = parse_time(start_raw)
-        end_time = parse_time(end_raw)
     except ValueError:
         return handle_error("Tid er ugyldig")
 
-    if end_time <= start_time:
-        return handle_error("Sluttid skal være efter start")
+    end_time = None
+    if end_raw:
+        try:
+            end_time = parse_time(end_raw)
+        except ValueError:
+            return handle_error("Tid er ugyldig")
+
+    if end_time is None and duration_minutes <= 0:
+        return handle_error("Angiv sluttid eller planlagt varighed")
 
     plan_date = appointment.starts_at.date()
     starts_at = datetime.combine(plan_date, start_time)
-    ends_at = datetime.combine(plan_date, end_time)
+    if end_time is None:
+        ends_at = starts_at + timedelta(minutes=duration_minutes)
+    else:
+        ends_at = datetime.combine(plan_date, end_time)
 
-    if ends_at - starts_at != timedelta(minutes=30):
-        return handle_error("Varighed skal være 30 minutter")
+    if ends_at <= starts_at:
+        return handle_error("Sluttid skal være efter start")
+
+    calculated_minutes = duration_minutes_between(starts_at, ends_at)
+    if duration_minutes > 0 and calculated_minutes != duration_minutes:
+        return handle_error("Sluttid matcher ikke planlagt varighed")
+
+    if calculated_minutes < 5 or calculated_minutes > 480:
+        return handle_error("Planlagt varighed skal være mellem 5 og 480 minutter")
 
     if not (time(8, 0) <= start_time < time(16, 0)):
         return handle_error("Tid skal være mellem 08:00 og 16:00")
+
+    if ends_at.time() > time(16, 0):
+        return handle_error("Sluttid skal være senest 16:00")
 
     availability = availability_for_date(db, user.id, plan_date)
     if status_map[status] == models.AppointmentStatus.SCHEDULED:
@@ -463,7 +494,7 @@ def update_task(
             return handle_error("Ingen arbejdsdag registreret på dagen")
         if not (availability.start_time <= start_time < availability.end_time):
             return handle_error("Tid ligger udenfor arbejdsdag")
-        if end_time > availability.end_time:
+        if ends_at.time() > availability.end_time:
             return handle_error("Slot slutter udenfor arbejdsdag")
         if has_conflict(db, appointment.id, user.id, starts_at, ends_at):
             return handle_error("Du er allerede planlagt på dette tidspunkt")
@@ -480,3 +511,35 @@ def update_task(
 
     flash(request, "Opgave opdateret", "success")
     return RedirectResponse("/vvs/tasks", status_code=303)
+
+
+@router.post("/{appointment_id}/close")
+def close_task(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id == appointment_id,
+            models.Appointment.contractor_id == user.id,
+        )
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    appointment.status = models.AppointmentStatus.CLOSED
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/vvs/tasks"
+    if date_query:
+        redirect_target = f"/vvs/tasks?date_query={date_query}"
+
+    flash(request, "Opgave afsluttet", "success")
+    return RedirectResponse(redirect_target, status_code=303)
