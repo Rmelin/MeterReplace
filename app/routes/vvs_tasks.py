@@ -110,6 +110,10 @@ def parse_time(raw: str) -> time:
     return datetime.strptime(raw, "%H:%M").time()
 
 
+def duration_minutes_between(starts_at: datetime, ends_at: datetime) -> int:
+    return int((ends_at - starts_at).total_seconds() // 60)
+
+
 def availability_for_date(
     db: Session, user_id: int, plan_date: date
 ) -> models.VvsAvailability | None:
@@ -349,6 +353,7 @@ def task_edit_context(
         "appointment": appointment,
         "address": address,
         "availability": availability,
+        "duration_minutes": duration_minutes_between(appointment.starts_at, appointment.ends_at),
     }
 
 
@@ -371,6 +376,7 @@ def edit_task(
         "appointment": context["appointment"],
         "address": context["address"],
         "availability": context["availability"],
+        "duration_minutes": context["duration_minutes"],
         "inline": bool(inline),
         "errors": [],
     }
@@ -390,6 +396,7 @@ def update_task(
     status: str = Form(""),
     start_raw: str = Form(""),
     end_raw: str = Form(""),
+    duration_minutes: int = Form(0),
     inline: bool = Form(False),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.VVS)),
@@ -419,6 +426,7 @@ def update_task(
                 "appointment": context["appointment"],
                 "address": context["address"],
                 "availability": context["availability"],
+                "duration_minutes": context["duration_minutes"],
                 "inline": True,
                 "errors": messages,
             },
@@ -444,22 +452,41 @@ def update_task(
 
     try:
         start_time = parse_time(start_raw)
-        end_time = parse_time(end_raw)
     except ValueError:
         return handle_error("Tid er ugyldig")
 
-    if end_time <= start_time:
-        return handle_error("Sluttid skal være efter start")
+    end_time = None
+    if end_raw:
+        try:
+            end_time = parse_time(end_raw)
+        except ValueError:
+            return handle_error("Tid er ugyldig")
+
+    if end_time is None and duration_minutes <= 0:
+        return handle_error("Angiv sluttid eller planlagt varighed")
 
     plan_date = appointment.starts_at.date()
     starts_at = datetime.combine(plan_date, start_time)
-    ends_at = datetime.combine(plan_date, end_time)
+    if end_time is None:
+        ends_at = starts_at + timedelta(minutes=duration_minutes)
+    else:
+        ends_at = datetime.combine(plan_date, end_time)
 
-    if ends_at - starts_at != timedelta(minutes=30):
-        return handle_error("Varighed skal være 30 minutter")
+    if ends_at <= starts_at:
+        return handle_error("Sluttid skal være efter start")
+
+    calculated_minutes = duration_minutes_between(starts_at, ends_at)
+    if duration_minutes > 0 and calculated_minutes != duration_minutes:
+        return handle_error("Sluttid matcher ikke planlagt varighed")
+
+    if calculated_minutes < 5 or calculated_minutes > 480:
+        return handle_error("Planlagt varighed skal være mellem 5 og 480 minutter")
 
     if not (time(8, 0) <= start_time < time(16, 0)):
         return handle_error("Tid skal være mellem 08:00 og 16:00")
+
+    if ends_at.time() > time(16, 0):
+        return handle_error("Sluttid skal være senest 16:00")
 
     availability = availability_for_date(db, user.id, plan_date)
     if status_map[status] == models.AppointmentStatus.SCHEDULED:
@@ -467,7 +494,7 @@ def update_task(
             return handle_error("Ingen arbejdsdag registreret på dagen")
         if not (availability.start_time <= start_time < availability.end_time):
             return handle_error("Tid ligger udenfor arbejdsdag")
-        if end_time > availability.end_time:
+        if ends_at.time() > availability.end_time:
             return handle_error("Slot slutter udenfor arbejdsdag")
         if has_conflict(db, appointment.id, user.id, starts_at, ends_at):
             return handle_error("Du er allerede planlagt på dette tidspunkt")

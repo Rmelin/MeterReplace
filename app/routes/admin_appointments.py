@@ -109,6 +109,10 @@ def parse_time(raw: str) -> time:
     return datetime.strptime(raw, "%H:%M").time()
 
 
+def duration_minutes_between(starts_at: datetime, ends_at: datetime) -> int:
+    return int((ends_at - starts_at).total_seconds() // 60)
+
+
 def availability_for_user(
     db: Session, user_id: int, plan_date: date
 ) -> models.VvsAvailability | None:
@@ -268,6 +272,7 @@ def create_manual_task(
     date_raw: str = Form(""),
     contractor_id: int = Form(0),
     start_raw: str = Form(""),
+    duration_minutes: int = Form(30),
     notes: str = Form(""),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
@@ -312,13 +317,25 @@ def create_manual_task(
             f"/admin/appointments?date_query={date_raw}", status_code=303
         )
 
+    if duration_minutes < 5 or duration_minutes > 480:
+        flash(request, "Planlagt varighed skal være mellem 5 og 480 minutter", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
     slot_start = datetime.combine(plan_date, start_time)
-    slot_end = slot_start + timedelta(minutes=30)
+    slot_end = slot_start + timedelta(minutes=duration_minutes)
     window_start = time(8, 0)
     window_end = time(16, 0)
 
     if not (window_start <= start_time < window_end):
         flash(request, "Tid skal være mellem 08:00 og 16:00", "error")
+        return RedirectResponse(
+            f"/admin/appointments?date_query={date_raw}", status_code=303
+        )
+
+    if slot_end.time() > window_end:
+        flash(request, "Sluttid skal være senest 16:00", "error")
         return RedirectResponse(
             f"/admin/appointments?date_query={date_raw}", status_code=303
         )
@@ -461,11 +478,16 @@ def appointment_edit_context(
         return None
     appointment, address, contractor = row
     availability = availability_for_user(db, contractor.id, appointment.starts_at.date())
+    vvs_users = available_vvs_for_date(db, appointment.starts_at.date())
+    if contractor not in vvs_users:
+        vvs_users = [contractor] + vvs_users
     return {
         "appointment": appointment,
         "address": address,
         "contractor": contractor,
         "availability": availability,
+        "vvs_users": vvs_users,
+        "duration_minutes": duration_minutes_between(appointment.starts_at, appointment.ends_at),
     }
 
 
@@ -491,6 +513,8 @@ def edit_appointment(
         "address": context["address"],
         "contractor": context["contractor"],
         "availability": context["availability"],
+        "vvs_users": context["vvs_users"],
+        "duration_minutes": context["duration_minutes"],
         "inline": bool(inline),
         "errors": [],
     }
@@ -510,6 +534,8 @@ def update_appointment(
     status: str = Form(""),
     start_raw: str = Form(""),
     end_raw: str = Form(""),
+    duration_minutes: int = Form(0),
+    contractor_id: int = Form(0),
     old_meter_no: str = Form(""),
     new_meter_no: str = Form(""),
     notes: str = Form(""),
@@ -535,6 +561,8 @@ def update_appointment(
                 "address": context["address"],
                 "contractor": context["contractor"],
                 "availability": context["availability"],
+                "vvs_users": context["vvs_users"],
+                "duration_minutes": context["duration_minutes"],
                 "inline": True,
                 "errors": messages,
             },
@@ -558,37 +586,61 @@ def update_appointment(
     if status not in status_map:
         return handle_error("Vælg en gyldig status")
 
+    contractor = db.query(models.User).filter(models.User.id == contractor_id).first()
+    if not contractor or contractor.role != models.UserRole.VVS:
+        return handle_error("Ugyldig VVS")
+
     try:
         start_time = parse_time(start_raw)
-        end_time = parse_time(end_raw)
     except ValueError:
         return handle_error("Tid er ugyldig")
 
-    if end_time <= start_time:
-        return handle_error("Sluttid skal være efter start")
+    end_time = None
+    if end_raw:
+        try:
+            end_time = parse_time(end_raw)
+        except ValueError:
+            return handle_error("Tid er ugyldig")
+
+    if end_time is None and duration_minutes <= 0:
+        return handle_error("Angiv sluttid eller planlagt varighed")
 
     plan_date = appointment.starts_at.date()
     starts_at = datetime.combine(plan_date, start_time)
-    ends_at = datetime.combine(plan_date, end_time)
+    if end_time is None:
+        ends_at = starts_at + timedelta(minutes=duration_minutes)
+    else:
+        ends_at = datetime.combine(plan_date, end_time)
 
-    if ends_at - starts_at != timedelta(minutes=30):
-        return handle_error("Varighed skal være 30 minutter")
+    if ends_at <= starts_at:
+        return handle_error("Sluttid skal være efter start")
+
+    calculated_minutes = duration_minutes_between(starts_at, ends_at)
+    if duration_minutes > 0 and calculated_minutes != duration_minutes:
+        return handle_error("Sluttid matcher ikke planlagt varighed")
+
+    if calculated_minutes < 5 or calculated_minutes > 480:
+        return handle_error("Planlagt varighed skal være mellem 5 og 480 minutter")
 
     if not (time(8, 0) <= start_time < time(16, 0)):
         return handle_error("Tid skal være mellem 08:00 og 16:00")
 
-    availability = availability_for_user(db, appointment.contractor_id, plan_date)
+    if ends_at.time() > time(16, 0):
+        return handle_error("Sluttid skal være senest 16:00")
+
+    availability = availability_for_user(db, contractor.id, plan_date)
     if status_map[status] == models.AppointmentStatus.SCHEDULED:
         if not availability:
             return handle_error("Ingen arbejdsdag registreret på dagen")
         if not (availability.start_time <= start_time < availability.end_time):
             return handle_error("Tid ligger udenfor arbejdsdag")
-        if end_time > availability.end_time:
+        if ends_at.time() > availability.end_time:
             return handle_error("Slot slutter udenfor arbejdsdag")
-        if has_conflict(db, appointment.id, appointment.contractor_id, starts_at, ends_at):
+        if has_conflict(db, appointment.id, contractor.id, starts_at, ends_at):
             return handle_error("VVS er allerede planlagt på dette tidspunkt")
 
     appointment.status = status_map[status]
+    appointment.contractor_id = contractor.id
     appointment.starts_at = starts_at
     appointment.ends_at = ends_at
     appointment.old_meter_no = old_meter_no.strip() or None

@@ -32,7 +32,7 @@
     <h2>Opret VVS-opgave</h2>
     {% if selected_date and vvs_users %}
         {% set single_vvs = vvs_users|length == 1 %}
-        <form method="post" action="/admin/appointments/manual-task" class="form-grid">
+        <form method="post" action="/admin/appointments/manual-task" class="form-grid" data-duration-form>
             <input type="hidden" name="date_raw" value="{{ selected_date.isoformat() }}" />
             <label>
                 VVS
@@ -43,14 +43,15 @@
                     {% endfor %}
                 </select>
             </label>
-            <label>Starttid<input type="time" name="start_raw" step="1800" required /></label>
+            <label>Starttid<input type="time" name="start_raw" step="1800" required data-duration-start /></label>
+            <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="30" required data-duration-minutes /></label>
             <label>
                 Opgave
                 <textarea name="notes" rows="3" placeholder="Luk for vand på X vej" required></textarea>
             </label>
             <button type="submit" class="primary-button">Opret opgave</button>
         </form>
-        <p class="hint">Varighed: 30 min. Arbejdsdag: {{ selected_date.strftime('%d/%m/%Y') }}.</p>
+        <p class="hint">Arbejdsdag: {{ selected_date.strftime('%d/%m/%Y') }}.</p>
     {% elif selected_date %}
         <p class="hint">Ingen VVS med arbejdsdag på den valgte dato.</p>
     {% else %}
@@ -69,7 +70,6 @@
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
                     {% else %}
-                        <h3>Opgave uden adresse</h3>
                         <span class="task-flag">Opgave uden adresse</span>
                     {% endif %}
                 </div>
@@ -134,7 +134,6 @@
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
                     {% else %}
-                        <h3>Opgave uden adresse</h3>
                         <span class="task-flag">Opgave uden adresse</span>
                     {% endif %}
                 </div>
