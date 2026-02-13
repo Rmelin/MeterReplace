@@ -105,6 +105,13 @@ def availability_dates(db: Session) -> list[date]:
     return [row[0] for row in rows]
 
 
+def closest_date(dates: list[date]) -> date | None:
+    if not dates:
+        return None
+    today = date.today()
+    return min(dates, key=lambda day: (abs((day - today).days), 1 if day > today else 0))
+
+
 def parse_time(raw: str) -> time:
     return datetime.strptime(raw, "%H:%M").time()
 
@@ -195,7 +202,7 @@ def appointment_overview(
             flash(request, "Dato er ugyldig", "error")
             return RedirectResponse("/admin/appointments", status_code=303)
     elif dates:
-        selected_date = dates[0]
+        selected_date = closest_date(dates)
 
     if selected_date and selected_date not in dates:
         flash(request, "Vælg en arbejdsdag", "error")
