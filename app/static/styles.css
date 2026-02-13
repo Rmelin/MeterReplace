@@ -255,6 +255,49 @@ label {
     color: var(--muted);
 }
 
+fieldset.option-field {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+    color: var(--muted);
+}
+
+fieldset.option-field legend {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.option-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.option-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.option-button input {
+    display: none;
+}
+
+.option-button:has(input:checked) {
+    border-color: #f97316;
+    color: #f97316;
+}
+
 input[type="text"],
 input[type="password"],
 input[type="file"],

@@ -41,7 +41,7 @@ def login(
         return RedirectResponse("/admin/addresses", status_code=303)
     if user.role == models.UserRole.USER:
         return RedirectResponse("/user/dashboard", status_code=303)
-    return RedirectResponse("/vvs", status_code=303)
+    return RedirectResponse("/vvs/tasks", status_code=303)
 
 
 @router.post("/logout")

@@ -82,26 +82,28 @@
                 {% endif %}
                 <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
-                <form method="post" action="/admin/appointments/{{ appointment.id }}/close" class="inline-form">
-                    {% if selected_date %}
-                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
-                    {% endif %}
-                    <button type="submit" class="ghost-button">Afslut</button>
-                </form>
                 {% if address %}
                     <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
                         {% if selected_date %}
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                         {% endif %}
-                        <label>
-                            Fototype
-                            <select name="photo_type" required>
-                                <option value="">Vælg type</option>
-                                <option value="both">Begge målere i ét foto</option>
-                                <option value="new">Ny måler</option>
-                                <option value="old">Gammel måler</option>
-                            </select>
-                        </label>
+                        <fieldset class="option-field" required>
+                            <legend>Fototype</legend>
+                            <div class="option-buttons">
+                                <label class="option-button">
+                                    <input type="radio" name="photo_type" value="both" required />
+                                    <span>Begge målere i ét foto</span>
+                                </label>
+                                <label class="option-button">
+                                    <input type="radio" name="photo_type" value="new" required />
+                                    <span>Ny måler</span>
+                                </label>
+                                <label class="option-button">
+                                    <input type="radio" name="photo_type" value="old" required />
+                                    <span>Gammel måler</span>
+                                </label>
+                            </div>
+                        </fieldset>
                         <label>Foto<input type="file" name="file" accept="image/*" required /></label>
                         <button type="submit" class="primary-button">Upload</button>
                     </form>
@@ -152,15 +154,23 @@
                         {% if selected_date %}
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                         {% endif %}
-                        <label>
-                            Fototype
-                            <select name="photo_type" required>
-                                <option value="">Vælg type</option>
-                                <option value="both">Begge målere i ét foto</option>
-                                <option value="new">Ny måler</option>
-                                <option value="old">Gammel måler</option>
-                            </select>
-                        </label>
+                        <fieldset class="option-field" required>
+                            <legend>Fototype</legend>
+                            <div class="option-buttons">
+                                <label class="option-button">
+                                    <input type="radio" name="photo_type" value="both" required />
+                                    <span>Begge målere i ét foto</span>
+                                </label>
+                                <label class="option-button">
+                                    <input type="radio" name="photo_type" value="new" required />
+                                    <span>Ny måler</span>
+                                </label>
+                                <label class="option-button">
+                                    <input type="radio" name="photo_type" value="old" required />
+                                    <span>Gammel måler</span>
+                                </label>
+                            </div>
+                        </fieldset>
                         <label>Foto<input type="file" name="file" accept="image/*" required /></label>
                         <button type="submit" class="primary-button">Upload</button>
                     </form>
