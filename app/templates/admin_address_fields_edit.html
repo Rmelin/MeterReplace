@@ -7,6 +7,8 @@
         <label>Husnr<input type="text" name="house_no" value="{{ address.house_no }}" required /></label>
         <label>Postnr<input type="text" name="zip" value="{{ address.zip }}" required /></label>
         <label>By<input type="text" name="city" value="{{ address.city }}" required /></label>
+        <label>Latitude<input type="number" name="latitude" value="{{ address.latitude or '' }}" step="0.000001" /></label>
+        <label>Longitude<input type="number" name="longitude" value="{{ address.longitude or '' }}" step="0.000001" /></label>
         <button type="submit" class="primary-button">Gem</button>
         <a href="/admin/addresses/{{ address.id }}/edit" class="ghost-button">Tilbage</a>
     </form>
