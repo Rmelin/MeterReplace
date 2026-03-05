@@ -3,7 +3,18 @@ from __future__ import annotations
 import enum
 from datetime import date, datetime, time
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    Time,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -41,6 +52,8 @@ class Address(Base):
     blocked_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     old_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     new_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -124,6 +137,8 @@ class AppointmentStatus(str, enum.Enum):
     NEEDS_RESCHEDULE = "needs_reschedule"
 
 
+
+
 class Appointment(Base):
     __tablename__ = "appointments"
 
@@ -144,6 +159,8 @@ class Appointment(Base):
     changed_by_user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
+
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

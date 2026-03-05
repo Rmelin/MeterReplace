@@ -7,6 +7,7 @@
     <link rel="icon" href="/static/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="/static/favicon.png" />
     <link rel="stylesheet" href="/static/styles.css" />
+    {% block head %}{% endblock %}
     <script src="/static/menu.js" defer></script>
     <script src="/static/lightbox.js" defer></script>
 </head>
@@ -21,6 +22,7 @@
                 {% if current_user.role.value == 'admin' %}
                     <a href="/admin/status">Status</a>
                     <a href="/admin/addresses">Adresser</a>
+                    <a href="/admin/addresses/map">Kort</a>
                     <a href="/admin/appointments">Opgaver</a>
                         <div class="nav-group">
                             <button class="nav-toggle nav-accent" type="button" data-nav-toggle="planning" aria-expanded="false" style="color: #f97316;">Planlægning</button>
@@ -47,6 +49,7 @@
                 {% elif current_user.role.value == 'user' %}
                     <a href="/user/dashboard">Dashboard</a>
                     <a href="/admin/addresses">Adresser</a>
+                    <a href="/admin/addresses/map">Kort</a>
                     <a href="/admin/appointments">Opgaver</a>
                     <a href="/admin/availability">Arbejdsdage</a>
                 {% endif %}

@@ -6,8 +6,14 @@
             <h1>Rediger adresse</h1>
             <button type="button" class="ghost-button" data-toggle-panel="address-details">Vis/skjul</button>
         </div>
+        <div class="address-highlight">
+            <div>
+                <div class="address-title">{{ address.street }} {{ address.house_no }}</div>
+                <div class="address-subtitle">{{ address.zip }} {{ address.city }}</div>
+            </div>
+            <span class="status-chip status-{{ status_key }}">{{ status_label }}</span>
+        </div>
         <div data-panel="address-details">
-            <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
             {% if resident_response %}
                 <p class="hint">Seneste beboersvar: {{ resident_response.label }} · {{ resident_response.date }}</p>
             {% endif %}
