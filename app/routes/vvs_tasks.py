@@ -33,6 +33,7 @@ PHOTO_FILENAME = {
 }
 
 STATUS_LABELS = {
+    models.AppointmentStatus.NOT_SCHEDULED: "Ikke planlagt",
     models.AppointmentStatus.SCHEDULED: "Planlagt",
     models.AppointmentStatus.INFORMED: "Beboer/kunde informeret",
     models.AppointmentStatus.COMPLETED: "Skiftet",
@@ -447,6 +448,7 @@ def update_task(
         return RedirectResponse(f"/vvs/tasks/{appointment_id}/edit", status_code=303)
 
     status_map = {
+        "notscheduled": models.AppointmentStatus.NOT_SCHEDULED,
         "scheduled": models.AppointmentStatus.SCHEDULED,
         "informed": models.AppointmentStatus.INFORMED,
         "completed": models.AppointmentStatus.COMPLETED,

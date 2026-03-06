@@ -111,6 +111,7 @@ def latest_status_map(
             models.Appointment.status.in_(
                 [
                     models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.NOT_SCHEDULED,
                     models.AppointmentStatus.INFORMED,
                     models.AppointmentStatus.COMPLETED,
                     models.AppointmentStatus.CLOSED,
@@ -123,10 +124,18 @@ def latest_status_map(
         .all()
     )
     status_map: dict[int, models.AppointmentStatus] = {}
+    notscheduled_map: dict[int, models.AppointmentStatus] = {}
     for appointment in appointments:
+        if appointment.status == models.AppointmentStatus.NOT_SCHEDULED:
+            if appointment.address_id not in notscheduled_map:
+                notscheduled_map[appointment.address_id] = appointment.status
+            continue
         if appointment.address_id in status_map:
             continue
         status_map[appointment.address_id] = appointment.status
+    for address_id, status in notscheduled_map.items():
+        if address_id not in status_map:
+            status_map[address_id] = status
     return status_map
 
 
@@ -210,6 +219,8 @@ def status_label_and_key(
         return "Afsluttet " + status_date, "closed"
     if status == models.AppointmentStatus.INFORMED:
         return "Informeret, planlagt til den " + status_date, "informed"
+    if status == models.AppointmentStatus.NOT_SCHEDULED:
+        return "Ikke planlagt", "unplanned"
     if status == models.AppointmentStatus.NOT_HOME:
         return "Ikke hjemme", "not_home"
     if status == models.AppointmentStatus.NEEDS_RESCHEDULE:
@@ -263,6 +274,7 @@ def list_addresses(
                 models.Appointment.status.in_(
                     [
                         models.AppointmentStatus.SCHEDULED,
+                        models.AppointmentStatus.NOT_SCHEDULED,
                         models.AppointmentStatus.INFORMED,
                         models.AppointmentStatus.COMPLETED,
                         models.AppointmentStatus.CLOSED,
@@ -274,7 +286,12 @@ def list_addresses(
             .order_by(models.Appointment.starts_at.desc())
             .all()
         )
+        notscheduled_candidates: dict[int, models.Appointment] = {}
         for appointment in appointments:
+            if appointment.status == models.AppointmentStatus.NOT_SCHEDULED:
+                if appointment.address_id not in notscheduled_candidates:
+                    notscheduled_candidates[appointment.address_id] = appointment
+                continue
             if appointment.address_id in status_map:
                 continue
             status_status_map[appointment.address_id] = appointment.status
@@ -295,6 +312,12 @@ def list_addresses(
                 )
             else:
                 status_map[appointment.address_id] = "Planlagt " + status_date
+
+        for address_id, appointment in notscheduled_candidates.items():
+            if address_id in status_map:
+                continue
+            status_status_map[address_id] = appointment.status
+            status_map[address_id] = "Ikke planlagt"
 
         not_home_rows = (
             db.query(models.Appointment.address_id, func.count(models.Appointment.id))
@@ -342,7 +365,9 @@ def list_addresses(
         allowed_statuses = filter_map.get(selected_status, set())
         if selected_status == "unplanned":
             addresses = [
-                address for address in addresses if address.id not in status_status_map
+                address
+                for address in addresses
+                if status_status_map.get(address.id) in {None, models.AppointmentStatus.NOT_SCHEDULED}
             ]
         elif selected_status == "not_home_history":
             addresses = [
@@ -466,6 +491,16 @@ def edit_address_form(
         .order_by(models.Appointment.starts_at.desc())
         .first()
     )
+    if not latest_appointment:
+        latest_appointment = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.address_id == address_id,
+                models.Appointment.status == models.AppointmentStatus.NOT_SCHEDULED,
+            )
+            .order_by(models.Appointment.starts_at.desc())
+            .first()
+        )
     current_year = datetime.utcnow().year
     status_label, status_key = status_label_and_key(latest_appointment, current_year)
     periods = (
@@ -687,7 +722,10 @@ def address_map_data(
         allowed_statuses = filter_map.get(selected_status, set())
         if selected_status == "unplanned":
             addresses = [
-                address for address in addresses if address.id not in status_map
+                address
+                for address in addresses
+                if status_map.get(address.id)
+                in {None, models.AppointmentStatus.NOT_SCHEDULED}
             ]
         elif selected_status == "not_home_history":
             not_home_rows = (
@@ -717,7 +755,7 @@ def address_map_data(
                 "city": address.city,
                 "latitude": float(address.latitude) if address.latitude is not None else None,
                 "longitude": float(address.longitude) if address.longitude is not None else None,
-                "status": status_value.value if status_value else "unplanned",
+                "status": status_value.value.lower() if status_value else "unplanned",
             }
         )
     return JSONResponse({"addresses": payload})

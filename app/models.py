@@ -128,13 +128,14 @@ class VvsAvailability(Base):
 
 
 class AppointmentStatus(str, enum.Enum):
-    DRAFT = "draft"
-    SCHEDULED = "scheduled"
-    INFORMED = "informed"
-    COMPLETED = "completed"
-    CLOSED = "closed"
-    NOT_HOME = "not_home"
-    NEEDS_RESCHEDULE = "needs_reschedule"
+    DRAFT = "DRAFT"
+    NOT_SCHEDULED = "NOTSCHEDULED"
+    SCHEDULED = "SCHEDULED"
+    INFORMED = "INFORMED"
+    COMPLETED = "COMPLETED"
+    CLOSED = "CLOSED"
+    NOT_HOME = "NOT_HOME"
+    NEEDS_RESCHEDULE = "NEEDS_RESCHEDULE"
 
 
 
