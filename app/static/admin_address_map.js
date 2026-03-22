@@ -14,7 +14,7 @@ const STATUS_COLORS = {
   notscheduled: '#94a3b8',
   informed: '#38bdf8',
   completed: '#22c55e',
-  closed: '#94a3b8',
+  closed: '#16a34a',
   not_home: '#ef4444',
   needs_reschedule: '#f97316',
   unplanned: '#64748b',
