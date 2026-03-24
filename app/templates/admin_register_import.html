@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Import af registeret</h1>
+        <p>Importer CSV fra vandværkskontoret og opdater status til Afsluttet.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>CSV import</h2>
+    <form method="post" action="/admin/import/register" enctype="multipart/form-data" class="form-grid">
+        <label>Fil<input type="file" name="file" accept=".csv" required /></label>
+        <button type="submit" class="primary-button">Importer</button>
+    </form>
+    <p class="hint">CSV header: Adresse;Målernr.</p>
+    <p class="hint">Adresseformat: Vej, nr, postnr, by</p>
+</section>
+{% endblock %}

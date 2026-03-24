@@ -24,12 +24,13 @@
             <label>
                 Status
                 <select name="status" required>
-                    <option value="scheduled" {% if appointment.status.value == 'scheduled' %}selected{% endif %}>Planlagt</option>
-                    <option value="informed" {% if appointment.status.value == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
-                    <option value="completed" {% if appointment.status.value == 'completed' %}selected{% endif %}>Skiftet</option>
-                    <option value="closed" {% if appointment.status.value == 'closed' %}selected{% endif %}>Afsluttet</option>
-                    <option value="not_home" {% if appointment.status.value == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
-                    <option value="needs_reschedule" {% if appointment.status.value == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
+                    <option value="notscheduled" {% if appointment.status.value|lower == 'notscheduled' %}selected{% endif %}>Ikke planlagt</option>
+                    <option value="scheduled" {% if appointment.status.value|lower == 'scheduled' %}selected{% endif %}>Planlagt</option>
+                    <option value="informed" {% if appointment.status.value|lower == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
+                    <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>
+                    <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>Afsluttet</option>
+                    <option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
+                    <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
                 </select>
             </label>
             <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
@@ -63,12 +64,13 @@
         <label>
             Status
             <select name="status" required>
-                <option value="scheduled" {% if appointment.status.value == 'scheduled' %}selected{% endif %}>Planlagt</option>
-                <option value="informed" {% if appointment.status.value == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
-                <option value="completed" {% if appointment.status.value == 'completed' %}selected{% endif %}>Skiftet</option>
-                <option value="closed" {% if appointment.status.value == 'closed' %}selected{% endif %}>Afsluttet</option>
-                <option value="not_home" {% if appointment.status.value == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
-                <option value="needs_reschedule" {% if appointment.status.value == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
+                <option value="notscheduled" {% if appointment.status.value|lower == 'notscheduled' %}selected{% endif %}>Ikke planlagt</option>
+                <option value="scheduled" {% if appointment.status.value|lower == 'scheduled' %}selected{% endif %}>Planlagt</option>
+                <option value="informed" {% if appointment.status.value|lower == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
+                <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>
+                <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>Afsluttet</option>
+                <option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
+                <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
             </select>
         </label>
         <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>

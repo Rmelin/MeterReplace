@@ -314,6 +314,7 @@ select {
 
 .primary-button,
 .ghost-button,
+.danger-button,
 .link {
     display: inline-flex;
     align-items: center;
@@ -335,6 +336,16 @@ select {
     background: transparent;
     border-color: var(--border);
     color: var(--text);
+}
+
+.danger-button {
+    background: #ef4444;
+    border-color: rgba(239, 68, 68, 0.8);
+    color: #0b0d12;
+}
+
+.danger-button:hover {
+    background: #f87171;
 }
 
 .inline-form {
@@ -747,9 +758,9 @@ body.lightbox-open {
 }
 
 .status-closed {
-    background: rgba(148, 163, 184, 0.18);
-    border-color: rgba(148, 163, 184, 0.6);
-    color: #cbd5f5;
+    background: rgba(22, 163, 74, 0.18);
+    border-color: rgba(22, 163, 74, 0.6);
+    color: #86efac;
 }
 
 .status-not_home {

@@ -1,5 +1,6 @@
 const STATUS_LABELS = {
   planned: 'Planlagt',
+  notscheduled: 'Ikke planlagt',
   informed: 'Beboer/kunde informeret',
   completed: 'Skiftet',
   closed: 'Afsluttet',
@@ -10,9 +11,10 @@ const STATUS_LABELS = {
 
 const STATUS_COLORS = {
   planned: '#f59e0b',
+  notscheduled: '#94a3b8',
   informed: '#38bdf8',
   completed: '#22c55e',
-  closed: '#94a3b8',
+  closed: '#16a34a',
   not_home: '#ef4444',
   needs_reschedule: '#f97316',
   unplanned: '#64748b',
@@ -83,7 +85,9 @@ const buildLegend = () => {
   legend.appendChild(selectedItem)
 }
 
-const statusColor = (status) => STATUS_COLORS[status] || STATUS_COLORS.unplanned
+const normalizeStatus = (status) => (status || '').trim().toLowerCase()
+const statusColor = (status) =>
+  STATUS_COLORS[normalizeStatus(status)] || STATUS_COLORS.unplanned
 
 const loadSelectedIds = () => {
   try {
@@ -141,7 +145,7 @@ const updateMarkers = () => {
       })
       marker.bindPopup(
         `<strong>${row.street} ${row.house_no}</strong><br>${row.zip} ${row.city}<br>${
-          STATUS_LABELS[row.status] || row.status
+          STATUS_LABELS[normalizeStatus(row.status)] || row.status
         }<br><div class="map-popup-actions">
           <button type="button" class="ghost-button map-popup-button" data-action="edit-coords" data-address-id="${
             row.id
@@ -240,7 +244,7 @@ const renderSelectedList = () => {
     item.innerHTML = `
       <div class="map-list-main">
         <span>${row.street} ${row.house_no}</span>
-        <span class="hint">${STATUS_LABELS[row.status] || row.status}</span>
+        <span class="hint">${STATUS_LABELS[normalizeStatus(row.status)] || row.status}</span>
       </div>
       <button type="button" class="ghost-button" data-address-id="${row.id}">Fjern</button>
     `

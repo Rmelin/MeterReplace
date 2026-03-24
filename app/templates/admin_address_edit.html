@@ -22,6 +22,9 @@
                 {% if letter_available %}
                     <a class="ghost-button" href="/admin/letters/address/{{ address.id }}">Brev</a>
                 {% endif %}
+                <form method="post" action="/admin/addresses/{{ address.id }}/delete" class="inline-form" onsubmit="return confirm('Er du sikker på, at du vil slette adressen?');">
+                    <button type="submit" class="danger-button">Slet adresse</button>
+                </form>
             </div>
             <form method="post" action="/admin/addresses/{{ address.id }}/edit" class="form-grid">
                 <label>Kontakt navn<input type="text" name="customer_name" value="{{ address.customer_name or '' }}" /></label>
@@ -124,9 +127,47 @@
     <section class="card">
         <div class="section-header">
             <h2>Fotos</h2>
-            <button type="button" class="ghost-button" data-toggle-panel="address-photos">Vis/skjul</button>
+            <div class="action-row" style="margin-bottom: 0;">
+                <button type="button" class="ghost-button" data-toggle-panel="address-photos">Vis/skjul</button>
+                {% if photos_complete %}
+                    <a class="ghost-button" href="/admin/addresses/{{ address.id }}/edit?edit_photos=1">Rediger fotos</a>
+                {% endif %}
+            </div>
         </div>
         <div data-panel="address-photos">
+            {% if show_photo_upload %}
+                <form method="post" action="/admin/addresses/{{ address.id }}/photos" enctype="multipart/form-data" class="form-grid">
+                    {% if photos_complete %}
+                        <input type="hidden" name="force" value="1" />
+                    {% endif %}
+                    <fieldset class="option-field" required>
+                        <legend>Fototype</legend>
+                        <div class="option-buttons">
+                            <label class="option-button">
+                                <input type="radio" name="photo_type" value="both" required />
+                                <span>Begge målere i ét foto</span>
+                            </label>
+                            <label class="option-button">
+                                <input type="radio" name="photo_type" value="new" required />
+                                <span>Ny måler</span>
+                            </label>
+                            <label class="option-button">
+                                <input type="radio" name="photo_type" value="old" required />
+                                <span>Gammel måler</span>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <label>Gammel målernr<input type="text" name="old_meter_no" /></label>
+                    <label>Ny målernr<input type="text" name="new_meter_no" /></label>
+                    {% if not has_appointment %}
+                        <label>Dato for udskiftning<input type="datetime-local" name="replacement_datetime" required /></label>
+                    {% endif %}
+                    <label>Foto<input type="file" name="file" accept="image/*" required /></label>
+                    <button type="submit" class="primary-button">Upload</button>
+                </form>
+            {% elif photos_complete %}
+                <p class="hint" style="margin-top: 1rem;">Fotos er komplette.</p>
+            {% endif %}
             {% if photos %}
                 <div class="photo-grid" style="margin-top: 1rem;">
                     {% for photo in photos %}

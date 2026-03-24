@@ -4,9 +4,11 @@ import csv
 import io
 import json
 import re
+import unicodedata
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -24,6 +26,15 @@ PHOTO_LABELS = {
     "new": "Ny måler",
     "old": "Gammel måler",
 }
+
+PHOTO_FILENAME = {
+    "both": "begge",
+    "new": "ny",
+    "old": "gammel",
+}
+
+UPLOAD_DIR = Path("data") / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 RESPONSE_LABELS = {
     "reschedule_request": "Tidspunkt passer ikke",
@@ -100,6 +111,7 @@ def latest_status_map(
             models.Appointment.status.in_(
                 [
                     models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.NOT_SCHEDULED,
                     models.AppointmentStatus.INFORMED,
                     models.AppointmentStatus.COMPLETED,
                     models.AppointmentStatus.CLOSED,
@@ -112,10 +124,18 @@ def latest_status_map(
         .all()
     )
     status_map: dict[int, models.AppointmentStatus] = {}
+    notscheduled_map: dict[int, models.AppointmentStatus] = {}
     for appointment in appointments:
+        if appointment.status == models.AppointmentStatus.NOT_SCHEDULED:
+            if appointment.address_id not in notscheduled_map:
+                notscheduled_map[appointment.address_id] = appointment.status
+            continue
         if appointment.address_id in status_map:
             continue
         status_map[appointment.address_id] = appointment.status
+    for address_id, status in notscheduled_map.items():
+        if address_id not in status_map:
+            status_map[address_id] = status
     return status_map
 
 
@@ -142,6 +162,44 @@ def parse_datetime_local(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%dT%H:%M")
 
 
+def photo_complete(photos: list[models.AppointmentPhoto]) -> bool:
+    types = {photo.photo_type for photo in photos}
+    return "both" in types or ("new" in types and "old" in types)
+
+
+def ensure_image(file: UploadFile) -> bool:
+    return file.content_type is not None and file.content_type.startswith("image/")
+
+
+def slugify_address(address: models.Address) -> str:
+    value = f"{address.street}{address.house_no}".strip().lower()
+    value = value.replace("æ", "ae").replace("ø", "oe").replace("å", "aa")
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]", "", value) or "adresse"
+
+
+def save_photo(address: models.Address, photo_type: str, file: UploadFile) -> str:
+    extension = Path(file.filename or "").suffix.lower() or ".jpg"
+    filename_slug = PHOTO_FILENAME.get(photo_type, "foto")
+    slug = slugify_address(address)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    counter = 1
+
+    folder = UPLOAD_DIR / slug
+    folder.mkdir(parents=True, exist_ok=True)
+
+    while True:
+        filename = f"{slug}-{filename_slug}-{timestamp}-{counter}{extension}"
+        path = folder / filename
+        if not path.exists():
+            break
+        counter += 1
+
+    with path.open("wb") as buffer:
+        buffer.write(file.file.read())
+    return str(path.relative_to(UPLOAD_DIR))
+
+
 def format_status_date(value: datetime, current_year: int) -> str:
     if value.year != current_year:
         return value.strftime("%d/%m/%Y")
@@ -161,6 +219,8 @@ def status_label_and_key(
         return "Afsluttet " + status_date, "closed"
     if status == models.AppointmentStatus.INFORMED:
         return "Informeret, planlagt til den " + status_date, "informed"
+    if status == models.AppointmentStatus.NOT_SCHEDULED:
+        return "Ikke planlagt", "unplanned"
     if status == models.AppointmentStatus.NOT_HOME:
         return "Ikke hjemme", "not_home"
     if status == models.AppointmentStatus.NEEDS_RESCHEDULE:
@@ -214,6 +274,7 @@ def list_addresses(
                 models.Appointment.status.in_(
                     [
                         models.AppointmentStatus.SCHEDULED,
+                        models.AppointmentStatus.NOT_SCHEDULED,
                         models.AppointmentStatus.INFORMED,
                         models.AppointmentStatus.COMPLETED,
                         models.AppointmentStatus.CLOSED,
@@ -225,7 +286,12 @@ def list_addresses(
             .order_by(models.Appointment.starts_at.desc())
             .all()
         )
+        notscheduled_candidates: dict[int, models.Appointment] = {}
         for appointment in appointments:
+            if appointment.status == models.AppointmentStatus.NOT_SCHEDULED:
+                if appointment.address_id not in notscheduled_candidates:
+                    notscheduled_candidates[appointment.address_id] = appointment
+                continue
             if appointment.address_id in status_map:
                 continue
             status_status_map[appointment.address_id] = appointment.status
@@ -246,6 +312,12 @@ def list_addresses(
                 )
             else:
                 status_map[appointment.address_id] = "Planlagt " + status_date
+
+        for address_id, appointment in notscheduled_candidates.items():
+            if address_id in status_map:
+                continue
+            status_status_map[address_id] = appointment.status
+            status_map[address_id] = "Ikke planlagt"
 
         not_home_rows = (
             db.query(models.Appointment.address_id, func.count(models.Appointment.id))
@@ -293,7 +365,9 @@ def list_addresses(
         allowed_statuses = filter_map.get(selected_status, set())
         if selected_status == "unplanned":
             addresses = [
-                address for address in addresses if address.id not in status_status_map
+                address
+                for address in addresses
+                if status_status_map.get(address.id) in {None, models.AppointmentStatus.NOT_SCHEDULED}
             ]
         elif selected_status == "not_home_history":
             addresses = [
@@ -392,6 +466,7 @@ def create_address(
 def edit_address_form(
     request: Request,
     address_id: int,
+    edit_photos: int | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
 ):
@@ -416,6 +491,16 @@ def edit_address_form(
         .order_by(models.Appointment.starts_at.desc())
         .first()
     )
+    if not latest_appointment:
+        latest_appointment = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.address_id == address_id,
+                models.Appointment.status == models.AppointmentStatus.NOT_SCHEDULED,
+            )
+            .order_by(models.Appointment.starts_at.desc())
+            .first()
+        )
     current_year = datetime.utcnow().year
     status_label, status_key = status_label_and_key(latest_appointment, current_year)
     periods = (
@@ -455,6 +540,8 @@ def edit_address_form(
         .order_by(models.AppointmentPhoto.created_at.desc())
         .all()
     )
+    photo_types = {photo.photo_type for photo in photos}
+    photos_complete = "both" in photo_types or ("new" in photo_types and "old" in photo_types)
     latest_response = (
         db.query(models.ResidentResponse)
         .filter(models.ResidentResponse.address_id == address_id)
@@ -482,6 +569,9 @@ def edit_address_form(
             "resident_response": resident_response,
             "status_label": status_label,
             "status_key": status_key,
+            "has_appointment": bool(latest_appointment),
+            "photos_complete": photos_complete,
+            "show_photo_upload": bool(edit_photos) or not photos_complete,
         },
     )
 
@@ -632,7 +722,10 @@ def address_map_data(
         allowed_statuses = filter_map.get(selected_status, set())
         if selected_status == "unplanned":
             addresses = [
-                address for address in addresses if address.id not in status_map
+                address
+                for address in addresses
+                if status_map.get(address.id)
+                in {None, models.AppointmentStatus.NOT_SCHEDULED}
             ]
         elif selected_status == "not_home_history":
             not_home_rows = (
@@ -662,7 +755,7 @@ def address_map_data(
                 "city": address.city,
                 "latitude": float(address.latitude) if address.latitude is not None else None,
                 "longitude": float(address.longitude) if address.longitude is not None else None,
-                "status": status_value.value if status_value else "unplanned",
+                "status": status_value.value.lower() if status_value else "unplanned",
             }
         )
     return JSONResponse({"addresses": payload})
@@ -762,6 +855,166 @@ def update_address(
     address.blocked_reason = blocked_reason
     db.commit()
     flash(request, "Adresse opdateret", "success")
+    return RedirectResponse("/admin/addresses", status_code=303)
+
+
+@router.post("/{address_id}/photos")
+def upload_address_photo(
+    request: Request,
+    address_id: int,
+    photo_type: str = Form(""),
+    old_meter_no: str = Form(""),
+    new_meter_no: str = Form(""),
+    replacement_datetime: str | None = Form(None),
+    force: int | None = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    address = db.query(models.Address).filter(models.Address.id == address_id).first()
+    if not address:
+        flash(request, "Adresse ikke fundet", "error")
+        return RedirectResponse("/admin/addresses", status_code=303)
+
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.address_id == address_id,
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                    models.AppointmentStatus.COMPLETED,
+                    models.AppointmentStatus.CLOSED,
+                    models.AppointmentStatus.NOT_HOME,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
+                ]
+            ),
+        )
+        .order_by(models.Appointment.starts_at.desc())
+        .first()
+    )
+
+    if not appointment:
+        replacement_value = (replacement_datetime or "").strip()
+        if not replacement_value:
+            flash(request, "Dato for udskiftning er påkrævet", "error")
+            return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+        try:
+            starts_at = parse_datetime_local(replacement_value)
+        except ValueError:
+            flash(request, "Ugyldig dato for udskiftning", "error")
+            return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+        appointment = models.Appointment(
+            address_id=address_id,
+            contractor_id=user.id,
+            starts_at=starts_at,
+            ends_at=starts_at + timedelta(hours=1),
+            status=models.AppointmentStatus.SCHEDULED,
+        )
+        db.add(appointment)
+        db.flush()
+
+    allowed_types = {"both", "new", "old"}
+    if photo_type not in allowed_types:
+        flash(request, "Vælg fototype", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    if not ensure_image(file):
+        flash(request, "Kun billedfiler er tilladt", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    if force:
+        db.query(models.AppointmentPhoto).filter(
+            models.AppointmentPhoto.address_id == address_id
+        ).delete(synchronize_session=False)
+        db.flush()
+
+    existing_photos = (
+        db.query(models.AppointmentPhoto)
+        .filter(models.AppointmentPhoto.appointment_id == appointment.id)
+        .all()
+    )
+    existing_count = len(existing_photos)
+    if existing_count >= 2:
+        flash(request, "Der må kun uploades 2 billeder", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    if photo_type == "both" and existing_count > 0:
+        flash(request, "Der findes allerede fotos for opgaven", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    if photo_type in {"new", "old"}:
+        existing_types = {photo.photo_type for photo in existing_photos}
+        if "both" in existing_types:
+            flash(request, "Der findes allerede foto af begge målere", "error")
+            return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+        if photo_type in existing_types:
+            flash(request, "Foto af denne type er allerede uploadet", "error")
+            return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    old_meter_value = old_meter_no.strip() or None
+    new_meter_value = new_meter_no.strip() or None
+    if old_meter_value:
+        appointment.old_meter_no = old_meter_value
+    if new_meter_value:
+        appointment.new_meter_no = new_meter_value
+
+    file_path = save_photo(address, photo_type, file)
+    photo = models.AppointmentPhoto(
+        appointment_id=appointment.id,
+        address_id=address.id,
+        file_path=file_path,
+        photo_type=photo_type,
+        uploaded_by_user_id=user.id,
+    )
+    db.add(photo)
+    db.commit()
+
+    updated_photos = existing_photos + [photo]
+    if photo_complete(updated_photos):
+        appointment.status = models.AppointmentStatus.COMPLETED
+        appointment.changed_date = datetime.utcnow()
+        appointment.changed_by_user_id = user.id
+        db.commit()
+        flash(request, "Foto uploadet og status sat til skiftet", "success")
+    else:
+        flash(request, "Foto uploadet", "success")
+
+    return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+
+@router.post("/{address_id}/delete")
+def delete_address(
+    request: Request,
+    address_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    address = db.query(models.Address).filter(models.Address.id == address_id).first()
+    if not address:
+        flash(request, "Adresse ikke fundet", "error")
+        return RedirectResponse("/admin/addresses", status_code=303)
+
+    db.query(models.ResidentResponse).filter(
+        models.ResidentResponse.address_id == address_id
+    ).delete(synchronize_session=False)
+    db.query(models.AppointmentPhoto).filter(
+        models.AppointmentPhoto.address_id == address_id
+    ).delete(synchronize_session=False)
+    db.query(models.Appointment).filter(models.Appointment.address_id == address_id).delete(
+        synchronize_session=False
+    )
+    db.query(models.ResidentLink).filter(models.ResidentLink.address_id == address_id).delete(
+        synchronize_session=False
+    )
+    db.query(models.AddressUnavailablePeriod).filter(
+        models.AddressUnavailablePeriod.address_id == address_id
+    ).delete(synchronize_session=False)
+    db.delete(address)
+    db.commit()
+
+    flash(request, "Adresse slettet", "success")
     return RedirectResponse("/admin/addresses", status_code=303)
 
 

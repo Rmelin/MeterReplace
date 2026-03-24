@@ -29,24 +29,35 @@ def latest_status_map(
         db.query(models.Appointment)
         .filter(
             models.Appointment.address_id.in_(address_ids),
-            models.Appointment.status.in_([
-                *COMPLETED_STATUSES,
-                *CLOSED_STATUSES,
-                *INFORMED_STATUSES,
-                *PLANNED_STATUSES,
-                models.AppointmentStatus.NOT_HOME,
-                models.AppointmentStatus.NEEDS_RESCHEDULE,
-            ]),
+            models.Appointment.status.in_(
+                [
+                    *COMPLETED_STATUSES,
+                    *CLOSED_STATUSES,
+                    *INFORMED_STATUSES,
+                    *PLANNED_STATUSES,
+                    models.AppointmentStatus.NOT_HOME,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
+                    models.AppointmentStatus.NOT_SCHEDULED,
+                ]
+            ),
         )
         .order_by(models.Appointment.starts_at.desc())
         .all()
     )
 
     status_map: dict[int, models.AppointmentStatus] = {}
+    notscheduled_map: dict[int, models.AppointmentStatus] = {}
     for appointment in appointments:
+        if appointment.status == models.AppointmentStatus.NOT_SCHEDULED:
+            if appointment.address_id not in notscheduled_map:
+                notscheduled_map[appointment.address_id] = appointment.status
+            continue
         if appointment.address_id in status_map:
             continue
         status_map[appointment.address_id] = appointment.status
+    for address_id, status in notscheduled_map.items():
+        if address_id not in status_map:
+            status_map[address_id] = status
     return status_map
 
 
