@@ -49,8 +49,8 @@ Bevidst valgt for:
 
 ## 🚀 Kom i gang
 ```bash
-git clone https://github.com/Rmelin/vandmalerudskiftning.git
-cd vandmalerudskiftning
+git clone https://github.com/Rmelin/MeterReplace.git
+cd MeterReplace
 
 python -m venv .venv
 source .venv/bin/activate
