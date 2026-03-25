@@ -65,6 +65,63 @@ uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0
 eller 
 http://IP:8000
 
+## 🚢 Deployment
+
+### systemd (Debian/Ubuntu)
+Nedenfor er et simpelt produktions-setup med `uvicorn` direkte via systemd.
+
+#### 1) Opret systembruger og mappe
+```bash
+sudo useradd -r -s /usr/sbin/nologin meterreplace
+sudo mkdir -p /opt/meterreplace
+sudo chown -R meterreplace:meterreplace /opt/meterreplace
+```
+
+#### 2) Læg kode i /opt og opsæt venv
+```bash
+sudo -u meterreplace git clone https://github.com/Rmelin/MeterReplace.git /opt/meterreplace
+sudo -u meterreplace python -m venv /opt/meterreplace/.venv
+sudo -u meterreplace /opt/meterreplace/.venv/bin/pip install -r /opt/meterreplace/requirements.txt
+```
+
+#### 3) Opret miljøvariabler
+Opret `/opt/meterreplace/.env` og udfyld mindst:
+```bash
+PUBLIC_BASE_URL=http://DIT_DOMAENE
+```
+
+#### 4) systemd service
+Opret `/etc/systemd/system/meterreplace.service`:
+```ini
+[Unit]
+Description=MeterReplace
+After=network.target
+
+[Service]
+User=meterreplace
+Group=meterreplace
+WorkingDirectory=/opt/meterreplace
+EnvironmentFile=/opt/meterreplace/.env
+ExecStart=/opt/meterreplace/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 5) Aktiver og start
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now meterreplace
+sudo systemctl status meterreplace
+```
+
+#### 6) Logs
+```bash
+journalctl -u meterreplace -f
+```
+
 ## 🧭 Overordnet proces
 Adresser oprettes/importeres
 Vandmålertype og lager oprettes
