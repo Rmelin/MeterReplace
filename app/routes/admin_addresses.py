@@ -1155,6 +1155,8 @@ def import_csv(
 
     created = 0
     skipped = 0
+    invalid_coords = 0
+    missing_coords = 0
     try:
         for row in reader:
             street = (row.get("street") or "").strip()
@@ -1167,17 +1169,37 @@ def import_csv(
             if not all([street, house_no, zip_code, city]):
                 skipped += 1
                 continue
-            db.add(
-                models.Address(
-                    street=street,
-                    house_no=house_no,
-                    zip=zip_code,
-                    city=city,
-                    customer_name=customer_name,
-                    customer_email=customer_email,
-                    customer_phone=customer_phone,
-                )
+            lat_value = (row.get("latitude") or row.get("lat") or "").strip()
+            lon_value = (row.get("longitude") or row.get("lng") or "").strip()
+            manual_coords: tuple[float, float] | None = None
+            if lat_value or lon_value:
+                try:
+                    manual_coords = (float(lat_value), float(lon_value))
+                except ValueError:
+                    invalid_coords += 1
+                    skipped += 1
+                    continue
+
+            address = models.Address(
+                street=street,
+                house_no=house_no,
+                zip=zip_code,
+                city=city,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                customer_phone=customer_phone,
             )
+            if manual_coords:
+                address.latitude = manual_coords[0]
+                address.longitude = manual_coords[1]
+            else:
+                coords = geocode_address(street, house_no, zip_code, city)
+                if coords:
+                    address.latitude = coords[0]
+                    address.longitude = coords[1]
+                else:
+                    missing_coords += 1
+            db.add(address)
             created += 1
         db.commit()
     except SQLAlchemyError:
@@ -1185,5 +1207,10 @@ def import_csv(
         flash(request, "Der opstod en fejl under import", "error")
         return RedirectResponse("/admin/addresses", status_code=303)
 
-    flash(request, f"Importerede {created} adresser, {skipped} sprunget over", "success")
+    message = f"Importerede {created} adresser, {skipped} sprunget over"
+    if invalid_coords:
+        message += f". {invalid_coords} rækker havde ugyldige koordinater"
+    if missing_coords:
+        message += f". {missing_coords} adresser mangler koordinater"
+    flash(request, message, "success")
     return RedirectResponse("/admin/addresses", status_code=303)
