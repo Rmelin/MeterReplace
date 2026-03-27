@@ -189,7 +189,7 @@ const renderMissingList = () => {
       </div>
       <div class="map-list-actions">
         <button type="button" class="ghost-button" data-action="select">Sæt koordinat</button>
-        <button type="button" class="ghost-button" data-action="geocode">Genberegn</button>
+        <button type="button" class="ghost-button" data-action="geocode">Søg koordinat</button>
       </div>
     `
     item.addEventListener('click', async (event) => {

@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import re
+import time
 import unicodedata
 import urllib.parse
 import urllib.request
@@ -229,6 +230,7 @@ def status_label_and_key(
 
 
 @router.get("")
+@router.get("/")
 def list_addresses(
     request: Request,
     q: str | None = None,
@@ -401,6 +403,7 @@ def list_addresses(
 
 
 @router.post("")
+@router.post("/")
 def create_address(
     request: Request,
     street: str = Form(""),
@@ -1134,9 +1137,11 @@ def mark_needs_reschedule(
 
 
 @router.post("/import")
+@router.post("/import/")
 def import_csv(
     request: Request,
     file: UploadFile = File(...),
+    geocode: bool = Form(False),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
 ):
@@ -1193,10 +1198,14 @@ def import_csv(
                 address.latitude = manual_coords[0]
                 address.longitude = manual_coords[1]
             else:
-                coords = geocode_address(street, house_no, zip_code, city)
-                if coords:
-                    address.latitude = coords[0]
-                    address.longitude = coords[1]
+                if geocode:
+                    coords = geocode_address(street, house_no, zip_code, city)
+                    if coords:
+                        address.latitude = coords[0]
+                        address.longitude = coords[1]
+                    else:
+                        missing_coords += 1
+                    time.sleep(0.3)
                 else:
                     missing_coords += 1
             db.add(address)

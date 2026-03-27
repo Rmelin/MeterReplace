@@ -59,6 +59,23 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0
 ```
 
+## 🔄 Opdatering (git pull)
+
+### Lokal udvikling
+```bash
+git pull
+pip install -r requirements.txt
+uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0
+```
+
+### Produktion (systemd)
+```bash
+cd /opt/meterreplace
+sudo -u meterreplace git pull
+sudo -u meterreplace /opt/meterreplace/.venv/bin/pip install -r /opt/meterreplace/requirements.txt
+sudo systemctl restart meterreplace
+```
+
 ## Åbn:
 
 👉 http://localhost:8000

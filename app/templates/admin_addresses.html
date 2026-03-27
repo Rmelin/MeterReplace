@@ -55,9 +55,14 @@
             <h2>CSV-import</h2>
             <form method="post" action="/admin/addresses/import" enctype="multipart/form-data" class="form-grid">
                 <label>Fil<input type="file" name="file" accept=".csv" required /></label>
+                <label class="checkbox-field">
+                    <input type="checkbox" name="geocode" value="1" />
+                    Geokod adresser under import
+                </label>
                 <button type="submit" class="primary-button">Importer</button>
             </form>
             <p class="hint">CSV felter: street, house_no, zip, city, customer_name, customer_email, customer_phone, latitude, longitude (eller lat/lng)</p>
+            <p class="hint">Hvis geokodning er slået fra, kan koordinater sættes i Adressekort.</p>
         </div>
     </div>
     <div class="filter-chips">
