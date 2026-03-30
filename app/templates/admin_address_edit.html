@@ -13,6 +13,15 @@
             </div>
             <span class="status-chip status-{{ status_key }}">{{ status_label }}</span>
         </div>
+        {% if address.register_closed and (missing_replacement_date or missing_photos) %}
+            <p class="hint" style="margin-top: 0.75rem;"><strong>OBS:</strong> Afsluttet via registerimport.</p>
+            {% if missing_replacement_date %}
+                <p class="hint">Skiftedag er ikke registreret i appen.</p>
+            {% endif %}
+            {% if missing_photos %}
+                <p class="hint">Der er ikke uploadet billeder endnu.</p>
+            {% endif %}
+        {% endif %}
         <div data-panel="address-details">
             {% if resident_response %}
                 <p class="hint">Seneste beboersvar: {{ resident_response.label }} · {{ resident_response.date }}</p>

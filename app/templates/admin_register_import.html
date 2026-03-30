@@ -3,8 +3,12 @@
 <section class="page-header">
     <div>
         <h1>Import af registeret</h1>
-        <p>Importer CSV fra vandværkskontoret og opdater status til Afsluttet.</p>
+        <p>Importer CSV fra vandværkskontoret og marker som Afsluttet.</p>
     </div>
+</section>
+
+<section class="card">
+    <p><strong>OBS:</strong> Importen markerer adresser som Afsluttet i appen, men der er stadig ingen billeder og dato i appen. Brug “Import af skiftet” til at importere dato og billeder.</p>
 </section>
 
 <section class="card">
@@ -13,7 +17,6 @@
         <label>Fil<input type="file" name="file" accept=".csv" required /></label>
         <button type="submit" class="primary-button">Importer</button>
     </form>
-    <p class="hint">CSV header: Adresse;Målernr.</p>
-    <p class="hint">Adresseformat: Vej, nr, postnr, by</p>
+    <p class="hint">CSV felter: street, house_no, zip, city, meter_no (eller new_meter_no)</p>
 </section>
 {% endblock %}

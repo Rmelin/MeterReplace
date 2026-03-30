@@ -58,6 +58,17 @@ def latest_status_map(
     for address_id, status in notscheduled_map.items():
         if address_id not in status_map:
             status_map[address_id] = status
+    register_closed_ids = {
+        row[0]
+        for row in db.query(models.Address.id)
+        .filter(
+            models.Address.id.in_(address_ids),
+            models.Address.register_closed.is_(True),
+        )
+        .all()
+    }
+    for address_id in register_closed_ids:
+        status_map[address_id] = models.AppointmentStatus.CLOSED
     return status_map
 
 
@@ -108,9 +119,10 @@ def status_dashboard(
     street_totals: dict[str, int] = defaultdict(int)
     street_completed: dict[str, int] = defaultdict(int)
 
+    done_ids = completed_ids | closed_ids
     for address in addresses:
         street_totals[address.street] += 1
-        if address.id in completed_ids:
+        if address.id in done_ids:
             street_completed[address.street] += 1
 
     street_progress = []

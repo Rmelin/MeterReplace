@@ -52,6 +52,25 @@ def missing_photos_overview(
             }
         )
 
+    register_closed_addresses = (
+        db.query(models.Address)
+        .filter(models.Address.register_closed.is_(True))
+        .order_by(models.Address.street, models.Address.house_no)
+        .all()
+    )
+    for address in register_closed_addresses:
+        if address.id in seen_addresses:
+            continue
+        if address.id in photo_address_ids:
+            continue
+        rows.append(
+            {
+                "appointment": None,
+                "address": address,
+                "contractor": None,
+            }
+        )
+
     return request.app.state.templates.TemplateResponse(
         "admin_missing_photos.html",
         {
