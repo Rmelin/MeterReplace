@@ -20,26 +20,6 @@ LOG_DIR = Path("data") / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def normalize_header(value: str) -> str:
-    return (
-        value.strip()
-        .lower()
-        .replace(".", "")
-        .replace(" ", "")
-        .replace("_", "")
-    )
-
-
-def parse_register_address(value: str) -> tuple[str, str, str, str] | None:
-    parts = [part.strip() for part in value.split(",")]
-    if len(parts) != 4:
-        return None
-    street, house_no, zip_code, city = parts
-    if not all([street, house_no, zip_code, city]):
-        return None
-    return street, house_no, zip_code, city
-
-
 def resolve_address(
     db: Session, street: str, house_no: str, zip_code: str, city: str
 ) -> models.Address | None:
@@ -81,7 +61,7 @@ def import_register(
     try:
         raw = file.file.read()
         content = raw.decode("utf-8-sig")
-        reader = csv.DictReader(io.StringIO(content), delimiter=";")
+        reader = csv.DictReader(io.StringIO(content))
     except Exception:
         flash(request, "CSV-filen kunne ikke læses", "error")
         return RedirectResponse("/admin/import/register", status_code=303)
@@ -90,72 +70,74 @@ def import_register(
         flash(request, "CSV-filen mangler header", "error")
         return RedirectResponse("/admin/import/register", status_code=303)
 
-    normalized = {normalize_header(name): name for name in reader.fieldnames}
-    address_key = normalized.get("adresse")
-    meter_key = normalized.get("maalernr") or normalized.get("målernr")
-
-    if not address_key or not meter_key:
-        flash(request, "CSV header skal være: Adresse;Målernr.", "error")
+    fieldnames = set(reader.fieldnames)
+    required_fields = {"street", "house_no", "zip", "city"}
+    has_meter = "new_meter_no" in fieldnames or "meter_no" in fieldnames
+    if not required_fields.issubset(fieldnames) or not has_meter:
+        flash(
+            request,
+            "CSV skal indeholde street, house_no, zip, city samt meter_no eller new_meter_no",
+            "error",
+        )
         return RedirectResponse("/admin/import/register", status_code=303)
 
     total = 0
     updated = 0
     skipped = 0
-    log_rows: list[tuple[str, str, str]] = []
+    log_rows: list[tuple[str, str, str, str, str, str]] = []
 
     for row in reader:
         total += 1
-        address_value = (row.get(address_key) or "").strip()
-        meter_value = (row.get(meter_key) or "").strip()
+        street = (row.get("street") or "").strip()
+        house_no = (row.get("house_no") or "").strip()
+        zip_code = (row.get("zip") or "").strip()
+        city = (row.get("city") or "").strip()
+        meter_value = (row.get("new_meter_no") or row.get("meter_no") or "").strip()
 
-        if not address_value:
+        if not all([street, house_no, zip_code, city]):
             skipped += 1
-            log_rows.append((address_value, meter_value, "Adresse mangler"))
+            log_rows.append(
+                (street, house_no, zip_code, city, meter_value, "Adresse mangler")
+            )
             continue
         if not meter_value:
             skipped += 1
-            log_rows.append((address_value, meter_value, "Målernr. mangler"))
+            log_rows.append(
+                (street, house_no, zip_code, city, meter_value, "Ny målernr. mangler")
+            )
             continue
-
-        parsed = parse_register_address(address_value)
-        if not parsed:
-            skipped += 1
-            log_rows.append((address_value, meter_value, "Adresseformat er ugyldigt"))
-            continue
-        street, house_no, zip_code, city = parsed
 
         address = resolve_address(db, street, house_no, zip_code, city)
         if not address:
             skipped += 1
-            log_rows.append((address_value, meter_value, "Adresse findes ikke"))
+            log_rows.append(
+                (street, house_no, zip_code, city, meter_value, "Adresse findes ikke")
+            )
             continue
 
         appointment = (
             db.query(models.Appointment)
-            .filter(
-                models.Appointment.address_id == address.id,
-                models.Appointment.status.in_(
-                    [
-                        models.AppointmentStatus.COMPLETED,
-                        models.AppointmentStatus.CLOSED,
-                    ]
-                ),
-            )
+            .filter(models.Appointment.address_id == address.id)
             .order_by(models.Appointment.starts_at.desc())
             .first()
         )
-        if not appointment:
-            skipped += 1
-            log_rows.append(
-                (address_value, meter_value, "Adresse mangler status Skiftet")
-            )
-            continue
-
         address.new_meter_no = meter_value
-        if appointment.status == models.AppointmentStatus.COMPLETED:
+        address.register_closed = True
+        if appointment:
             appointment.status = models.AppointmentStatus.CLOSED
             appointment.changed_date = datetime.utcnow()
             appointment.changed_by_user_id = user.id
+        else:
+            log_rows.append(
+                (
+                    street,
+                    house_no,
+                    zip_code,
+                    city,
+                    meter_value,
+                    "Afsluttet uden aftale",
+                )
+            )
         updated += 1
 
     if updated:
@@ -168,7 +150,7 @@ def import_register(
         log_path = LOG_DIR / log_filename
         with log_path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.writer(handle, delimiter=";")
-            writer.writerow(["Adresse", "Målernr.", "Fejl"])
+            writer.writerow(["street", "house_no", "zip", "city", "meter_no", "Fejl"])
             writer.writerows(log_rows)
 
     if log_filename:

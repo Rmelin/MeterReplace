@@ -160,6 +160,7 @@ def fetch_addresses(
         db.query(models.Address)
         .filter(~models.Address.id.in_(scheduled))
         .filter(models.Address.blocked_reason.is_(None))
+        .filter(models.Address.register_closed.is_(False))
     )
     if plan_date:
         unavailable_ids = unavailable_address_ids(db, plan_date)
@@ -198,7 +199,11 @@ def fetch_skipped_addresses(
             ]
         )
     )
-    base_query = db.query(models.Address).filter(~models.Address.id.in_(scheduled))
+    base_query = (
+        db.query(models.Address)
+        .filter(~models.Address.id.in_(scheduled))
+        .filter(models.Address.register_closed.is_(False))
+    )
     if plan_date:
         unavailable_ids = unavailable_address_ids(db, plan_date)
         if unavailable_ids:

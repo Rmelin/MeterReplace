@@ -137,6 +137,17 @@ def latest_status_map(
     for address_id, status in notscheduled_map.items():
         if address_id not in status_map:
             status_map[address_id] = status
+    register_closed_ids = {
+        row[0]
+        for row in db.query(models.Address.id)
+        .filter(
+            models.Address.id.in_(address_ids),
+            models.Address.register_closed.is_(True),
+        )
+        .all()
+    }
+    for address_id in register_closed_ids:
+        status_map[address_id] = models.AppointmentStatus.CLOSED
     return status_map
 
 
@@ -208,8 +219,10 @@ def format_status_date(value: datetime, current_year: int) -> str:
 
 
 def status_label_and_key(
-    appointment: models.Appointment | None, current_year: int
+    appointment: models.Appointment | None, current_year: int, register_closed: bool
 ) -> tuple[str, str]:
+    if register_closed:
+        return "Afsluttet", "closed"
     if not appointment:
         return "Ikke planlagt", "unplanned"
     status = appointment.status
@@ -320,6 +333,13 @@ def list_addresses(
                 continue
             status_status_map[address_id] = appointment.status
             status_map[address_id] = "Ikke planlagt"
+
+        register_closed_ids = {
+            address.id for address in addresses if address.register_closed
+        }
+        for address_id in register_closed_ids:
+            status_status_map[address_id] = models.AppointmentStatus.CLOSED
+            status_map[address_id] = "Afsluttet"
 
         not_home_rows = (
             db.query(models.Appointment.address_id, func.count(models.Appointment.id))
@@ -505,7 +525,9 @@ def edit_address_form(
             .first()
         )
     current_year = datetime.utcnow().year
-    status_label, status_key = status_label_and_key(latest_appointment, current_year)
+    status_label, status_key = status_label_and_key(
+        latest_appointment, current_year, address.register_closed
+    )
     periods = (
         db.query(models.AddressUnavailablePeriod)
         .filter(models.AddressUnavailablePeriod.address_id == address_id)
@@ -545,6 +567,8 @@ def edit_address_form(
     )
     photo_types = {photo.photo_type for photo in photos}
     photos_complete = "both" in photo_types or ("new" in photo_types and "old" in photo_types)
+    missing_replacement_date = address.register_closed
+    missing_photos = address.register_closed and not photos_complete
     latest_response = (
         db.query(models.ResidentResponse)
         .filter(models.ResidentResponse.address_id == address_id)
@@ -575,6 +599,8 @@ def edit_address_form(
             "has_appointment": bool(latest_appointment),
             "photos_complete": photos_complete,
             "show_photo_upload": bool(edit_photos) or not photos_complete,
+            "missing_replacement_date": missing_replacement_date,
+            "missing_photos": missing_photos,
         },
     )
 

@@ -52,6 +52,7 @@ class Address(Base):
     blocked_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     old_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     new_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    register_closed: Mapped[bool] = mapped_column(Boolean, default=False)
     latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
