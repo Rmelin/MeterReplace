@@ -1,196 +1,187 @@
 {% extends "base.html" %}
 {% block content %}
+<section class="page-header">
+    <div>
+        <a href="/admin/addresses" class="link" style="margin-bottom: 0.5rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            Tilbage til listen
+        </a>
+        <h1 style="margin-top: 0.5rem;">{{ address.street }} {{ address.house_no }}</h1>
+        <p class="hint">{{ address.zip }} {{ address.city }}</p>
+    </div>
+    <div class="action-row">
+        {% if letter_available %}
+            <a class="primary-button" href="/admin/letters/address/{{ address.id }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                Brev
+            </a>
+        {% endif %}
+        <a class="ghost-button" href="/admin/addresses/map?q={{ address.street|urlencode }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+            Kort
+        </a>
+    </div>
+</section>
+
 <div class="grid">
+    <!-- Hovedinformation & Kontakt -->
     <section class="card">
-        <div class="section-header">
-            <h1>Rediger adresse</h1>
-            <button type="button" class="ghost-button" data-toggle-panel="address-details">Vis/skjul</button>
-        </div>
-        <div class="address-highlight">
-            <div>
-                <div class="address-title">{{ address.street }} {{ address.house_no }}</div>
-                <div class="address-subtitle">{{ address.zip }} {{ address.city }}</div>
-            </div>
+        <div class="section-header" style="margin-bottom: 1.5rem;">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                Kontakt & Status
+            </h2>
             <span class="status-chip status-{{ status_key }}">{{ status_label }}</span>
         </div>
-        {% if address.register_closed and (missing_replacement_date or missing_photos) %}
-            <p class="hint" style="margin-top: 0.75rem;"><strong>OBS:</strong> Afsluttet via registerimport.</p>
-            {% if missing_replacement_date %}
-                <p class="hint">Skiftedag er ikke registreret i appen.</p>
-            {% endif %}
-            {% if missing_photos %}
-                <p class="hint">Der er ikke uploadet billeder endnu.</p>
-            {% endif %}
-        {% endif %}
-        <div data-panel="address-details">
-            {% if resident_response %}
-                <p class="hint">Seneste beboersvar: {{ resident_response.label }} · {{ resident_response.date }}</p>
-            {% endif %}
-            <div class="action-row" style="margin-bottom: 1rem;">
-                <a class="ghost-button" href="/admin/addresses/{{ address.id }}/edit/address">Rediger vej/hus/postnr/by</a>
-                {% if letter_available %}
-                    <a class="ghost-button" href="/admin/letters/address/{{ address.id }}">Brev</a>
-                {% endif %}
-                <form method="post" action="/admin/addresses/{{ address.id }}/delete" class="inline-form" onsubmit="return confirm('Er du sikker på, at du vil slette adressen?');">
-                    <button type="submit" class="danger-button">Slet adresse</button>
-                </form>
+        
+        <form method="post" action="/admin/addresses/{{ address.id }}/edit" class="form-grid">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+                <label>Kontakt navn<input type="text" name="customer_name" value="{{ address.customer_name or '' }}" placeholder="Beboerens navn" /></label>
+                <label>Kontakt telefon<input type="text" name="customer_phone" value="{{ address.customer_phone or '' }}" placeholder="Mobil / Fastnet" /></label>
             </div>
-            <form method="post" action="/admin/addresses/{{ address.id }}/edit" class="form-grid">
-                <label>Kontakt navn<input type="text" name="customer_name" value="{{ address.customer_name or '' }}" /></label>
-                <label>Kontakt email<input type="text" name="customer_email" value="{{ address.customer_email or '' }}" /></label>
-                <label>Kontakt telefon<input type="text" name="customer_phone" value="{{ address.customer_phone or '' }}" /></label>
-                <label class="checkbox-field">
-                    <input type="checkbox" name="buffer_flag" {% if address.buffer_flag %}checked{% endif %} />
-                    Har Målerbrønd
-                </label>
-                <label>Placering af målerbrønd<input type="text" name="buffer_note" value="{{ address.buffer_note or '' }}" /></label>
-                <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ address.old_meter_no or '' }}" /></label>
-                <label>Ny målernr<input type="text" name="new_meter_no" value="{{ address.new_meter_no or '' }}" /></label>
-                <label class="checkbox-field">
-                    <input type="checkbox" name="blocked_flag" {% if address.blocked_reason %}checked{% endif %} />
-                    Fejl ved stophane
-                </label>
-                <label>Stophane note<input type="text" name="blocked_note" value="{{ address.blocked_reason or '' }}" /></label>
-                <button type="submit" class="primary-button">Gem</button>
-                <a href="/admin/addresses" class="ghost-button">Tilbage</a>
-            </form>
-        </div>
-    </section>
-
-    <section class="card">
-        <div class="section-header">
-            <h2>Ikke tilgængelig</h2>
-            <button type="button" class="ghost-button" data-toggle-panel="address-unavailable">Vis/skjul</button>
-        </div>
-        <div data-panel="address-unavailable">
-            <form method="post" action="/admin/addresses/{{ address.id }}/unavailable" class="form-grid">
-                <label>Start<input type="datetime-local" name="starts_at" required /></label>
-                <label>Slut<input type="datetime-local" name="ends_at" required /></label>
-                <label>Note<input type="text" name="note" placeholder="Valgfrit" /></label>
-                <button type="submit" class="primary-button">Tilføj periode</button>
-            </form>
-            {% if unavailable_periods %}
-                <div class="table-wrapper" style="margin-top: 1rem;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Start</th>
-                                <th>Slut</th>
-                                <th>Note</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for period in unavailable_periods %}
-                                <tr>
-                                    <td>{{ period.starts_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                                    <td>{{ period.ends_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                                    <td>{{ period.note or '-' }}</td>
-                                    <td>
-                                        <form method="post" action="/admin/addresses/{{ address.id }}/unavailable/{{ period.id }}/delete">
-                                            <button type="submit" class="ghost-button">Slet</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <label>Kontakt email<input type="text" name="customer_email" value="{{ address.customer_email or '' }}" placeholder="E-mail" /></label>
+            
+            <div style="border-top: 1px solid var(--border); margin: 1rem 0; padding-top: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <label>Gammel måler nr<input type="text" name="old_meter_no" value="{{ address.old_meter_no or '' }}" /></label>
+                    <label>Ny måler nr<input type="text" name="new_meter_no" value="{{ address.new_meter_no or '' }}" /></label>
                 </div>
-            {% else %}
-                <p class="hint" style="margin-top: 1rem;">Ingen perioder registreret endnu.</p>
-            {% endif %}
-        </div>
-    </section>
 
-    <section class="card">
-        <div class="section-header">
-            <h2>Ikke hjemme historik</h2>
-            <button type="button" class="ghost-button" data-toggle-panel="address-not-home">Vis/skjul</button>
-        </div>
-        <div data-panel="address-not-home">
-            {% if not_home_history %}
-                <div class="table-wrapper" style="margin-top: 1rem;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Dato</th>
-                                <th>VVS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in not_home_history %}
-                                <tr>
-                                    <td>{{ row.appointment.starts_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                                    <td>{{ row.contractor.username }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <p class="hint" style="margin-top: 1rem;">Ingen ikke hjemme registreringer endnu.</p>
-            {% endif %}
-        </div>
-    </section>
-
-    <section class="card">
-        <div class="section-header">
-            <h2>Fotos</h2>
-            <div class="action-row" style="margin-bottom: 0;">
-                <button type="button" class="ghost-button" data-toggle-panel="address-photos">Vis/skjul</button>
-                {% if photos_complete %}
-                    <a class="ghost-button" href="/admin/addresses/{{ address.id }}/edit?edit_photos=1">Rediger fotos</a>
-                {% endif %}
-            </div>
-        </div>
-        <div data-panel="address-photos">
-            {% if show_photo_upload %}
-                <form method="post" action="/admin/addresses/{{ address.id }}/photos" enctype="multipart/form-data" class="form-grid">
-                    {% if photos_complete %}
-                        <input type="hidden" name="force" value="1" />
-                    {% endif %}
-                    <fieldset class="option-field" required>
-                        <legend>Fototype</legend>
-                        <div class="option-buttons">
-                            <label class="option-button">
-                                <input type="radio" name="photo_type" value="both" required />
-                                <span>Begge målere i ét foto</span>
+                <div class="card" style="background: rgba(var(--accent-rgb), 0.03); border-color: rgba(var(--accent-rgb), 0.1); margin: 0;">
+                    <h3 style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 1rem;">Tekniske forhold</h3>
+                    <div style="display: grid; gap: 1.25rem;">
+                        <div style="display: grid; gap: 0.5rem;">
+                            <label class="checkbox-field" style="font-weight: 700;">
+                                <input type="checkbox" name="buffer_flag" {% if address.buffer_flag %}checked{% endif %} />
+                                Målerbrønd placeret
                             </label>
-                            <label class="option-button">
-                                <input type="radio" name="photo_type" value="new" required />
-                                <span>Ny måler</span>
-                            </label>
-                            <label class="option-button">
-                                <input type="radio" name="photo_type" value="old" required />
-                                <span>Gammel måler</span>
-                            </label>
+                            <input type="text" name="buffer_note" value="{{ address.buffer_note or '' }}" placeholder="Note om brønd" style="font-size: 0.9rem;" />
                         </div>
-                    </fieldset>
-                    <label>Gammel målernr<input type="text" name="old_meter_no" /></label>
-                    <label>Ny målernr<input type="text" name="new_meter_no" /></label>
-                    {% if not has_appointment %}
-                        <label>Dato for udskiftning<input type="datetime-local" name="replacement_datetime" required /></label>
-                    {% endif %}
-                    <label>Foto<input type="file" name="file" accept="image/*" required /></label>
-                    <button type="submit" class="primary-button">Upload</button>
-                </form>
-            {% elif photos_complete %}
-                <p class="hint" style="margin-top: 1rem;">Fotos er komplette.</p>
+                        
+                        <div style="display: grid; gap: 0.5rem;">
+                            <label class="checkbox-field" style="font-weight: 700; color: var(--error);">
+                                <input type="checkbox" name="blocked_flag" {% if address.blocked_reason %}checked{% endif %} />
+                                Defekt / Blokeret stophane
+                            </label>
+                            <input type="text" name="blocked_note" value="{{ address.blocked_reason or '' }}" placeholder="Årsag til blokering" style="font-size: 0.9rem;" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button type="submit" class="primary-button" style="flex: 2;">Gem oplysninger</button>
+                <a class="ghost-button" href="/admin/addresses/{{ address.id }}/edit/address" style="flex: 1;">Ret stamdata</a>
+            </div>
+        </form>
+    </section>
+
+    <!-- Fotos Sektion -->
+    <section class="card">
+        <div class="section-header" style="margin-bottom: 1.5rem;">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                Dokumentation
+            </h2>
+            {% if photos_complete %}
+                <a class="link" href="/admin/addresses/{{ address.id }}/edit?edit_photos=1" style="font-size: 0.85rem;">Rediger fotos</a>
             {% endif %}
-            {% if photos %}
-                <div class="photo-grid" style="margin-top: 1rem;">
-                    {% for photo in photos %}
-                        <div class="photo-item">
-                            <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" data-lightbox />
-                            <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+        </div>
+        
+        {% if show_photo_upload %}
+            <form method="post" action="/admin/addresses/{{ address.id }}/photos" enctype="multipart/form-data" class="form-grid card" style="background: rgba(var(--accent-rgb), 0.02); border-style: dashed;">
+                <div>
+                    <label style="margin-bottom: 0.5rem; display: block; font-weight: 700;">Fototype</label>
+                    <div class="option-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <label class="option-button">
+                            <input type="radio" name="photo_type" value="both" required style="display: none;" />
+                            <span>Begge i ét</span>
+                        </label>
+                        <label class="option-button">
+                            <input type="radio" name="photo_type" value="new" required style="display: none;" />
+                            <span>Ny måler</span>
+                        </label>
+                        <label class="option-button">
+                            <input type="radio" name="photo_type" value="old" required style="display: none;" />
+                            <span>Gammel måler</span>
+                        </label>
+                    </div>
+                </div>
+                <label>Vælg fil<input type="file" name="file" accept="image/*" required /></label>
+                <button type="submit" class="ghost-button">Upload billede</button>
+            </form>
+        {% endif %}
+
+        {% if photos %}
+            <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem;">
+                {% for photo in photos %}
+                    <div class="photo-item card" style="padding: 0.4rem; margin: 0; background: var(--bg);">
+                        <img src="/upload/{{ photo.file_path }}" alt="Foto" class="photo-thumb" style="width: 100%; height: 100px; border-radius: 8px;" data-lightbox />
+                        <span class="hint" style="display: block; text-align: center; margin-top: 0.4rem; font-size: 0.75rem;">{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 3rem 1rem; border: 2px dashed var(--border); border-radius: 16px; background: rgba(var(--accent-rgb), 0.01);">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1" style="margin-bottom: 1rem;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                <p class="hint">Ingen fotos dokumenteret endnu</p>
+            </div>
+        {% endif %}
+    </section>
+
+    <!-- Højre Kolonne: Historik & Farezone -->
+    <div style="display: grid; gap: 1.5rem;">
+        <section class="card">
+            <div class="section-header">
+                <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Tidsbegrænsning</h2>
+            </div>
+            <form method="post" action="/admin/addresses/{{ address.id }}/unavailable" class="form-grid">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label>Start<input type="datetime-local" name="starts_at" required style="font-size: 0.85rem;" /></label>
+                    <label>Slut<input type="datetime-local" name="ends_at" required style="font-size: 0.85rem;" /></label>
+                </div>
+                <button type="submit" class="ghost-button" style="font-size: 0.85rem; padding: 0.5rem;">Registrer periode</button>
+            </form>
+            
+            {% if unavailable_periods %}
+                <div style="margin-top: 1rem; display: grid; gap: 0.5rem;">
+                    {% for period in unavailable_periods %}
+                        <div class="card" style="padding: 0.75rem; margin: 0; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>{{ period.starts_at.strftime('%d/%m %H:%M') }}</strong>
+                                <span class="hint">→ {{ period.ends_at.strftime('%H:%M') }}</span>
+                            </div>
+                            <form method="post" action="/admin/addresses/{{ address.id }}/unavailable/{{ period.id }}/delete">
+                                <button type="submit" style="background: none; border: none; color: var(--error); cursor: pointer; padding: 0.25rem;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                            </form>
                         </div>
                     {% endfor %}
                 </div>
-            {% else %}
-                <p class="hint" style="margin-top: 1rem;">Ingen fotos registreret endnu.</p>
             {% endif %}
-        </div>
-    </section>
+        </section>
+
+        {% if not_home_history %}
+        <section class="card" style="border-left: 4px solid var(--error);">
+            <h2 style="color: var(--error); font-size: 1.1rem; margin-bottom: 1rem;">Ikke hjemme historik</h2>
+            <div style="display: grid; gap: 0.5rem;">
+                {% for row in not_home_history %}
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                        <span>{{ row.appointment.starts_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                        <span class="hint">v/ {{ row.contractor.username }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="card" style="border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.02);">
+            <h2 style="color: var(--error); font-size: 1.1rem; margin-bottom: 0.5rem;">Sletning</h2>
+            <p class="hint" style="margin-bottom: 1rem;">Fjern adressen permanent fra systemet.</p>
+            <form method="post" action="/admin/addresses/{{ address.id }}/delete" onsubmit="return confirm('Er du sikker på du vil slette denne adresse permanent?');">
+                <button type="submit" class="danger-button" style="width: 100%; font-size: 0.85rem;">Slet adresse</button>
+            </form>
+        </section>
+    </div>
 </div>
 <script src="/static/admin_address_edit.js" defer></script>
 {% endblock %}

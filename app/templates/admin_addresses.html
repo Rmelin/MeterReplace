@@ -65,12 +65,12 @@
             <p class="hint">Hvis geokodning er slået fra, kan koordinater sættes i Adressekort.</p>
         </div>
     </div>
-    <div class="filter-chips">
+    <div class="filter-chips" style="overflow-x: auto; white-space: nowrap; padding-bottom: 0.5rem; -webkit-overflow-scrolling: touch;">
         {% for item in status_filters %}
             {% if item.value == 'all' %}
-                <a class="chip {% if selected_status == 'all' %}is-active{% endif %}" href="/admin/addresses{% if search_query %}?q={{ search_query }}{% endif %}">{{ item.label }}</a>
+                <a class="chip {% if selected_status == 'all' %}is-active{% endif %}" href="/admin/addresses{% if search_query %}?q={{ search_query }}{% endif %}" style="display: inline-block; float: none;">{{ item.label }}</a>
             {% else %}
-                <a class="chip {% if selected_status == item.value %}is-active{% endif %}" href="/admin/addresses?status={{ item.value }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ item.label }}</a>
+                <a class="chip {% if selected_status == item.value %}is-active{% endif %}" href="/admin/addresses?status={{ item.value }}{% if search_query %}&q={{ search_query }}{% endif %}" style="display: inline-block; float: none;">{{ item.label }}</a>
             {% endif %}
         {% endfor %}
     </div>
@@ -84,7 +84,7 @@
             {% set _ = query_parts.append('q=' ~ search_query) %}
         {% endif %}
         {% set redirect_url = '/admin/addresses' ~ ('?' ~ '&'.join(query_parts) if query_parts else '') %}
-        <div class="table-wrapper">
+        <div class="table-wrapper table-mobile-stacked">
             <table>
                 <thead>
                     <tr>
@@ -95,61 +95,62 @@
                         <th>Status</th>
                         <th>Kontakt</th>
                         <th>Noter</th>
-                        <th></th>
+                        <th>Handlinger</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for address in addresses %}
                         <tr>
-                            <td>{{ address.street }}</td>
-                            <td>{{ address.house_no }}</td>
-                            <td>{{ address.zip }}</td>
-                            <td>{{ address.city }}</td>
-                            <td>{{ status_map.get(address.id, 'Ikke planlagt') }}</td>
-                            <td>
+                            <td data-label="Vej">{{ address.street }}</td>
+                            <td data-label="Husnr">{{ address.house_no }}</td>
+                            <td data-label="Postnr">{{ address.zip }}</td>
+                            <td data-label="By">{{ address.city }}</td>
+                            <td data-label="Status">{{ status_map.get(address.id, 'Ikke planlagt') }}</td>
+                            <td data-label="Kontakt">
                                 {% if address.customer_name or address.customer_email or address.customer_phone %}
-                                    <div>{{ address.customer_name or '-' }}</div>
+                                    <span>{{ address.customer_name or '-' }}</span>
                                     <div class="hint">{{ address.customer_email or address.customer_phone or '-' }}</div>
                                 {% else %}
                                     <span class="hint">Ingen kontakt</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {% set show_letter = status_status_map.get(address.id) in (AppointmentStatus.SCHEDULED, AppointmentStatus.INFORMED) %}
-                                {% set not_home_count = not_home_history_map.get(address.id, 0) %}
-                                {% set photo_count = photo_map.get(address.id, 0) %}
-                                {% set resident_response = resident_response_map.get(address.id) %}
-                                {% if show_letter %}
-                                    <a class="chip" href="/admin/letters/address/{{ address.id }}">Brev</a>
-                                {% endif %}
-                                {% if resident_response %}
-                                    <span class="chip">Svar: {{ resident_response.label }} · {{ resident_response.date }}</span>
-                                {% endif %}
-                                {% if address.buffer_flag %}
-                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Målerbrønd</a>
-                                {% endif %}
-                                {% if address.blocked_reason %}
-                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Stophane</a>
-                                {% endif %}
-                                {% if not_home_count %}
-                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Ikke hjemme</a>
-                                {% endif %}
-                                {% if photo_count %}
-                                    <a class="chip" href="/admin/addresses/{{ address.id }}/edit">📷</a>
-                                {% endif %}
-                                {% if not (show_letter or resident_response or address.buffer_flag or address.blocked_reason or not_home_count or photo_count) %}
-                                    <span class="hint">-</span>
-                                {% endif %}
+                            <td data-label="Noter">
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; justify-content: flex-end;">
+                                    {% set show_letter = status_status_map.get(address.id) in (AppointmentStatus.SCHEDULED, AppointmentStatus.INFORMED) %}
+                                    {% set not_home_count = not_home_history_map.get(address.id, 0) %}
+                                    {% set photo_count = photo_map.get(address.id, 0) %}
+                                    {% set resident_response = resident_response_map.get(address.id) %}
+                                    {% if show_letter %}
+                                        <a class="chip" href="/admin/letters/address/{{ address.id }}">Brev</a>
+                                    {% endif %}
+                                    {% if resident_response %}
+                                        <span class="chip">Svar: {{ resident_response.label }}</span>
+                                    {% endif %}
+                                    {% if address.buffer_flag %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Brønd</a>
+                                    {% endif %}
+                                    {% if address.blocked_reason %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Stophane</a>
+                                    {% endif %}
+                                    {% if not_home_count %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Ikke hjemme</a>
+                                    {% endif %}
+                                    {% if photo_count %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">📷</a>
+                                    {% endif %}
+                                </div>
                             </td>
-                            <td>
-                                <a class="link" href="/admin/addresses/{{ address.id }}/edit">Detaljer</a>
-                                {% if status_status_map.get(address.id) and status_status_map.get(address.id) != AppointmentStatus.NEEDS_RESCHEDULE %}
-                                    <form method="post" action="/admin/addresses/{{ address.id }}/needs-reschedule" class="inline-status-form">
-                                        <input type="hidden" name="redirect" value="{{ redirect_url }}" />
-                                        <input type="text" name="note" placeholder="Note til behov for ny dato" required />
-                                        <button type="submit" class="ghost-button">Behov for ny dato</button>
-                                    </form>
-                                {% endif %}
+                            <td data-label="Handlinger">
+                                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <a class="primary-button" href="/admin/addresses/{{ address.id }}/edit" style="font-size: 0.85rem; padding: 0.4rem;">Detaljer / Rediger</a>
+                                    {% if status_status_map.get(address.id) and status_status_map.get(address.id) != AppointmentStatus.NEEDS_RESCHEDULE %}
+                                        <form method="post" action="/admin/addresses/{{ address.id }}/needs-reschedule" class="inline-status-form" style="display: grid; gap: 0.25rem;">
+                                            <input type="hidden" name="redirect" value="{{ redirect_url }}" />
+                                            <input type="text" name="note" placeholder="Note til ny dato" required style="font-size: 0.85rem; padding: 0.4rem;" />
+                                            <button type="submit" class="ghost-button" style="font-size: 0.85rem; padding: 0.4rem;">Behov for ny dato</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}

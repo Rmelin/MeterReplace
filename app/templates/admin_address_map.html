@@ -17,10 +17,10 @@
 
 <section class="card map-card">
     <div class="map-toolbar">
-        <div class="map-filters">
+        <div class="map-filters" style="flex: 1;">
             <label>
                 Søg
-                <input type="text" id="map-search" placeholder="Vej, postnr, kunde..." />
+                <input type="text" id="map-search" placeholder="Vej, kunde..." style="width: 200px;" />
             </label>
             <label>
                 Status
@@ -30,9 +30,13 @@
                     {% endfor %}
                 </select>
             </label>
-            <button type="button" class="ghost-button" id="map-sidebar-toggle">Skjul sidepanel</button>
+            <button type="button" class="ghost-button" id="map-sidebar-toggle">Sidepanel</button>
         </div>
-        <div class="map-legend" id="map-legend"></div>
+    </div>
+    
+    <!-- JS handles the legend in this container -->
+    <div class="card" style="margin-bottom: 1rem; padding: 1rem;">
+        <div class="map-legend" id="map-legend" style="display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: center;"></div>
     </div>
     <div class="map-layout">
         <div id="address-map" class="address-map"></div>
