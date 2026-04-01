@@ -4,7 +4,7 @@
     <h1>Besked til os</h1>
     <p class="hint">Adresse: {{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
     {% if appointment %}
-        <p class="hint">Planlagt tid: {{ appointment.starts_at.strftime('%d/%m %H:%M') }}</p>
+        <p class="hint">Planlagt tid: {% if appointment.starts_at.hour < 12 %}Formiddag (08:00–12:00){% else %}Eftermiddag (12:00–16:00){% endif %}</p>
     {% endif %}
     <form method="post" action="/r/{{ token }}" class="form-grid">
         <fieldset class="form-fieldset">
@@ -33,9 +33,30 @@
                 <span>De forslået tidspunker passer ikke, der er behov for en ny dato</span>
             </label>
         </fieldset>
+        <label>
+            Besked
+            <textarea name="time_message" rows="4" class="textarea" placeholder="Skriv dit forslag" data-time-message></textarea>
+        </label>
         <label>Telefon<input type="text" name="phone" /></label>
         <label>Email<input type="text" name="email" /></label>
         <button type="submit" class="primary-button">Send svar</button>
     </form>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const yes = document.querySelector('input[name="time_answer"][value="yes"]');
+            const no = document.querySelector('input[name="time_answer"][value="no"]');
+            const box = document.querySelector("[data-time-message]");
+            if (!yes || !no || !box) {
+                return;
+            }
+            const toggle = () => {
+                const enabled = no.checked;
+                box.disabled = !enabled;
+            };
+            yes.addEventListener("change", toggle);
+            no.addEventListener("change", toggle);
+            toggle();
+        });
+    </script>
 </section>
 {% endblock %}
