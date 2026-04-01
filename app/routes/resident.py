@@ -92,6 +92,7 @@ def resident_submit(
     buffer_answer: str = Form(""),
     time_answer: str = Form(""),
     message: str | None = Form(""),
+    time_message: str | None = Form(""),
     phone: str | None = Form(""),
     email: str | None = Form(""),
     db: Session = Depends(get_db),
@@ -110,6 +111,7 @@ def resident_submit(
     buffer_answer = buffer_answer.strip().lower()
     time_answer = time_answer.strip().lower()
     message = (message or "").strip() or None
+    time_message = (time_message or "").strip() or None
     phone = (phone or "").strip() or None
     email = (email or "").strip() or None
     if phone:
@@ -164,7 +166,7 @@ def resident_submit(
                 address_id=address.id,
                 appointment_id=appointment.id if appointment else None,
                 response_type="reschedule_request",
-                message=None,
+                message=time_message,
                 phone=phone,
                 email=email,
                 created_at=datetime.utcnow(),
