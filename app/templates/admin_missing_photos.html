@@ -36,15 +36,14 @@
                                 <td>
                                     <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
                                         <input type="hidden" name="redirect" value="/admin/missing-photos" />
-                                        <label>
-                                            Fototype
-                                            <select name="photo_type" required>
-                                                <option value="">Vælg type</option>
-                                                <option value="both">Begge målere i ét foto</option>
-                                                <option value="new">Ny måler</option>
-                                                <option value="old">Gammel måler</option>
-                                            </select>
-                                        </label>
+                                        <div>
+                                            <label style="margin-bottom: 0.5rem; display: block; font-weight: 700;">Fototype</label>
+                                            <div class="option-buttons">
+                                                <label class="option-button"><input type="radio" name="photo_type" value="both" required style="display: none;" /><span>Begge</span></label>
+                                                <label class="option-button"><input type="radio" name="photo_type" value="new" required style="display: none;" /><span>Ny</span></label>
+                                                <label class="option-button"><input type="radio" name="photo_type" value="old" required style="display: none;" /><span>Gammel</span></label>
+                                            </div>
+                                        </div>
                                         <label>Foto<input type="file" name="file" accept="image/*" required /></label>
                                         <button type="submit" class="primary-button">Upload</button>
                                     </form>

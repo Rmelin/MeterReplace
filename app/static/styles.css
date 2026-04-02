@@ -398,6 +398,66 @@ a.chip:hover {
 .address-map { height: 700px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .map-legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; }
 .map-legend-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.1); flex-shrink: 0; }
+.map-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+.map-filter-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.map-filter-button { position: relative; }
+.map-filter-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--status-color, transparent);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    display: inline-block;
+    flex-shrink: 0;
+    margin-right: 0.35rem;
+}
+.map-filter-button.is-active .map-filter-swatch {
+    border-color: rgba(0, 0, 0, 0.3);
+}
+.map-filter-button.is-active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.3);
+}
+.map-filter-date input,
+.map-filter-date select { width: 180px; }
+.leaflet-popup-content-wrapper {
+    background: var(--card) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow) !important;
+}
+
+.leaflet-popup-tip {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+}
+
+.leaflet-popup-content {
+    color: var(--text) !important;
+    margin: 0.75rem 1rem !important;
+}
+
+.leaflet-popup-content a { color: var(--accent) !important; }
+
+.leaflet-popup-content .map-popup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.leaflet-popup-content .ghost-button.map-popup-button {
+    color: #0b0d12 !important;
+    border-color: var(--accent) !important;
+    background: var(--accent) !important;
+    box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.25) !important;
+}
+
+.leaflet-popup-content .ghost-button.map-popup-button:hover {
+    filter: brightness(1.05) !important;
+}
 
 /* Forms */
 * { box-sizing: border-box; }

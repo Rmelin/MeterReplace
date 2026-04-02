@@ -700,6 +700,13 @@ def address_map(
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
 ):
+    availability_dates = [
+        row[0]
+        for row in db.query(models.VvsAvailability.date)
+        .distinct()
+        .order_by(models.VvsAvailability.date.desc())
+        .all()
+    ]
     return request.app.state.templates.TemplateResponse(
         "admin_address_map.html",
         {
@@ -707,6 +714,7 @@ def address_map(
             "current_user": user,
             "flashes": consume_flashes(request),
             "status_filters": STATUS_FILTERS,
+            "availability_dates": availability_dates,
         },
     )
 
@@ -715,6 +723,7 @@ def address_map(
 def address_map_data(
     q: str | None = None,
     status: str | None = None,
+    date: str | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
 ):
@@ -734,8 +743,62 @@ def address_map_data(
             )
         )
     addresses = query.all()
+    if date:
+        try:
+            selected_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = None
+        if selected_date:
+            day_start = datetime.combine(selected_date, datetime.min.time())
+            day_end = datetime.combine(selected_date, datetime.max.time())
+            date_rows = (
+                db.query(models.Appointment.address_id)
+                .filter(
+                    models.Appointment.starts_at >= day_start,
+                    models.Appointment.starts_at <= day_end,
+                )
+                .distinct()
+                .all()
+            )
+            date_ids = {row[0] for row in date_rows}
+            addresses = [address for address in addresses if address.id in date_ids]
     address_ids = [address.id for address in addresses]
     status_map = latest_status_map(db, address_ids)
+    current_year = datetime.utcnow().year
+    appointment_map: dict[int, models.Appointment] = {}
+    notscheduled_candidates: dict[int, models.Appointment] = {}
+    if address_ids:
+        appointments = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.address_id.in_(address_ids),
+                models.Appointment.status.in_(
+                    [
+                        models.AppointmentStatus.SCHEDULED,
+                        models.AppointmentStatus.NOT_SCHEDULED,
+                        models.AppointmentStatus.INFORMED,
+                        models.AppointmentStatus.COMPLETED,
+                        models.AppointmentStatus.CLOSED,
+                        models.AppointmentStatus.NOT_HOME,
+                        models.AppointmentStatus.NEEDS_RESCHEDULE,
+                    ]
+                ),
+            )
+            .order_by(models.Appointment.starts_at.desc())
+            .all()
+        )
+        for appointment in appointments:
+            if appointment.status == models.AppointmentStatus.NOT_SCHEDULED:
+                if appointment.address_id not in notscheduled_candidates:
+                    notscheduled_candidates[appointment.address_id] = appointment
+                continue
+            if appointment.address_id in appointment_map:
+                continue
+            appointment_map[appointment.address_id] = appointment
+        for address_id, appointment in notscheduled_candidates.items():
+            if address_id in appointment_map:
+                continue
+            appointment_map[address_id] = appointment
 
     allowed_filters = {item["value"] for item in STATUS_FILTERS}
     selected_status = status if status in allowed_filters else "all"
@@ -775,6 +838,9 @@ def address_map_data(
     payload = []
     for address in addresses:
         status_value = status_map.get(address.id)
+        status_label, status_key = status_label_and_key(
+            appointment_map.get(address.id), current_year, address.register_closed
+        )
         payload.append(
             {
                 "id": address.id,
@@ -784,7 +850,9 @@ def address_map_data(
                 "city": address.city,
                 "latitude": float(address.latitude) if address.latitude is not None else None,
                 "longitude": float(address.longitude) if address.longitude is not None else None,
-                "status": status_value.value.lower() if status_value else "unplanned",
+                "status": status_key,
+                "status_label": status_label,
+                "status_value": status_value.value.lower() if status_value else "unplanned",
             }
         )
     return JSONResponse({"addresses": payload})

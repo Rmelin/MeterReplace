@@ -22,22 +22,57 @@
                 Søg
                 <input type="text" id="map-search" placeholder="Vej, kunde..." style="width: 200px;" />
             </label>
-            <label>
-                Status
-                <select id="map-status">
-                    {% for item in status_filters %}
-                        <option value="{{ item.value }}">{{ item.label }}</option>
+            <label class="map-filter-date">
+                Arbejdsdato
+                <select id="map-date">
+                    <option value="">Alle</option>
+                    {% for day in availability_dates %}
+                        <option value="{{ day.strftime('%Y-%m-%d') }}">{{ day.strftime('%d/%m/%Y') }}</option>
                     {% endfor %}
                 </select>
             </label>
+            <div class="map-filter-buttons option-buttons" id="map-status-buttons" aria-label="Status filter">
+                <button type="button" class="option-button map-filter-button is-active" data-status="all">
+                    <span class="map-filter-swatch"></span>
+                    Alle
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="planned">
+                    <span class="map-filter-swatch"></span>
+                    Planlagt
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="unplanned">
+                    <span class="map-filter-swatch"></span>
+                    Ikke planlagt
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="informed">
+                    <span class="map-filter-swatch"></span>
+                    Beboer/kunde informeret
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="completed">
+                    <span class="map-filter-swatch"></span>
+                    Skiftet
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="closed">
+                    <span class="map-filter-swatch"></span>
+                    Afsluttet
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="not_home">
+                    <span class="map-filter-swatch"></span>
+                    Ikke hjemme
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="needs_reschedule">
+                    <span class="map-filter-swatch"></span>
+                    Behov for ny dato
+                </button>
+                <button type="button" class="option-button map-filter-button" data-filter="selected">
+                    <span class="map-filter-swatch"></span>
+                    Markeret
+                </button>
+            </div>
             <button type="button" class="ghost-button" id="map-sidebar-toggle">Sidepanel</button>
         </div>
     </div>
     
-    <!-- JS handles the legend in this container -->
-    <div class="card" style="margin-bottom: 1rem; padding: 1rem;">
-        <div class="map-legend" id="map-legend" style="display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: center;"></div>
-    </div>
     <div class="map-layout">
         <div id="address-map" class="address-map"></div>
         <aside class="map-sidebar">
