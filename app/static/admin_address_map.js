@@ -27,10 +27,12 @@ const MAP_ZOOM = 7
 const MAP_CENTER_ZOOM = 13
 
 const searchInput = document.getElementById('map-search')
-const statusSelect = document.getElementById('map-status')
+const statusButtons = Array.from(
+  document.querySelectorAll('.map-filter-button')
+)
+const dateInput = document.getElementById('map-date')
 const missingList = document.getElementById('missing-list')
 const missingCount = document.getElementById('missing-count')
-const legend = document.getElementById('map-legend')
 const editHint = document.getElementById('edit-hint')
 const selectedList = document.getElementById('selected-list')
 const selectedCount = document.getElementById('selected-count')
@@ -51,6 +53,8 @@ let currentEditId = null
 let addresses = []
 let editLabel = ''
 let selectedIds = []
+let activeStatus = 'all'
+let activeFilter = 'status'
 const selectedStorageKey = 'address_map_selected_ids'
 const sidebarStorageKey = 'address_map_hide_sidebar'
 
@@ -65,24 +69,20 @@ const updateEditHint = () => {
 }
 
 
-const buildLegend = () => {
-  legend.innerHTML = ''
-  Object.entries(STATUS_COLORS).forEach(([status, color]) => {
-    const item = document.createElement('div')
-    item.className = 'map-legend-item'
-    item.innerHTML = `
-      <span class="map-legend-swatch" style="background: ${color}"></span>
-      <span>${STATUS_LABELS[status] || status}</span>
-    `
-    legend.appendChild(item)
+const applyFilterSwatches = () => {
+  statusButtons.forEach((button) => {
+    const status = button.dataset.status
+    const filter = button.dataset.filter
+    let color = ''
+    if (filter === 'selected') {
+      color = SELECTED_COLOR
+    } else if (status && status !== 'all') {
+      color = STATUS_COLORS[status] || STATUS_COLORS.unplanned
+    }
+    if (color) {
+      button.style.setProperty('--status-color', color)
+    }
   })
-  const selectedItem = document.createElement('div')
-  selectedItem.className = 'map-legend-item'
-  selectedItem.innerHTML = `
-    <span class="map-legend-swatch" style="background: ${SELECTED_COLOR}"></span>
-    <span>Markeret</span>
-  `
-  legend.appendChild(selectedItem)
 }
 
 const normalizeStatus = (status) => (status || '').trim().toLowerCase()
@@ -130,12 +130,23 @@ const loadSidebarState = () => {
   updateSidebarToggle(hidden)
 }
 
+const getVisibleAddresses = () => {
+  if (activeFilter === 'selected') {
+    return addresses.filter((row) => selectedIds.includes(row.id))
+  }
+  return addresses
+}
+
 const updateMarkers = () => {
   markerLayer.clearLayers()
-  addresses
+  getVisibleAddresses()
     .filter((row) => row.latitude !== null && row.longitude !== null)
     .forEach((row) => {
       const isSelected = selectedIds.includes(row.id)
+      const statusLabel =
+        row.status_label ||
+        STATUS_LABELS[normalizeStatus(row.status)] ||
+        row.status
       const marker = L.circleMarker([row.latitude, row.longitude], {
         radius: isSelected ? 9 : 7,
         color: isSelected ? SELECTED_COLOR : statusColor(row.status),
@@ -145,7 +156,7 @@ const updateMarkers = () => {
       })
       marker.bindPopup(
         `<strong>${row.street} ${row.house_no}</strong><br>${row.zip} ${row.city}<br>${
-          STATUS_LABELS[normalizeStatus(row.status)] || row.status
+          statusLabel
         }<br><div class="map-popup-actions">
           <button type="button" class="ghost-button map-popup-button" data-action="edit-coords" data-address-id="${
             row.id
@@ -174,7 +185,7 @@ const fitMapToVisible = () => {
 
 const renderMissingList = () => {
   missingList.innerHTML = ''
-  const missing = addresses.filter(
+  const missing = getVisibleAddresses().filter(
     (row) => row.latitude === null || row.longitude === null
   )
   missingCount.textContent = String(missing.length)
@@ -244,7 +255,11 @@ const renderSelectedList = () => {
     item.innerHTML = `
       <div class="map-list-main">
         <span>${row.street} ${row.house_no}</span>
-        <span class="hint">${STATUS_LABELS[normalizeStatus(row.status)] || row.status}</span>
+        <span class="hint">${
+          row.status_label ||
+          STATUS_LABELS[normalizeStatus(row.status)] ||
+          row.status
+        }</span>
       </div>
       <button type="button" class="ghost-button" data-address-id="${row.id}">Fjern</button>
     `
@@ -263,8 +278,11 @@ const loadMapData = async () => {
   if (searchInput.value.trim()) {
     params.set('q', searchInput.value.trim())
   }
-  if (statusSelect.value && statusSelect.value !== 'all') {
-    params.set('status', statusSelect.value)
+  if (activeFilter !== 'selected' && activeStatus !== 'all') {
+    params.set('status', activeStatus)
+  }
+  if (dateInput && dateInput.value) {
+    params.set('date', dateInput.value)
   }
   const response = await fetch(`/admin/addresses/map-data?${params.toString()}`)
   const data = await response.json()
@@ -346,7 +364,24 @@ const triggerSearch = () => {
 }
 
 searchInput.addEventListener('input', triggerSearch)
-statusSelect.addEventListener('change', loadMapData)
+if (dateInput) {
+  dateInput.addEventListener('change', loadMapData)
+}
+statusButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const status = button.dataset.status
+    const filter = button.dataset.filter
+    if (filter === 'selected') {
+      activeFilter = 'selected'
+    } else {
+      activeFilter = 'status'
+      activeStatus = status || 'all'
+    }
+    statusButtons.forEach((node) => node.classList.remove('is-active'))
+    button.classList.add('is-active')
+    loadMapData()
+  })
+})
 if (selectedClear) {
   selectedClear.addEventListener('click', () => {
     selectedIds = []
@@ -394,7 +429,7 @@ const loadMapCenter = async () => {
   }
 }
 
-buildLegend()
+applyFilterSwatches()
 updateEditHint()
 loadSelectedIds()
 loadSidebarState()
