@@ -169,10 +169,14 @@ def has_conflict(
 def vvs_tasks(
     request: Request,
     date_query: str | None = None,
+    show_all: int | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.VVS)),
 ):
     dates = availability_dates(db, user.id)
+    show_all_dates = bool(show_all)
+    cutoff_date = date.today() - timedelta(days=5)
+    filtered_dates = [day for day in dates if day >= cutoff_date]
     selected_date = None
     if date_query:
         try:
@@ -181,8 +185,18 @@ def vvs_tasks(
             flash(request, "Dato er ugyldig", "error")
             return RedirectResponse("/vvs/tasks", status_code=303)
 
+    elif filtered_dates:
+        selected_date = closest_date(filtered_dates)
     elif dates:
         selected_date = closest_date(dates)
+
+    available_dates = dates if show_all_dates else filtered_dates
+
+    if selected_date and not show_all_dates and selected_date < cutoff_date:
+        return RedirectResponse(
+            f"/vvs/tasks?date_query={selected_date.isoformat()}&show_all=1",
+            status_code=303,
+        )
 
     if selected_date and selected_date not in dates:
         flash(request, "Vælg en arbejdsdag", "error")
@@ -241,7 +255,8 @@ def vvs_tasks(
             "photos": photos,
             "todo": todo,
             "done": done,
-            "availability_dates": dates,
+            "availability_dates": available_dates,
+            "show_all_dates": show_all_dates,
             "selected_date": selected_date,
             "photo_labels": PHOTO_LABELS,
             "status_labels": STATUS_LABELS,
@@ -472,6 +487,7 @@ def edit_task(
     if not context:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
+    photos = appointment_photos(db, [appointment_id])
     template_name = "partials/vvs_task_form.html" if inline else "vvs_task_edit.html"
     base_context = {
         "request": request,
@@ -482,6 +498,8 @@ def edit_task(
         "duration_minutes": context["duration_minutes"],
         "inline": bool(inline),
         "errors": [],
+        "photos": photos.get(appointment_id, []),
+        "photo_labels": PHOTO_LABELS,
     }
     if not inline:
         base_context["flashes"] = consume_flashes(request)
