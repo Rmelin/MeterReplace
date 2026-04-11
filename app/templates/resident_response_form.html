@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card narrow">
+<section class="card narrow resident-response">
     <h1>Besked til os</h1>
     <p class="hint">Adresse: {{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
     {% if appointment %}
@@ -9,14 +9,16 @@
     <form method="post" action="/r/{{ token }}" class="form-grid">
         <fieldset class="form-fieldset">
             <legend>Er der målerbrønd på adresse?</legend>
-            <label class="radio-field">
-                <input type="radio" name="buffer_answer" value="yes" required />
-                <span>Ja</span>
-            </label>
-            <label class="radio-field">
-                <input type="radio" name="buffer_answer" value="no" />
-                <span>Nej</span>
-            </label>
+            <div class="option-buttons">
+                <label class="option-button">
+                    <input type="radio" name="buffer_answer" value="yes" required style="display: none;" />
+                    <span>Ja</span>
+                </label>
+                <label class="option-button">
+                    <input type="radio" name="buffer_answer" value="no" style="display: none;" />
+                    <span>Nej</span>
+                </label>
+            </div>
         </fieldset>
         <label>
             Hvis ja, placering af målerbrønd er:
@@ -24,18 +26,20 @@
         </label>
         <fieldset class="form-fieldset">
             <legend>Tidspunkt</legend>
-            <label class="radio-field">
-                <input type="radio" name="time_answer" value="yes" required />
-                <span>Tidspunkt passer mig</span>
-            </label>
-            <label class="radio-field">
-                <input type="radio" name="time_answer" value="no" />
-                <span>De forslået tidspunker passer ikke, der er behov for en ny dato</span>
-            </label>
+            <div class="option-buttons">
+                <label class="option-button">
+                    <input type="radio" name="time_answer" value="yes" required style="display: none;" />
+                    <span>Tidspunkt passer mig</span>
+                </label>
+                <label class="option-button">
+                    <input type="radio" name="time_answer" value="no" style="display: none;" />
+                    <span>De forslået tidspunker passer ikke, der er behov for en ny dato</span>
+                </label>
+            </div>
         </fieldset>
         <label>
             Besked
-            <textarea name="time_message" rows="4" class="textarea" placeholder="Skriv dit forslag" data-time-message></textarea>
+            <textarea name="time_message" rows="4" class="textarea" placeholder="Evt. besked" data-time-message></textarea>
         </label>
         <label>Telefon<input type="text" name="phone" /></label>
         <label>Email<input type="text" name="email" /></label>

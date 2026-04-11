@@ -580,6 +580,9 @@ def edit_address_form(
         resident_response = {
             "label": RESPONSE_LABELS.get(latest_response.response_type, "Svar modtaget"),
             "date": latest_response.created_at.strftime("%d/%m/%Y"),
+            "message": latest_response.message,
+            "phone": latest_response.phone,
+            "email": latest_response.email,
         }
     return request.app.state.templates.TemplateResponse(
         "admin_address_edit.html",

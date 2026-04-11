@@ -174,6 +174,28 @@
         </section>
         {% endif %}
 
+        {% if resident_response %}
+        <section class="card" style="border-left: 4px solid rgba(var(--accent-rgb), 0.5);">
+            <h2 style="font-size: 1.1rem; margin-bottom: 0.75rem;">Beboer svar</h2>
+            <p class="hint" style="margin-bottom: 0.75rem;">{{ resident_response.label }} · {{ resident_response.date }}</p>
+            {% if resident_response.message %}
+                <div class="card" style="margin: 0 0 0.75rem; padding: 0.75rem; background: rgba(var(--accent-rgb), 0.04); border-color: rgba(var(--accent-rgb), 0.15);">
+                    {{ resident_response.message }}
+                </div>
+            {% endif %}
+            {% if resident_response.phone or resident_response.email %}
+                <div style="display: grid; gap: 0.25rem; font-size: 0.9rem;">
+                    {% if resident_response.phone %}
+                        <div><strong>Telefon:</strong> {{ resident_response.phone }}</div>
+                    {% endif %}
+                    {% if resident_response.email %}
+                        <div><strong>Email:</strong> {{ resident_response.email }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
         <section class="card" style="border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.02);">
             <h2 style="color: var(--error); font-size: 1.1rem; margin-bottom: 0.5rem;">Sletning</h2>
             <p class="hint" style="margin-bottom: 1rem;">Fjern adressen permanent fra systemet.</p>

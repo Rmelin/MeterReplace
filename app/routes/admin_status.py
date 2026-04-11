@@ -115,6 +115,13 @@ def status_dashboard(
     )
     not_home_count = not_home_total
     stock = db.query(func.coalesce(func.sum(models.StockMovement.quantity), 0)).scalar() or 0
+    message_count = (
+        db.query(func.count(func.distinct(models.ResidentResponse.address_id)))
+        .filter(models.ResidentResponse.message.is_not(None))
+        .filter(models.ResidentResponse.message != "")
+        .scalar()
+        or 0
+    )
 
     street_totals: dict[str, int] = defaultdict(int)
     street_completed: dict[str, int] = defaultdict(int)
@@ -225,6 +232,7 @@ def status_dashboard(
             "needs_reschedule": needs_reschedule,
             "remaining": remaining,
             "stock": stock,
+            "message_count": message_count,
             "street_progress": street_progress,
             "day_status": day_status,
         },

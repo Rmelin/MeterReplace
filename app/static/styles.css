@@ -339,6 +339,33 @@ a.chip:hover {
     box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.2);
 }
 
+/* Resident response form */
+.resident-response .form-fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.resident-response .form-fieldset legend {
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.resident-response .option-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.resident-response .option-button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.9rem 1rem;
+    font-size: 1rem;
+}
+
 /* Tables */
 .table-wrapper {
     background: var(--card);
@@ -350,6 +377,15 @@ a.chip:hover {
 .table-wrapper table { width: 100%; border-collapse: collapse; }
 .table-wrapper th { background: rgba(0,0,0,0.02); color: var(--muted); font-size: 0.85rem; text-transform: uppercase; font-weight: 700; padding: 1rem; text-align: left; }
 .table-wrapper td { padding: 1rem; border-top: 1px solid var(--border); }
+
+.message-old td {
+    color: var(--muted);
+}
+
+.message-old a {
+    color: var(--muted);
+    border-color: var(--border);
+}
 
 /* Photo uploads */
 .photo-upload-panel {
@@ -489,6 +525,8 @@ a.chip:hover {
     .container { padding: 1rem; padding-bottom: 7rem; }
     .grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
     .metric { font-size: 1.75rem; }
+
+    .resident-response .option-buttons { grid-template-columns: 1fr; }
 
     .address-table { display: none; }
     .address-mobile-list { display: block; }
