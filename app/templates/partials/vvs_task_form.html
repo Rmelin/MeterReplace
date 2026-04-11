@@ -48,17 +48,59 @@
         {% endif %}
     </div>
 {% else %}
-    <h1>Rediger opgave</h1>
     {% if address %}
-        <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
+        <h1>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h1>
         {% if address.buffer_flag and address.buffer_note %}
             <p class="hint">Placering af målerbrønd: {{ address.buffer_note }}</p>
         {% endif %}
     {% else %}
-        <p class="hint">Opgave uden adresse</p>
+        <h1>Opgave uden adresse</h1>
     {% endif %}
     {% if appointment.notes %}
         <p class="hint">Opgave: {{ appointment.notes }}</p>
+    {% endif %}
+    {% if address %}
+        <div class="photo-upload-panel">
+            <h2>Upload fotos</h2>
+            {% set photo_types = photos | map(attribute='photo_type') | list %}
+            {% set photo_complete = ('both' in photo_types) or (photos | length >= 2) %}
+            <div class="photo-count-badge">Fotos: {{ photos | length }}/2{% if photo_complete %} · Komplet{% endif %}</div>
+            <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form">
+                <fieldset class="option-field" required>
+                    <legend>Fototype</legend>
+                    <div class="option-buttons">
+                        <label class="option-button">
+                            <input type="radio" name="photo_type" value="both" required style="display: none;" />
+                            <span>Begge</span>
+                        </label>
+                        <label class="option-button">
+                            <input type="radio" name="photo_type" value="new" required style="display: none;" />
+                            <span>Ny</span>
+                        </label>
+                        <label class="option-button">
+                            <input type="radio" name="photo_type" value="old" required style="display: none;" />
+                            <span>Gammel</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <label>Gammel nr<input type="text" name="old_meter_no" /></label>
+                    <label>Ny nr<input type="text" name="new_meter_no" /></label>
+                </div>
+                <label>Foto<input type="file" name="file" accept="image/*" capture="environment" required /></label>
+                <button type="submit" class="primary-button">Upload</button>
+            </form>
+            {% if photos %}
+                <div class="photo-grid" style="margin-top: 1rem;">
+                    {% for photo in photos %}
+                        <div class="photo-item">
+                            <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
+                            <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
     {% endif %}
     <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid" data-duration-form>
         <label>
@@ -73,9 +115,14 @@
                 <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
             </select>
         </label>
-        <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
-        <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
-        <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
+        <details class="task-time-panel">
+            <summary>Ret tid</summary>
+            <div class="task-time-fields">
+                <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
+                <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
+                <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
+            </div>
+        </details>
         <button type="submit" class="primary-button">Gem</button>
         <a href="/vvs/tasks" class="ghost-button">Tilbage</a>
     </form>

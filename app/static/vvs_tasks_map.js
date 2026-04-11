@@ -65,12 +65,29 @@ if (!mapContainer) {
         const timeLabel = row.starts_at && row.ends_at
           ? `${row.starts_at} – ${row.ends_at}`
           : ''
+        const dateValue = dateInput && dateInput.value ? dateInput.value : ''
         marker.bindPopup(
           `<strong>${row.street} ${row.house_no}</strong><br>${row.zip} ${row.city}<br>${statusLabel}` +
             (timeLabel ? `<br>${timeLabel}` : '') +
             `<br><div class="map-popup-actions">
               <a class="ghost-button map-popup-button" href="/vvs/tasks/${row.appointment_id}/edit">Åben opgave</a>
-            </div>`
+            </div>
+            <details class="map-popup-upload">
+              <summary>Upload foto</summary>
+              <form method="post" action="/vvs/tasks/${row.appointment_id}/photos" enctype="multipart/form-data" class="map-popup-form">
+                <input type="hidden" name="date_query" value="${dateValue}" />
+                <label>Fototype
+                  <select name="photo_type" required>
+                    <option value="">Vælg</option>
+                    <option value="both">Begge</option>
+                    <option value="new">Ny</option>
+                    <option value="old">Gammel</option>
+                  </select>
+                </label>
+                <label>Foto<input type="file" name="file" accept="image/*" capture="environment" required /></label>
+                <button type="submit" class="ghost-button map-popup-button">Upload</button>
+              </form>
+            </details>`
         )
         markerLayer.addLayer(marker)
       })

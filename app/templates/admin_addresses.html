@@ -88,7 +88,77 @@
             {% set _ = query_parts.append('q=' ~ search_query) %}
         {% endif %}
         {% set redirect_url = '/admin/addresses' ~ ('?' ~ '&'.join(query_parts) if query_parts else '') %}
-        <div class="table-wrapper table-mobile-stacked">
+        <div class="address-mobile-list">
+            {% for address in addresses %}
+                <details class="address-mobile-item">
+                    <summary>
+                        <div class="address-mobile-main">
+                            <span class="address-mobile-title">{{ address.street }} {{ address.house_no }}</span>
+                            <span class="address-mobile-status">{{ status_map.get(address.id, 'Ikke planlagt') }}</span>
+                        </div>
+                        <span class="address-mobile-toggle"></span>
+                    </summary>
+                    <div class="address-mobile-details">
+                        <div class="address-mobile-row"><span>Postnr</span><span>{{ address.zip }}</span></div>
+                        <div class="address-mobile-row"><span>By</span><span>{{ address.city }}</span></div>
+                        <div class="address-mobile-row"><span>Status</span><span>{{ status_map.get(address.id, 'Ikke planlagt') }}</span></div>
+                        <div class="address-mobile-row">
+                            <span>Kontakt</span>
+                            <span>
+                                {% if address.customer_name or address.customer_email or address.customer_phone %}
+                                    {{ address.customer_name or '-' }}
+                                    {% if address.customer_email or address.customer_phone %}
+                                        <span class="hint">{{ address.customer_email or address.customer_phone }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="hint">Ingen kontakt</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="address-mobile-row">
+                            <span>Noter</span>
+                            <span>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; justify-content: flex-start;">
+                                    {% set show_letter = status_status_map.get(address.id) in (AppointmentStatus.SCHEDULED, AppointmentStatus.INFORMED) %}
+                                    {% set not_home_count = not_home_history_map.get(address.id, 0) %}
+                                    {% set photo_count = photo_map.get(address.id, 0) %}
+                                    {% set resident_response = resident_response_map.get(address.id) %}
+                                    {% if show_letter %}
+                                        <a class="chip" href="/admin/letters/address/{{ address.id }}">Brev</a>
+                                    {% endif %}
+                                    {% if resident_response %}
+                                        <span class="chip">Svar: {{ resident_response.label }}</span>
+                                    {% endif %}
+                                    {% if address.buffer_flag %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Brønd</a>
+                                    {% endif %}
+                                    {% if address.blocked_reason %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Stophane</a>
+                                    {% endif %}
+                                    {% if not_home_count %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">Ikke hjemme</a>
+                                    {% endif %}
+                                    {% if photo_count %}
+                                        <a class="chip" href="/admin/addresses/{{ address.id }}/edit">📷</a>
+                                    {% endif %}
+                                </div>
+                            </span>
+                        </div>
+                        <div class="address-mobile-actions">
+                            <a class="primary-button" href="/admin/addresses/{{ address.id }}/edit" style="font-size: 0.85rem; padding: 0.5rem 0.75rem;">Detaljer / Rediger</a>
+                            {% if status_status_map.get(address.id) and status_status_map.get(address.id) != AppointmentStatus.NEEDS_RESCHEDULE %}
+                                <form method="post" action="/admin/addresses/{{ address.id }}/needs-reschedule" class="inline-status-form" style="display: grid; gap: 0.4rem;">
+                                    <input type="hidden" name="redirect" value="{{ redirect_url }}" />
+                                    <input type="text" name="note" placeholder="Note til ny dato" required style="font-size: 0.85rem; padding: 0.45rem;" />
+                                    <button type="submit" class="ghost-button" style="font-size: 0.85rem; padding: 0.45rem;">Behov for ny dato</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </details>
+            {% endfor %}
+        </div>
+        <div class="table-wrapper table-mobile-stacked address-table">
             <table>
                 <thead>
                     <tr>

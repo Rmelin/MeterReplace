@@ -29,8 +29,18 @@
                     {% endfor %}
                 </select>
             </label>
+            {% if show_all_dates %}
+                <input type="hidden" name="show_all" value="1" />
+            {% endif %}
             <button type="submit" class="primary-button">Vælg dag</button>
         </form>
+        <div class="action-row" style="margin-top: 0.75rem;">
+            {% if show_all_dates %}
+                <a class="ghost-button" href="/vvs/tasks{% if selected_date %}?date_query={{ selected_date.isoformat() }}{% endif %}">Skjul ældre datoer</a>
+            {% else %}
+                <a class="ghost-button" href="/vvs/tasks?show_all=1{% if selected_date %}&date_query={{ selected_date.isoformat() }}{% endif %}">Vis ældre datoer</a>
+            {% endif %}
+        </div>
         {% if selected_date %}
             <p class="hint" style="margin-top: 0.5rem;">Status: {{ done_count }}/{{ total_count }} færdige</p>
         {% endif %}
@@ -136,15 +146,19 @@
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
 
                 {% if address %}
-                    <details style="margin-top: 1rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem;">
+                    {% set photo_list = photos.get(appointment.id, []) %}
+                    {% set photo_types = photo_list | map(attribute='photo_type') | list %}
+                    {% set photo_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
+                    <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photo_complete %} · Komplet{% endif %}</div>
+                    <details style="margin-top: 0.75rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem;">
                         <summary style="cursor: pointer; font-weight: 600; color: var(--accent); padding: 0.25rem;">
-                            {% if photos.get(appointment.id) %}
-                                Se/Upload fotos ({{ photos.get(appointment.id)|length }})
+                            {% if photo_list %}
+                                Se/Upload fotos ({{ photo_list | length }})
                             {% else %}
                                 Upload fotos
                             {% endif %}
                         </summary>
-                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid" style="margin-top: 1rem;">
+                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form" style="margin-top: 1rem;">
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <fieldset class="option-field" required>
                                 <legend>Fototype</legend>
@@ -170,9 +184,9 @@
                             <label>Foto<input type="file" name="file" accept="image/*" capture="environment" required /></label>
                             <button type="submit" class="primary-button">Upload</button>
                         </form>
-                        {% if photos.get(appointment.id) %}
+                        {% if photo_list %}
                             <div class="photo-grid">
-                                {% for photo in photos.get(appointment.id) %}
+                                {% for photo in photo_list %}
                                     <div class="photo-item">
                                         <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
                                         <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
@@ -224,11 +238,15 @@
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
 
                 {% if address %}
+                    {% set photo_list = photos.get(appointment.id, []) %}
+                    {% set photo_types = photo_list | map(attribute='photo_type') | list %}
+                    {% set photo_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
+                    <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photo_complete %} · Komplet{% endif %}</div>
                     <details style="margin-top: 0.5rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem; opacity: 0.8;">
                         <summary style="cursor: pointer; font-size: 0.85rem; font-weight: 600; padding: 0.2rem;">
-                            Se fotos ({{ photos.get(appointment.id)|length if photos.get(appointment.id) else 0 }})
+                            Se fotos ({{ photo_list | length }})
                         </summary>
-                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid" style="margin-top: 0.5rem;">
+                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form" style="margin-top: 0.5rem;">
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <fieldset class="option-field">
                                 <legend>Tilføj foto</legend>
@@ -241,9 +259,9 @@
                             <label>Foto<input type="file" name="file" accept="image/*" capture="environment" required /></label>
                             <button type="submit" class="ghost-button">Upload ekstra</button>
                         </form>
-                        {% if photos.get(appointment.id) %}
+                        {% if photo_list %}
                             <div class="photo-grid" style="margin-top: 0.5rem;">
-                                {% for photo in photos.get(appointment.id) %}
+                                {% for photo in photo_list %}
                                     <div class="photo-item">
                                         <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb small" />
                                     </div>
