@@ -7,7 +7,7 @@ import re
 import unicodedata
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
@@ -40,6 +40,15 @@ STATUS_LABELS = {
     models.AppointmentStatus.CLOSED: "Afsluttet",
     models.AppointmentStatus.NOT_HOME: "Ikke hjemme",
     models.AppointmentStatus.NEEDS_RESCHEDULE: "Behov for ny dato",
+}
+
+STATUS_KEYS = {
+    models.AppointmentStatus.SCHEDULED: "planned",
+    models.AppointmentStatus.INFORMED: "informed",
+    models.AppointmentStatus.COMPLETED: "completed",
+    models.AppointmentStatus.CLOSED: "closed",
+    models.AppointmentStatus.NOT_HOME: "not_home",
+    models.AppointmentStatus.NEEDS_RESCHEDULE: "needs_reschedule",
 }
 
 
@@ -240,6 +249,92 @@ def vvs_tasks(
             "total_count": len(appointments),
         },
     )
+
+
+@router.get("/map-data")
+def vvs_tasks_map_data(
+    q: str | None = None,
+    status: str | None = None,
+    date: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    if not date:
+        return JSONResponse({"addresses": []})
+    try:
+        selected_date = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        return JSONResponse({"addresses": []})
+
+    query = (
+        db.query(models.Appointment, models.Address)
+        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .filter(
+            models.Appointment.contractor_id == user.id,
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                    models.AppointmentStatus.COMPLETED,
+                    models.AppointmentStatus.CLOSED,
+                    models.AppointmentStatus.NOT_HOME,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
+                ]
+            ),
+            func.date(models.Appointment.starts_at) == selected_date,
+        )
+        .order_by(models.Appointment.starts_at)
+    )
+
+    search_value = (q or "").strip().lower()
+    if search_value:
+        pattern = f"%{search_value}%"
+        query = query.filter(
+            or_(
+                func.lower(models.Address.street).like(pattern),
+                func.lower(models.Address.house_no).like(pattern),
+                func.lower(models.Address.zip).like(pattern),
+                func.lower(models.Address.city).like(pattern),
+                func.lower(models.Address.customer_name).like(pattern),
+                func.lower(models.Address.customer_email).like(pattern),
+                func.lower(models.Address.customer_phone).like(pattern),
+            )
+        )
+
+    status_filter = {
+        "planned": models.AppointmentStatus.SCHEDULED,
+        "informed": models.AppointmentStatus.INFORMED,
+        "completed": models.AppointmentStatus.COMPLETED,
+        "closed": models.AppointmentStatus.CLOSED,
+        "not_home": models.AppointmentStatus.NOT_HOME,
+        "needs_reschedule": models.AppointmentStatus.NEEDS_RESCHEDULE,
+    }
+    if status in status_filter:
+        query = query.filter(models.Appointment.status == status_filter[status])
+
+    payload = []
+    for appointment, address in query.all():
+        if not address:
+            continue
+        status_key = STATUS_KEYS.get(appointment.status, "planned")
+        payload.append(
+            {
+                "id": address.id,
+                "appointment_id": appointment.id,
+                "street": address.street,
+                "house_no": address.house_no,
+                "zip": address.zip,
+                "city": address.city,
+                "latitude": float(address.latitude) if address.latitude is not None else None,
+                "longitude": float(address.longitude) if address.longitude is not None else None,
+                "status": status_key,
+                "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+                "starts_at": appointment.starts_at.strftime("%H:%M"),
+                "ends_at": appointment.ends_at.strftime("%H:%M"),
+            }
+        )
+
+    return JSONResponse({"addresses": payload})
 
 
 @router.post("/{appointment_id}/photos")

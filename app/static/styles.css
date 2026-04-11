@@ -396,6 +396,9 @@ a.chip:hover {
 
 /* MAP */
 .address-map { height: 700px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.map-card .map-toolbar { margin-bottom: 1rem; }
+.map-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+.vvs-map-card .address-map { height: 520px; }
 .map-legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 600; }
 .map-legend-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.1); flex-shrink: 0; }
 .map-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
