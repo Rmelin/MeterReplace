@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -161,6 +161,17 @@ def resident_submit(
             appointment.changed_date = datetime.utcnow()
             appointment.changed_by_user_id = None
             release_stock(db, f"Beboer ønsker nyt tidspunkt {address.street} {address.house_no}")
+            day = appointment.starts_at.date()
+            starts_at = datetime.combine(day, time(8, 0))
+            ends_at = datetime.combine(day, time(16, 0))
+            db.add(
+                models.AddressUnavailablePeriod(
+                    address_id=address.id,
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                    note=(time_message or "Beboer har ikke tid"),
+                )
+            )
         db.add(
             models.ResidentResponse(
                 address_id=address.id,

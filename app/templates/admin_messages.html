@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Beskeder</h1>
+        <p>Indkomne beskeder fra beboere via brevlink/QR.</p>
+    </div>
+</section>
+
+<section class="card">
+    <div class="filter-chips">
+        {% for item in filters %}
+            {% set is_active = (selected_type == item.value) %}
+            {% set url = "/admin/messages" %}
+            {% if item.value != 'all' %}
+                {% set url = url ~ "?response_type=" ~ item.value %}
+            {% endif %}
+            <a class="chip {% if is_active %}is-active{% endif %}" href="{{ url }}">{{ item.label }}</a>
+        {% endfor %}
+    </div>
+
+    {% if messages %}
+        <div class="table-wrapper table-mobile-stacked">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dato</th>
+                        <th>Kanal</th>
+                        <th>Type</th>
+                        <th>Besked</th>
+                        <th>Adresse</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in messages %}
+                        <tr class="{% if item.is_old %}message-old{% endif %}">
+                            <td data-label="Dato">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td data-label="Kanal">{{ item.channel }}</td>
+                            <td data-label="Type">{{ item.type_label }}</td>
+                            <td data-label="Besked">{{ item.message }}</td>
+                            <td data-label="Adresse">{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}</td>
+                            <td data-label="Link">
+                                <a class="ghost-button" href="/admin/addresses/{{ item.address.id }}/edit" style="font-size: 0.85rem; padding: 0.35rem 0.6rem;">Adresse</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen beskeder endnu.</p>
+    {% endif %}
+</section>
+{% endblock %}
