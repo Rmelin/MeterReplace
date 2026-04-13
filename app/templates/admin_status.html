@@ -1,4 +1,76 @@
 {% extends "base.html" %}
+{% macro render_day_status_card(row) %}
+    <article class="day-status-card day-status-card-{{ row.state_key }}">
+        <div class="day-status-card-header">
+            <div>
+                <h4>{{ row.date.strftime('%d/%m/%Y') }}</h4>
+                <p class="hint">{{ row.relative_label }}</p>
+            </div>
+            <span class="chip day-status-chip day-status-chip-{{ row.state_key }}">{{ row.state_label }}</span>
+        </div>
+        <div class="day-status-progress">
+            <div class="day-status-progress-meta">
+                <span class="day-status-progress-label">Fremdrift</span>
+                <strong>{{ row.done }}/{{ row.total }}</strong>
+            </div>
+            <div class="day-status-progress-bar" aria-hidden="true">
+                <span style="width: {{ row.completion_pct }}%"></span>
+            </div>
+        </div>
+        <div class="day-status-metrics">
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">I alt</span>
+                <strong>{{ row.total }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Planlagt</span>
+                <strong>{{ row.planned }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Informeret</span>
+                <strong>{{ row.informed }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Skiftet</span>
+                <strong>{{ row.completed }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Afsluttet</span>
+                <strong>{{ row.closed }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Ikke hjemme</span>
+                <strong>{{ row.not_home }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Mangler</span>
+                <strong>{{ row.remaining }}</strong>
+            </div>
+        </div>
+    </article>
+{% endmacro %}
+{% macro render_street_progress_card(row) %}
+    <article class="street-progress-card street-progress-card-{{ row.state_key }}">
+        <div class="street-progress-card-header">
+            <h4>{{ row.street }}</h4>
+            <span class="chip street-progress-chip street-progress-chip-{{ row.state_key }}">{{ row.state_label }}</span>
+        </div>
+        <div class="street-progress-main">
+            <strong>{{ row.completed }}/{{ row.total }}</strong>
+            <span>{{ row.completion_pct }}%</span>
+        </div>
+        <div class="street-progress-bar" aria-hidden="true">
+            <span style="width: {{ row.completion_pct }}%"></span>
+        </div>
+        <p class="hint">
+            {% if row.is_complete %}
+                Alle adresser er afsluttet.
+            {% else %}
+                Mangler {{ row.remaining }} adresse{% if row.remaining != 1 %}r{% endif %}.
+            {% endif %}
+        </p>
+    </article>
+{% endmacro %}
 {% block content %}
 <section class="page-header">
     <div>
@@ -8,51 +80,49 @@
 </section>
 
 <section class="grid">
-    <a class="card card-link" href="/admin/addresses?status=planned">
-        <div class="metric-container">
+    <section class="card status-group-card status-group-card-pre">
+        <div class="status-group-header">
             <div>
-                <h2>Planlagt</h2>
-                <p class="metric">{{ planned }}</p>
+                <h2 class="status-group-title">Præ total <span class="status-group-title-value">{{ pre_total }}</span></h2>
+                <p class="hint">Planlagt og informeret</p>
             </div>
-            <div class="metric-icon">
+            <div class="metric-icon status-group-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
             </div>
         </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=informed">
-        <div class="metric-container">
-            <div>
-                <h2>Informeret</h2>
-                <p class="metric">{{ informed }}</p>
-            </div>
-            <div class="metric-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            </div>
+        <div class="status-group-grid">
+            <a class="status-group-item status-group-item-planned" href="/admin/addresses?status=planned">
+                <span class="status-group-label">Planlagt</span>
+                <span class="status-group-value">{{ planned }}</span>
+            </a>
+            <a class="status-group-item status-group-item-informed" href="/admin/addresses?status=informed">
+                <span class="status-group-label">Informeret</span>
+                <span class="status-group-value">{{ informed }}</span>
+            </a>
         </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=completed">
-        <div class="metric-container">
+    </section>
+    <section class="card status-group-card status-group-card-post">
+        <div class="status-group-header">
             <div>
-                <h2>Skiftet</h2>
-                <p class="metric">{{ completed }}</p>
+                <h2 class="status-group-title">Post total <span class="status-group-title-value">{{ post_total }}</span></h2>
+                <p class="hint">Skiftet og afsluttet</p>
             </div>
-            <div class="metric-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </div>
-        </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=closed">
-        <div class="metric-container">
-            <div>
-                <h2>Afsluttet</h2>
-                <p class="metric">{{ closed }}</p>
-            </div>
-            <div class="metric-icon">
+            <div class="metric-icon status-group-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             </div>
         </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=not_home_history">
+        <div class="status-group-grid">
+            <a class="status-group-item status-group-item-completed" href="/admin/addresses?status=completed">
+                <span class="status-group-label">Skiftet</span>
+                <span class="status-group-value">{{ completed }}</span>
+            </a>
+            <a class="status-group-item status-group-item-closed" href="/admin/addresses?status=closed">
+                <span class="status-group-label">Afsluttet</span>
+                <span class="status-group-value">{{ closed }}</span>
+            </a>
+        </div>
+    </section>
+    <a class="card card-link status-card status-card-not-home" href="/admin/addresses?status=not_home_history">
         <div class="metric-container">
             <div>
                 <h2>Ikke hjemme</h2>
@@ -63,7 +133,7 @@
             </div>
         </div>
     </a>
-    <a class="card card-link" href="/admin/addresses?status=needs_reschedule">
+    <a class="card card-link status-card status-card-needs-reschedule" href="/admin/addresses?status=needs_reschedule">
         <div class="metric-container">
             <div>
                 <h2>Behov for ny dato</h2>
@@ -74,7 +144,29 @@
             </div>
         </div>
     </a>
-    <a class="card card-link" href="/admin/inventory">
+    <a class="card card-link status-card status-card-total" href="/admin/addresses">
+        <div class="metric-container">
+            <div>
+                <h2>Total adresse</h2>
+                <p class="metric">{{ total }}</p>
+            </div>
+            <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5"></path><path d="M5 10.5V21h14V10.5"></path><path d="M9 21v-6h6v6"></path></svg>
+            </div>
+        </div>
+    </a>
+    <a class="card card-link status-card status-card-unplanned" href="/admin/addresses?status=unplanned">
+        <div class="metric-container">
+            <div>
+                <h2>Mangler i alt</h2>
+                <p class="metric">{{ remaining }}</p>
+            </div>
+            <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+        </div>
+    </a>
+    <a class="card card-link status-card status-card-stock" href="/admin/inventory">
         <div class="metric-container">
             <div>
                 <h2>Lager</h2>
@@ -85,7 +177,7 @@
             </div>
         </div>
     </a>
-    <a class="card card-link" href="/admin/messages">
+    <a class="card card-link status-card status-card-messages" href="/admin/messages">
         <div class="metric-container">
             <div>
                 <h2>Beskeder</h2>
@@ -100,32 +192,58 @@
 
 <section class="card">
     <h2>Arbejdsdage status</h2>
-    {% if day_status %}
-        <div class="table-wrapper table-mobile-stacked">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Dato</th>
-                        <th>Informeret</th>
-                        <th>Skiftet</th>
-                        <th>Afsluttet</th>
-                        <th>Ikke hjemme</th>
-                        <th>I alt</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in day_status %}
-                        <tr>
-                            <td data-label="Dato">{{ row.date.strftime('%d/%m/%Y') }}</td>
-                            <td data-label="Informeret">{{ row.informed }}</td>
-                            <td data-label="Skiftet">{{ row.completed }}</td>
-                            <td data-label="Afsluttet">{{ row.closed }}</td>
-                            <td data-label="Ikke hjemme">{{ row.not_home }}</td>
-                            <td data-label="I alt">{{ row.total }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <p class="hint">Kommende arbejdsdage vises først. Dage ældre end 7 dage er foldet sammen nederst.</p>
+    {% if today_day_status or upcoming_day_status or recent_day_status or older_day_status %}
+        <div class="day-status-sections">
+            {% if today_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>I dag</h3>
+                        <span class="chip">{{ today_day_status|length }} arbejdsdag{% if today_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in today_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if upcoming_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Kommende arbejdsdage</h3>
+                        <span class="chip">{{ upcoming_day_status|length }} arbejdsdag{% if upcoming_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in upcoming_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if recent_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Seneste 7 dage</h3>
+                        <span class="chip">{{ recent_day_status|length }} arbejdsdag{% if recent_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in recent_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if older_day_status %}
+                <details class="day-status-older">
+                    <summary>Ældre arbejdsdage ({{ older_day_status|length }})</summary>
+                    <div class="day-status-grid">
+                        {% for row in older_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
         </div>
     {% else %}
         <p class="hint">Ingen arbejdsdage registreret endnu.</p>
@@ -134,24 +252,31 @@
 
 <section class="card">
     <h2>Fremdrift pr. vej</h2>
-    {% if street_progress %}
-        <div class="table-wrapper table-mobile-stacked">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Vej</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in street_progress %}
-                        <tr>
-                            <td data-label="Vej">{{ row.street }}</td>
-                            <td data-label="Status">{{ row.completed }}/{{ row.total }}{% if row.is_complete %} ✅{% endif %}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% if active_street_progress or completed_street_progress %}
+        <div class="street-progress-sections">
+            {% if active_street_progress %}
+                <section class="street-progress-group">
+                    <div class="street-progress-group-header">
+                        <h3>I gang</h3>
+                        <span class="chip">{{ active_street_progress|length }} vej{% if active_street_progress|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="street-progress-grid">
+                        {% for row in active_street_progress %}
+                            {{ render_street_progress_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if completed_street_progress %}
+                <details class="street-progress-completed">
+                    <summary>Færdige veje ({{ completed_street_progress|length }})</summary>
+                    <div class="street-progress-grid">
+                        {% for row in completed_street_progress %}
+                            {{ render_street_progress_card(row) }}
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
         </div>
     {% else %}
         <p class="hint">Ingen adresser registreret endnu.</p>
