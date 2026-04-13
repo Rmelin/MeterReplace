@@ -8,51 +8,49 @@
 </section>
 
 <section class="grid">
-    <a class="card card-link" href="/admin/addresses?status=planned">
-        <div class="metric-container">
+    <section class="card status-group-card status-group-card-pre">
+        <div class="status-group-header">
             <div>
-                <h2>Planlagt</h2>
-                <p class="metric">{{ planned }}</p>
+                <h2 class="status-group-title">Præ total <span class="status-group-title-value">{{ pre_total }}</span></h2>
+                <p class="hint">Planlagt og informeret</p>
             </div>
-            <div class="metric-icon">
+            <div class="metric-icon status-group-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
             </div>
         </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=informed">
-        <div class="metric-container">
-            <div>
-                <h2>Informeret</h2>
-                <p class="metric">{{ informed }}</p>
-            </div>
-            <div class="metric-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            </div>
+        <div class="status-group-grid">
+            <a class="status-group-item status-group-item-planned" href="/admin/addresses?status=planned">
+                <span class="status-group-label">Planlagt</span>
+                <span class="status-group-value">{{ planned }}</span>
+            </a>
+            <a class="status-group-item status-group-item-informed" href="/admin/addresses?status=informed">
+                <span class="status-group-label">Informeret</span>
+                <span class="status-group-value">{{ informed }}</span>
+            </a>
         </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=completed">
-        <div class="metric-container">
+    </section>
+    <section class="card status-group-card status-group-card-post">
+        <div class="status-group-header">
             <div>
-                <h2>Skiftet</h2>
-                <p class="metric">{{ completed }}</p>
+                <h2 class="status-group-title">Post total <span class="status-group-title-value">{{ post_total }}</span></h2>
+                <p class="hint">Skiftet og afsluttet</p>
             </div>
-            <div class="metric-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </div>
-        </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=closed">
-        <div class="metric-container">
-            <div>
-                <h2>Afsluttet</h2>
-                <p class="metric">{{ closed }}</p>
-            </div>
-            <div class="metric-icon">
+            <div class="metric-icon status-group-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             </div>
         </div>
-    </a>
-    <a class="card card-link" href="/admin/addresses?status=not_home_history">
+        <div class="status-group-grid">
+            <a class="status-group-item status-group-item-completed" href="/admin/addresses?status=completed">
+                <span class="status-group-label">Skiftet</span>
+                <span class="status-group-value">{{ completed }}</span>
+            </a>
+            <a class="status-group-item status-group-item-closed" href="/admin/addresses?status=closed">
+                <span class="status-group-label">Afsluttet</span>
+                <span class="status-group-value">{{ closed }}</span>
+            </a>
+        </div>
+    </section>
+    <a class="card card-link status-card status-card-not-home" href="/admin/addresses?status=not_home_history">
         <div class="metric-container">
             <div>
                 <h2>Ikke hjemme</h2>
@@ -63,7 +61,7 @@
             </div>
         </div>
     </a>
-    <a class="card card-link" href="/admin/addresses?status=needs_reschedule">
+    <a class="card card-link status-card status-card-needs-reschedule" href="/admin/addresses?status=needs_reschedule">
         <div class="metric-container">
             <div>
                 <h2>Behov for ny dato</h2>
@@ -74,7 +72,29 @@
             </div>
         </div>
     </a>
-    <a class="card card-link" href="/admin/inventory">
+    <a class="card card-link status-card status-card-total" href="/admin/addresses">
+        <div class="metric-container">
+            <div>
+                <h2>Total adresse</h2>
+                <p class="metric">{{ total }}</p>
+            </div>
+            <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5"></path><path d="M5 10.5V21h14V10.5"></path><path d="M9 21v-6h6v6"></path></svg>
+            </div>
+        </div>
+    </a>
+    <a class="card card-link status-card status-card-unplanned" href="/admin/addresses?status=unplanned">
+        <div class="metric-container">
+            <div>
+                <h2>Mangler i alt</h2>
+                <p class="metric">{{ remaining }}</p>
+            </div>
+            <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+        </div>
+    </a>
+    <a class="card card-link status-card status-card-stock" href="/admin/inventory">
         <div class="metric-container">
             <div>
                 <h2>Lager</h2>
@@ -85,7 +105,7 @@
             </div>
         </div>
     </a>
-    <a class="card card-link" href="/admin/messages">
+    <a class="card card-link status-card status-card-messages" href="/admin/messages">
         <div class="metric-container">
             <div>
                 <h2>Beskeder</h2>

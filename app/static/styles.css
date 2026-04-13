@@ -8,6 +8,31 @@
     --accent: #f97316; /* Default Orange */
     --success: #22c55e;
     --error: #ef4444;
+    --status-planned: #f59e0b;
+    --status-planned-rgb: 245, 158, 11;
+    --status-informed: #38bdf8;
+    --status-informed-rgb: 56, 189, 248;
+    --status-completed: #22c55e;
+    --status-completed-rgb: 34, 197, 94;
+    --status-closed: #16a34a;
+    --status-closed-rgb: 22, 163, 74;
+    --status-not-home: #ef4444;
+    --status-not-home-rgb: 239, 68, 68;
+    --status-needs-reschedule: #f97316;
+    --status-needs-reschedule-rgb: 249, 115, 22;
+    --status-unplanned: #64748b;
+    --status-unplanned-rgb: 100, 116, 139;
+    --status-pre: #6366f1;
+    --status-pre-rgb: 99, 102, 241;
+    --status-post: #0f766e;
+    --status-post-rgb: 15, 118, 110;
+    --status-total: #2563eb;
+    --status-total-rgb: 37, 99, 235;
+    --status-stock: #14b8a6;
+    --status-stock-rgb: 20, 184, 166;
+    --status-messages: #a855f7;
+    --status-messages-rgb: 168, 85, 247;
+    --status-selected: #a855f7;
     --header-bg: #ffffff;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
@@ -204,12 +229,15 @@ a:hover {
 
 .card-link {
     text-decoration: none;
+    color: var(--text);
     transition: transform 0.2s, border-color 0.2s;
 }
 
 .card-link:hover {
     transform: translateY(-4px);
     border-color: var(--accent);
+    color: var(--text);
+    filter: none;
 }
 
 .metric-container {
@@ -229,6 +257,200 @@ a:hover {
     border-radius: 12px;
     background: rgba(var(--accent-rgb), 0.1);
     color: var(--accent);
+}
+
+.status-card {
+    --status-color: var(--accent);
+    --status-rgb: var(--accent-rgb);
+    border-color: rgba(var(--status-rgb), 0.22);
+}
+
+.status-card:hover {
+    border-color: var(--status-color);
+}
+
+.status-card .metric {
+    color: var(--status-color);
+}
+
+.status-card .metric-icon {
+    background: rgba(var(--status-rgb), 0.12);
+    color: var(--status-color);
+}
+
+.status-card-planned {
+    --status-color: var(--status-planned);
+    --status-rgb: var(--status-planned-rgb);
+}
+
+.status-card-informed {
+    --status-color: var(--status-informed);
+    --status-rgb: var(--status-informed-rgb);
+}
+
+.status-card-completed {
+    --status-color: var(--status-completed);
+    --status-rgb: var(--status-completed-rgb);
+}
+
+.status-card-closed {
+    --status-color: var(--status-closed);
+    --status-rgb: var(--status-closed-rgb);
+}
+
+.status-card-not-home {
+    --status-color: var(--status-not-home);
+    --status-rgb: var(--status-not-home-rgb);
+}
+
+.status-card-needs-reschedule {
+    --status-color: var(--status-needs-reschedule);
+    --status-rgb: var(--status-needs-reschedule-rgb);
+}
+
+.status-card-unplanned {
+    --status-color: var(--status-unplanned);
+    --status-rgb: var(--status-unplanned-rgb);
+}
+
+.status-card-total {
+    --status-color: var(--status-total);
+    --status-rgb: var(--status-total-rgb);
+}
+
+.status-card-stock {
+    --status-color: var(--status-stock);
+    --status-rgb: var(--status-stock-rgb);
+}
+
+.status-card-messages {
+    --status-color: var(--status-messages);
+    --status-rgb: var(--status-messages-rgb);
+}
+
+.status-group-card {
+    --group-color: var(--accent);
+    --group-rgb: var(--accent-rgb);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border-color: rgba(var(--group-rgb), 0.22);
+}
+
+.status-group-card-pre {
+    --group-color: var(--status-pre);
+    --group-rgb: var(--status-pre-rgb);
+}
+
+.status-group-card-post {
+    --group-color: var(--status-post);
+    --group-rgb: var(--status-post-rgb);
+}
+
+.status-group-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.status-group-header h2 {
+    margin: 0;
+}
+
+.status-group-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.status-group-title-value {
+    color: var(--group-color);
+    font-size: 1.6rem;
+    font-weight: 800;
+}
+
+.status-group-header .hint {
+    margin: 0.35rem 0 0;
+}
+
+.status-group-icon {
+    background: rgba(var(--group-rgb), 0.12);
+    color: var(--group-color);
+}
+
+.status-group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0.75rem;
+}
+
+.status-group-item {
+    --item-color: var(--group-color);
+    --item-rgb: var(--group-rgb);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(var(--item-rgb), 0.24);
+    background: rgba(var(--item-rgb), 0.08);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.status-group-item:hover {
+    border-color: var(--item-color);
+    transform: translateY(-2px);
+    filter: none;
+}
+
+.status-group-total:hover {
+    transform: none;
+}
+
+.status-group-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.status-group-value {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--item-color);
+}
+
+.status-group-item-planned {
+    --item-color: var(--status-planned);
+    --item-rgb: var(--status-planned-rgb);
+}
+
+.status-group-item-informed {
+    --item-color: var(--status-informed);
+    --item-rgb: var(--status-informed-rgb);
+}
+
+.status-group-item-completed {
+    --item-color: var(--status-completed);
+    --item-rgb: var(--status-completed-rgb);
+}
+
+.status-group-item-closed {
+    --item-color: var(--status-closed);
+    --item-rgb: var(--status-closed-rgb);
+}
+
+.status-group-item-pre-total {
+    --item-color: var(--status-pre);
+    --item-rgb: var(--status-pre-rgb);
+}
+
+.status-group-item-post-total {
+    --item-color: var(--status-post);
+    --item-rgb: var(--status-post-rgb);
 }
 
 /* Buttons Modern */
@@ -649,10 +871,10 @@ a.chip:hover {
     border-color: rgba(0, 0, 0, 0.3);
 }
 .map-filter-button.is-active {
-    background: var(--accent);
+    background: var(--status-color, var(--accent));
     color: #000;
-    border-color: var(--accent);
-    box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.3);
+    border-color: var(--status-color, var(--accent));
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
 }
 .map-filter-date input,
 .map-filter-date select { width: 180px; }

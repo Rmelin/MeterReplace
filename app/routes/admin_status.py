@@ -110,6 +110,8 @@ def status_dashboard(
     planned = len(planned_ids)
     not_home = len(not_home_ids)
     needs_reschedule = len(needs_reschedule_ids)
+    pre_total = planned + informed
+    post_total = completed + closed
     remaining = max(
         total - completed - closed - informed - planned - not_home - needs_reschedule, 0
     )
@@ -228,6 +230,8 @@ def status_dashboard(
             "closed": closed,
             "informed": informed,
             "planned": planned,
+            "pre_total": pre_total,
+            "post_total": post_total,
             "not_home": not_home_count,
             "needs_reschedule": needs_reschedule,
             "remaining": remaining,
