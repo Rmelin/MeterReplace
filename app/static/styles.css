@@ -453,6 +453,281 @@ a:hover {
     --item-rgb: var(--status-post-rgb);
 }
 
+.day-status-sections {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.day-status-group {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.day-status-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.day-status-group-header h3 {
+    margin: 0;
+}
+
+.day-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.day-status-card {
+    --day-color: var(--status-unplanned);
+    --day-rgb: var(--status-unplanned-rgb);
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(var(--day-rgb), 0.24);
+    border-radius: 14px;
+    background: rgba(var(--day-rgb), 0.06);
+}
+
+.day-status-card-today {
+    --day-color: var(--status-total);
+    --day-rgb: var(--status-total-rgb);
+}
+
+.day-status-card-upcoming {
+    --day-color: var(--status-pre);
+    --day-rgb: var(--status-pre-rgb);
+}
+
+.day-status-card-done {
+    --day-color: var(--status-completed);
+    --day-rgb: var(--status-completed-rgb);
+}
+
+.day-status-card-history {
+    --day-color: var(--status-unplanned);
+    --day-rgb: var(--status-unplanned-rgb);
+}
+
+.day-status-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.day-status-card-header h4 {
+    margin: 0;
+}
+
+.day-status-card-header .hint {
+    margin: 0.25rem 0 0;
+}
+
+.day-status-chip {
+    border-color: rgba(var(--day-rgb), 0.3);
+    background: rgba(var(--day-rgb), 0.12);
+}
+
+.day-status-progress {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.day-status-progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.day-status-progress-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.day-status-progress-bar {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(var(--day-rgb), 0.12);
+    overflow: hidden;
+}
+
+.day-status-progress-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--day-color);
+}
+
+.day-status-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.75rem;
+}
+
+.day-status-metric {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.day-status-metric-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+.day-status-metric strong {
+    font-size: 1.15rem;
+    color: var(--day-color);
+}
+
+.day-status-older {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem;
+    background: rgba(var(--status-unplanned-rgb), 0.04);
+}
+
+.day-status-older summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--text);
+    list-style: none;
+}
+
+.day-status-older summary::-webkit-details-marker {
+    display: none;
+}
+
+.day-status-older[open] {
+    display: grid;
+    gap: 1rem;
+}
+
+.street-progress-sections {
+    display: grid;
+    gap: 1rem;
+}
+
+.street-progress-group {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.street-progress-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.street-progress-group-header h3 {
+    margin: 0;
+}
+
+.street-progress-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.street-progress-card {
+    --street-color: var(--status-pre);
+    --street-rgb: var(--status-pre-rgb);
+    display: grid;
+    gap: 0.85rem;
+    padding: 1rem;
+    border: 1px solid rgba(var(--street-rgb), 0.24);
+    border-radius: 14px;
+    background: rgba(var(--street-rgb), 0.06);
+}
+
+.street-progress-card-done {
+    --street-color: var(--status-completed);
+    --street-rgb: var(--status-completed-rgb);
+}
+
+.street-progress-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.street-progress-card-header h4 {
+    margin: 0;
+}
+
+.street-progress-chip {
+    border-color: rgba(var(--street-rgb), 0.3);
+    background: rgba(var(--street-rgb), 0.12);
+}
+
+.street-progress-main {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.street-progress-main strong {
+    font-size: 1.8rem;
+    color: var(--street-color);
+    line-height: 1;
+}
+
+.street-progress-main span {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.street-progress-bar {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(var(--street-rgb), 0.12);
+    overflow: hidden;
+}
+
+.street-progress-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--street-color);
+}
+
+.street-progress-card .hint {
+    margin: 0;
+}
+
+.street-progress-completed {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem;
+    background: rgba(var(--status-completed-rgb), 0.04);
+}
+
+.street-progress-completed summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--text);
+    list-style: none;
+}
+
+.street-progress-completed summary::-webkit-details-marker {
+    display: none;
+}
+
+.street-progress-completed[open] {
+    display: grid;
+    gap: 1rem;
+}
+
 /* Buttons Modern */
 .primary-button, .ghost-button, .danger-button {
     display: inline-flex;

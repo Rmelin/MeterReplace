@@ -1,4 +1,76 @@
 {% extends "base.html" %}
+{% macro render_day_status_card(row) %}
+    <article class="day-status-card day-status-card-{{ row.state_key }}">
+        <div class="day-status-card-header">
+            <div>
+                <h4>{{ row.date.strftime('%d/%m/%Y') }}</h4>
+                <p class="hint">{{ row.relative_label }}</p>
+            </div>
+            <span class="chip day-status-chip day-status-chip-{{ row.state_key }}">{{ row.state_label }}</span>
+        </div>
+        <div class="day-status-progress">
+            <div class="day-status-progress-meta">
+                <span class="day-status-progress-label">Fremdrift</span>
+                <strong>{{ row.done }}/{{ row.total }}</strong>
+            </div>
+            <div class="day-status-progress-bar" aria-hidden="true">
+                <span style="width: {{ row.completion_pct }}%"></span>
+            </div>
+        </div>
+        <div class="day-status-metrics">
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">I alt</span>
+                <strong>{{ row.total }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Planlagt</span>
+                <strong>{{ row.planned }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Informeret</span>
+                <strong>{{ row.informed }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Skiftet</span>
+                <strong>{{ row.completed }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Afsluttet</span>
+                <strong>{{ row.closed }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Ikke hjemme</span>
+                <strong>{{ row.not_home }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Mangler</span>
+                <strong>{{ row.remaining }}</strong>
+            </div>
+        </div>
+    </article>
+{% endmacro %}
+{% macro render_street_progress_card(row) %}
+    <article class="street-progress-card street-progress-card-{{ row.state_key }}">
+        <div class="street-progress-card-header">
+            <h4>{{ row.street }}</h4>
+            <span class="chip street-progress-chip street-progress-chip-{{ row.state_key }}">{{ row.state_label }}</span>
+        </div>
+        <div class="street-progress-main">
+            <strong>{{ row.completed }}/{{ row.total }}</strong>
+            <span>{{ row.completion_pct }}%</span>
+        </div>
+        <div class="street-progress-bar" aria-hidden="true">
+            <span style="width: {{ row.completion_pct }}%"></span>
+        </div>
+        <p class="hint">
+            {% if row.is_complete %}
+                Alle adresser er afsluttet.
+            {% else %}
+                Mangler {{ row.remaining }} adresse{% if row.remaining != 1 %}r{% endif %}.
+            {% endif %}
+        </p>
+    </article>
+{% endmacro %}
 {% block content %}
 <section class="page-header">
     <div>
@@ -120,32 +192,58 @@
 
 <section class="card">
     <h2>Arbejdsdage status</h2>
-    {% if day_status %}
-        <div class="table-wrapper table-mobile-stacked">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Dato</th>
-                        <th>Informeret</th>
-                        <th>Skiftet</th>
-                        <th>Afsluttet</th>
-                        <th>Ikke hjemme</th>
-                        <th>I alt</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in day_status %}
-                        <tr>
-                            <td data-label="Dato">{{ row.date.strftime('%d/%m/%Y') }}</td>
-                            <td data-label="Informeret">{{ row.informed }}</td>
-                            <td data-label="Skiftet">{{ row.completed }}</td>
-                            <td data-label="Afsluttet">{{ row.closed }}</td>
-                            <td data-label="Ikke hjemme">{{ row.not_home }}</td>
-                            <td data-label="I alt">{{ row.total }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <p class="hint">Kommende arbejdsdage vises først. Dage ældre end 7 dage er foldet sammen nederst.</p>
+    {% if today_day_status or upcoming_day_status or recent_day_status or older_day_status %}
+        <div class="day-status-sections">
+            {% if today_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>I dag</h3>
+                        <span class="chip">{{ today_day_status|length }} arbejdsdag{% if today_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in today_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if upcoming_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Kommende arbejdsdage</h3>
+                        <span class="chip">{{ upcoming_day_status|length }} arbejdsdag{% if upcoming_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in upcoming_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if recent_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Seneste 7 dage</h3>
+                        <span class="chip">{{ recent_day_status|length }} arbejdsdag{% if recent_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in recent_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if older_day_status %}
+                <details class="day-status-older">
+                    <summary>Ældre arbejdsdage ({{ older_day_status|length }})</summary>
+                    <div class="day-status-grid">
+                        {% for row in older_day_status %}
+                            {{ render_day_status_card(row) }}
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
         </div>
     {% else %}
         <p class="hint">Ingen arbejdsdage registreret endnu.</p>
@@ -154,24 +252,31 @@
 
 <section class="card">
     <h2>Fremdrift pr. vej</h2>
-    {% if street_progress %}
-        <div class="table-wrapper table-mobile-stacked">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Vej</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in street_progress %}
-                        <tr>
-                            <td data-label="Vej">{{ row.street }}</td>
-                            <td data-label="Status">{{ row.completed }}/{{ row.total }}{% if row.is_complete %} ✅{% endif %}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% if active_street_progress or completed_street_progress %}
+        <div class="street-progress-sections">
+            {% if active_street_progress %}
+                <section class="street-progress-group">
+                    <div class="street-progress-group-header">
+                        <h3>I gang</h3>
+                        <span class="chip">{{ active_street_progress|length }} vej{% if active_street_progress|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="street-progress-grid">
+                        {% for row in active_street_progress %}
+                            {{ render_street_progress_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if completed_street_progress %}
+                <details class="street-progress-completed">
+                    <summary>Færdige veje ({{ completed_street_progress|length }})</summary>
+                    <div class="street-progress-grid">
+                        {% for row in completed_street_progress %}
+                            {{ render_street_progress_card(row) }}
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
         </div>
     {% else %}
         <p class="hint">Ingen adresser registreret endnu.</p>
