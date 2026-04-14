@@ -1,4 +1,24 @@
 {% extends "base.html" %}
+{% macro render_planning_day_card(row) %}
+    <a class="day-status-card day-status-card-{{ row.state_key }}{% if row.is_selected %} is-selected{% endif %}" href="{{ row.planning_href }}"{% if row.is_selected %} style="border: 2px solid #1f4f7a; box-shadow: inset 0 0 0 1px #1f4f7a;"{% endif %}>
+        <div class="day-status-card-header">
+            <div>
+                <h4>{{ row.date.strftime('%d/%m/%Y') }}</h4>
+                <p class="hint">{{ row.relative_label }}</p>
+            </div>
+        </div>
+        <div class="day-status-metrics">
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Booket</span>
+                <strong>{{ row.booked }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Ledig tid</span>
+                <strong>{{ row.display_free_slots }}</strong>
+            </div>
+        </div>
+    </a>
+{% endmacro %}
 {% block content %}
 <section class="page-header">
     <div>
@@ -8,6 +28,43 @@
     <div>
         <a class="ghost-button" href="/admin/planning/manual">Manuel planlægning</a>
     </div>
+</section>
+
+<section class="card">
+    <h2>Arbejdsdage</h2>
+    <p class="hint">Klik på en arbejdsdag for at åbne planlægningen direkte i preview.</p>
+    {% if today_day_status or upcoming_day_status %}
+        <div class="day-status-sections">
+            {% if today_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>I dag</h3>
+                        <span class="chip">{{ today_day_status|length }} arbejdsdag{% if today_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in today_day_status %}
+                            {{ render_planning_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if upcoming_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Kommende arbejdsdage</h3>
+                        <span class="chip">{{ upcoming_day_status|length }} arbejdsdag{% if upcoming_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in upcoming_day_status %}
+                            {{ render_planning_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+        </div>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
 </section>
 
 <section class="card">
@@ -32,25 +89,149 @@
     <form method="post" action="/admin/planning/commit" class="form-grid" style="margin-top: 1rem;">
         <input type="hidden" name="date_raw" value="{{ plan_date.isoformat() if plan_date else '' }}" />
         <input type="hidden" name="address_order" value="" data-address-order />
-        <button type="submit" class="ghost-button">Commit plan</button>
+        <button type="submit" class="ghost-button">Godkend plan</button>
     </form>
-    {% if plan_date and scheduled_addresses %}
+    {% if plan_date and committed_letter_required_count %}
+        <div class="action-row" style="margin-top: 1rem;">
+            <a class="primary-button" href="/admin/letters/batch/pdf?date={{ plan_date.isoformat() }}">Download alle breve for dagen</a>
+        </div>
+    {% endif %}
+    {% if plan_date and committed_appointments %}
         <div style="margin-top: 1rem;">
             <p class="hint">Planlagte adresser (committed):</p>
-            <ul class="list">
-                {% for address in scheduled_addresses %}
-                    <li>{{ address.street }} {{ address.house_no }}</li>
-                {% endfor %}
-            </ul>
+            {% if committed_missing_letter_count %}
+                <p class="status-error" style="font-weight: 700; margin: 0.5rem 0;">{{ committed_missing_letter_count }} adresse(r) mangler stadig brev.</p>
+            {% endif %}
+            <div class="action-row" style="margin: 0.75rem 0;">
+                <button type="button" class="ghost-button is-active" data-letter-filter="all">Alle</button>
+                <button type="button" class="ghost-button" data-letter-filter="missing">Kun brev mangler</button>
+                <button type="button" class="ghost-button" data-letter-filter="ready">Kun brev lavet</button>
+                <button type="button" class="ghost-button" data-letter-filter="buffer">Kun buffer</button>
+            </div>
+            <div class="table-wrapper">
+                <table data-committed-table>
+                    <thead>
+                        <tr>
+                            <th>Adresse</th>
+                            <th>VVS</th>
+                            <th>Tid</th>
+                            <th>Status</th>
+                            <th>Brev</th>
+                            <th>Handling</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in committed_appointments %}
+                            {% if not row.letter_required %}
+                                {% set letter_status = 'buffer' %}
+                            {% elif row.letter_ready %}
+                                {% set letter_status = 'ready' %}
+                            {% elif row.appointment.status.value == 'SCHEDULED' %}
+                                {% set letter_status = 'missing' %}
+                            {% else %}
+                                {% set letter_status = 'na' %}
+                            {% endif %}
+                            <tr data-committed-row data-letter-status="{{ letter_status }}">
+                                <td>{{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}</td>
+                                <td>{{ row.contractor.username }}</td>
+                                <td>{{ row.appointment.starts_at.strftime('%H:%M') }} - {{ row.appointment.ends_at.strftime('%H:%M') }}</td>
+                                <td>{{ row.status_label }}</td>
+                                <td>
+                                    {% if not row.letter_required and row.letter_ready %}
+                                        <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet (buffer)</span>
+                                    {% elif not row.letter_required %}
+                                        <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Buffer - brev valgfrit</span>
+                                    {% elif row.letter_ready %}
+                                        <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet</span>
+                                    {% elif row.appointment.status.value == 'SCHEDULED' %}
+                                        <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV MANGLER</span>
+                                    {% else %}
+                                        <span class="hint">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not row.letter_required and row.letter_ready %}
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
+                                    {% elif not row.letter_required %}
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev</a>
+                                    {% elif row.appointment.status.value == 'SCHEDULED' %}
+                                        <a class="primary-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev nu</a>
+                                    {% elif row.appointment.status.value == 'INFORMED' %}
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
+                                    {% else %}
+                                        <span class="hint">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     {% endif %}
 </section>
 
+{% if plan_date and latest_committed_appointments %}
+<section class="card">
+    <div class="section-header">
+        <div>
+            <h2>Nye planlagte adresser</h2>
+            <p class="hint">Kun adresser oprettet ved seneste godkendelse på denne dag.</p>
+        </div>
+        {% if latest_letter_required_count %}
+            <a class="primary-button" href="/admin/letters/planning/latest/pdf?date={{ plan_date.isoformat() }}">Download PDF for nye planlagte</a>
+        {% endif %}
+    </div>
+    {% if not latest_letter_required_count %}
+        <p class="hint">De nye adresser er bufferbesøg og kræver ikke brev.</p>
+    {% endif %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Adresse</th>
+                    <th>VVS</th>
+                    <th>Tid</th>
+                    <th>Status</th>
+                    <th>Brev</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in latest_committed_appointments %}
+                    <tr>
+                        <td>{{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}</td>
+                        <td>{{ row.contractor.username }}</td>
+                        <td>{{ row.appointment.starts_at.strftime('%H:%M') }} - {{ row.appointment.ends_at.strftime('%H:%M') }}</td>
+                        <td>{{ row.status_label }}</td>
+                        <td>
+                            {% if not row.letter_required and row.letter_ready %}
+                                <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet (buffer)</span>
+                            {% elif not row.letter_required %}
+                                <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Buffer - brev valgfrit</span>
+                            {% elif row.letter_ready %}
+                                <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet</span>
+                            {% else %}
+                                <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV MANGLER</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
 {% if plan_date %}
 <section class="card">
     <h2>Resultat (udkast)</h2>
-    <p class="hint">Udkastet bliver først planlagt ved commit.</p>
-    <p class="hint">Planlagt {{ planned|length }} af {{ total_addresses }} adresser. Slots: {{ slot_count }}. Lager: {{ stock }}.</p>
+    <p class="hint">Udkastet bliver først planlagt, når admin godkender planen.</p>
+    {% if within_notice_period %}
+        <p class="status-warning" style="font-weight: 700;">Kort varsel: datoen ligger inden for {{ planning_notice_days }} dage, så auto-planen bruger kun bufferadresser.</p>
+    {% else %}
+        <p class="hint">Varslingsperiode opfyldt: almindelige adresser og behov for ny dato indgår i auto-planen.</p>
+    {% endif %}
+    <p class="hint">Planlagt {{ planned|length }} af {{ total_addresses }} adresser. Ledige slots: {{ slot_count }}. Lager: {{ stock }}.</p>
     {% if stock == 0 %}
         <p class="hint">Ingen lager tilbage. Vent på nyt indkøb.</p>
     {% endif %}
@@ -81,9 +262,25 @@
 </section>
 {% endif %}
 
+{% if notice_waiting %}
+<section class="card">
+    <h2>Afventer varslingsperiode</h2>
+    <p class="hint">Disse adresser kræver brev og kommer først med i auto-planlægning på datoer mindst {{ planning_notice_days }} dage ude i fremtiden.</p>
+    <ul class="list">
+        {% for address in notice_waiting %}
+            <li>
+                {{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}
+                <span class="hint">(Kræver brev - afventer {{ planning_notice_days }} dages varsling)</span>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
 {% if skipped_buffer %}
 <section class="card">
     <h2>Hoppet over</h2>
+    <p class="hint">Bufferadresser som ikke kom med i den aktuelle plan.</p>
     <ul class="list">
         {% for address in skipped_buffer %}
             <li class="status-warning">
@@ -102,6 +299,10 @@
 {% if planned %}
 <section class="card">
     <h2>Planlagte adresser (udkast)</h2>
+    <div class="action-row" style="margin: 0.75rem 0;">
+        <button type="button" class="ghost-button is-active" data-planned-filter="all">Alle</button>
+        <button type="button" class="ghost-button" data-planned-filter="needs_reschedule">Kun behov for ny dato</button>
+    </div>
     <div class="table-wrapper">
         <table data-planned-table>
             <thead>
@@ -111,16 +312,37 @@
                     <th>VVS</th>
                     <th>Start</th>
                     <th>Slut</th>
+                    <th>Type</th>
+                    <th>Varsling</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in planned %}
-                    <tr data-plan-row data-address-id="{{ item.address.id }}" data-address-search="{{ item.address.street }} {{ item.address.house_no }} {{ item.address.zip }} {{ item.address.city }}" draggable="true">
+                    <tr data-plan-row data-plan-status="{% if item.address.id in reschedule_ids %}needs_reschedule{% else %}other{% endif %}" data-address-id="{{ item.address.id }}" data-address-search="{{ item.address.street }} {{ item.address.house_no }} {{ item.address.zip }} {{ item.address.city }}" draggable="true">
                         <td data-plan-address>{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}</td>
                         <td>{{ plan_date.strftime('%d/%m') }}</td>
                         <td>{{ item.contractor.username }}</td>
                         <td>{{ item.starts_at.strftime('%H:%M') }}</td>
                         <td>{{ item.ends_at.strftime('%H:%M') }}</td>
+                        <td>
+                            {% if item.address.id in reschedule_ids %}
+                                <span class="chip" style="font-weight: 700; color: #7a4a12; background: #fff3e4; border-color: #e5ba84;">Behov for ny dato</span>
+                            {% endif %}
+                            {% if item.is_buffer and item.closes_street %}
+                                <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Buffer - lukker vej</span>
+                            {% elif item.is_buffer %}
+                                <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Buffer</span>
+                            {% elif item.address.id not in reschedule_ids %}
+                                <span class="hint">Varslet adresse</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.letter_required %}
+                                <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV KRÆVES</span>
+                            {% else %}
+                                <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Ingen brev nødvendig</span>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>

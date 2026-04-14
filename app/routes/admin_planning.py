@@ -10,10 +10,22 @@ from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from app import models
+from app.app_settings import is_within_planning_notice, planning_notice_days
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.planning_slots import SLOT_OCCUPYING_STATUSES, availability_slots, build_slots
+from app.workday_status import build_workday_status
 
 router = APIRouter(prefix="/admin/planning", tags=["admin"])
+
+STATUS_LABELS = {
+    models.AppointmentStatus.SCHEDULED: "Planlagt",
+    models.AppointmentStatus.INFORMED: "Informeret",
+    models.AppointmentStatus.COMPLETED: "Skiftet",
+    models.AppointmentStatus.CLOSED: "Afsluttet",
+    models.AppointmentStatus.NOT_HOME: "Ikke hjemme",
+    models.AppointmentStatus.NEEDS_RESCHEDULE: "Behov for ny dato",
+}
 
 
 def street_priority_map(db: Session) -> dict[str, int]:
@@ -41,6 +53,9 @@ class PlannedSlot:
     contractor: models.User
     starts_at: datetime
     ends_at: datetime
+    is_buffer: bool = False
+    closes_street: bool = False
+    letter_required: bool = True
 
 
 @dataclass
@@ -58,33 +73,6 @@ def parse_time(raw: str) -> time:
     return datetime.strptime(raw, "%H:%M").time()
 
 
-def build_slots(db: Session, plan_date: date) -> list[tuple[models.User, datetime, datetime]]:
-    availability = (
-        db.query(models.VvsAvailability, models.User)
-        .join(models.User, models.User.id == models.VvsAvailability.user_id)
-        .filter(models.VvsAvailability.date == plan_date)
-        .order_by(models.User.username)
-        .all()
-    )
-    slots: list[tuple[models.User, datetime, datetime]] = []
-    windows = [(time(8, 0), time(12, 0)), (time(12, 0), time(16, 0))]
-
-    for entry, contractor in availability:
-        for window_start, window_end in windows:
-            start = max(entry.start_time, window_start)
-            end = min(entry.end_time, window_end)
-            if start >= end:
-                continue
-            current = datetime.combine(plan_date, start)
-            end_dt = datetime.combine(plan_date, end)
-            while current + timedelta(minutes=30) <= end_dt:
-                slots.append((contractor, current, current + timedelta(minutes=30)))
-                current += timedelta(minutes=30)
-
-    slots.sort(key=lambda item: (item[1], item[0].username))
-    return slots
-
-
 def available_stock(db: Session) -> int:
     return (
         db.query(func.coalesce(func.sum(models.StockMovement.quantity), 0)).scalar() or 0
@@ -92,9 +80,43 @@ def available_stock(db: Session) -> int:
 
 
 def apply_buffer_rule(
-    addresses: list[models.Address], limit: int = 14
-) -> list[models.Address]:
-    return addresses
+    addresses: list[models.Address],
+    priority_map: dict[str, int],
+    limit: int | None = None,
+) -> tuple[list[models.Address], set[int]]:
+    sorted_addresses = sorted(
+        addresses, key=lambda address: address_sort_key(address, priority_map)
+    )
+    grouped: dict[str, dict[str, list[models.Address]]] = {}
+    street_order: list[str] = []
+    for address in sorted_addresses:
+        street_key = (address.street or "").lower()
+        if street_key not in grouped:
+            grouped[street_key] = {"regular": [], "buffer": []}
+            street_order.append(street_key)
+        group_key = "buffer" if address.buffer_flag else "regular"
+        grouped[street_key][group_key].append(address)
+
+    remaining_capacity = max(limit or 0, 0)
+    ordered: list[models.Address] = []
+    deferred_buffers: list[models.Address] = []
+    closing_buffer_ids: set[int] = set()
+
+    for street_key in street_order:
+        regular = grouped[street_key]["regular"]
+        buffer = grouped[street_key]["buffer"]
+        ordered.extend(regular)
+        can_close_street = bool(buffer) and remaining_capacity >= (len(regular) + len(buffer))
+        if can_close_street:
+            ordered.extend(buffer)
+            closing_buffer_ids.update(address.id for address in buffer)
+            remaining_capacity -= len(regular) + len(buffer)
+            continue
+        deferred_buffers.extend(buffer)
+        remaining_capacity = max(remaining_capacity - len(regular), 0)
+
+    ordered.extend(deferred_buffers)
+    return ordered, closing_buffer_ids
 
 
 def latest_status_map(db: Session, address_ids: list[int]) -> dict[int, models.AppointmentStatus]:
@@ -143,9 +165,19 @@ def unavailable_address_ids(db: Session, plan_date: date) -> set[int]:
     return {row[0] for row in rows}
 
 
+def planning_notice_state(db: Session, plan_date: date | None) -> tuple[int, bool]:
+    notice_days = planning_notice_days(db)
+    if not plan_date:
+        return notice_days, False
+    return notice_days, is_within_planning_notice(plan_date, notice_days)
+
+
 def fetch_addresses(
-    db: Session, plan_date: date | None = None
-) -> tuple[list[models.Address], set[int]]:
+    db: Session,
+    plan_date: date | None = None,
+    limit: int | None = None,
+    notice_days: int | None = None,
+) -> tuple[list[models.Address], set[int], set[int]]:
     scheduled = select(models.Appointment.address_id).where(
         models.Appointment.status.in_(
             [
@@ -168,27 +200,40 @@ def fetch_addresses(
             query = query.filter(~models.Address.id.in_(unavailable_ids))
     addresses = query.all()
     priority_map = street_priority_map(db)
-    sorted_addresses = sorted(addresses, key=lambda address: address_sort_key(address, priority_map))
+    sorted_addresses = sorted(
+        addresses, key=lambda address: address_sort_key(address, priority_map)
+    )
     status_map = latest_status_map(db, [address.id for address in sorted_addresses])
     reschedule_ids = {
         address_id
         for address_id, status in status_map.items()
         if status == models.AppointmentStatus.NEEDS_RESCHEDULE
     }
+    short_notice = bool(
+        plan_date and notice_days is not None and is_within_planning_notice(plan_date, notice_days)
+    )
+    if short_notice:
+        buffer_only = [address for address in sorted_addresses if address.buffer_flag]
+        ordered_addresses, closing_buffer_ids = apply_buffer_rule(
+            buffer_only,
+            priority_map,
+            limit=limit,
+        )
+        return ordered_addresses, set(), closing_buffer_ids
 
-    reschedule_addresses = [
-        address for address in sorted_addresses if address.id in reschedule_ids
-    ]
-    remaining = [
-        address for address in sorted_addresses if address.id not in reschedule_ids
-    ]
-    ordered_remaining = apply_buffer_rule(remaining, limit=14)
-    return reschedule_addresses + ordered_remaining, reschedule_ids
+    ordered_addresses, closing_buffer_ids = apply_buffer_rule(
+        sorted_addresses,
+        priority_map,
+        limit=limit,
+    )
+    return ordered_addresses, reschedule_ids, closing_buffer_ids
 
 
 def fetch_skipped_addresses(
-    db: Session, plan_date: date | None = None
-) -> tuple[list[models.Address], list[models.Address]]:
+    db: Session,
+    plan_date: date | None = None,
+    notice_days: int | None = None,
+) -> tuple[list[models.Address], list[models.Address], list[models.Address]]:
     scheduled = select(models.Appointment.address_id).where(
         models.Appointment.status.in_(
             [
@@ -224,7 +269,19 @@ def fetch_skipped_addresses(
     buffer_sorted = sorted(
         buffer_addresses, key=lambda address: address_sort_key(address, priority_map)
     )
-    return blocked_sorted, buffer_sorted
+    notice_waiting: list[models.Address] = []
+    short_notice = bool(
+        plan_date and notice_days is not None and is_within_planning_notice(plan_date, notice_days)
+    )
+    if short_notice:
+        notice_waiting = sorted(
+            base_query.filter(
+                models.Address.blocked_reason.is_(None),
+                models.Address.buffer_flag.is_(False),
+            ).all(),
+            key=lambda address: address_sort_key(address, priority_map),
+        )
+    return blocked_sorted, buffer_sorted, notice_waiting
 
 
 def fetch_unavailable_periods(
@@ -282,7 +339,7 @@ def has_conflict(db: Session, contractor_id: int, starts_at: datetime, ends_at: 
         db.query(models.Appointment)
         .filter(
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status == models.AppointmentStatus.SCHEDULED,
+            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -292,21 +349,29 @@ def has_conflict(db: Session, contractor_id: int, starts_at: datetime, ends_at: 
 
 
 def compute_plan_from_addresses(
-    db: Session, plan_date: date, addresses: list[models.Address]
+    db: Session,
+    plan_date: date,
+    addresses: list[models.Address],
+    closing_buffer_ids: set[int] | None = None,
 ) -> tuple[list[PlannedSlot], list[models.Address], int, int]:
     slots = build_slots(db, plan_date)
     stock = available_stock(db)
     max_count = min(len(slots), len(addresses), stock)
     planned: list[PlannedSlot] = []
+    closing_buffer_ids = closing_buffer_ids or set()
 
     for idx in range(max_count):
         contractor, starts_at, ends_at = slots[idx]
+        address = addresses[idx]
         planned.append(
             PlannedSlot(
-                address=addresses[idx],
+                address=address,
                 contractor=contractor,
                 starts_at=starts_at,
                 ends_at=ends_at,
+                is_buffer=address.buffer_flag,
+                closes_street=address.id in closing_buffer_ids,
+                letter_required=not address.buffer_flag,
             )
         )
 
@@ -316,19 +381,27 @@ def compute_plan_from_addresses(
 
 def compute_plan(db: Session, plan_date: date) -> tuple[list[PlannedSlot], list[models.Address], int, int, set[int]]:
     slots = build_slots(db, plan_date)
-    addresses, reschedule_ids = fetch_addresses(db, plan_date)
     stock = available_stock(db)
+    planning_limit = min(len(slots), stock)
+    notice_days, _ = planning_notice_state(db, plan_date)
+    addresses, reschedule_ids, closing_buffer_ids = fetch_addresses(
+        db, plan_date, limit=planning_limit, notice_days=notice_days
+    )
     max_count = min(len(slots), len(addresses), stock)
     planned: list[PlannedSlot] = []
 
     for idx in range(max_count):
         contractor, starts_at, ends_at = slots[idx]
+        address = addresses[idx]
         planned.append(
             PlannedSlot(
-                address=addresses[idx],
+                address=address,
                 contractor=contractor,
                 starts_at=starts_at,
                 ends_at=ends_at,
+                is_buffer=address.buffer_flag,
+                closes_street=address.id in closing_buffer_ids,
+                letter_required=not address.buffer_flag,
             )
         )
 
@@ -345,42 +418,76 @@ def available_planning_dates(db: Session) -> list[dict[str, object]]:
     )
     options: list[dict[str, object]] = []
     for (availability_date,) in rows:
-        slot_count = len(build_slots(db, availability_date))
-        if slot_count == 0:
+        total_slot_count = len(availability_slots(db, availability_date))
+        if total_slot_count == 0:
             continue
-        day_start = datetime.combine(availability_date, time.min)
-        day_end = datetime.combine(availability_date, time.max)
-        scheduled_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.status.in_(
-                    [
-                        models.AppointmentStatus.SCHEDULED,
-                        models.AppointmentStatus.INFORMED,
-                        models.AppointmentStatus.COMPLETED,
-                        models.AppointmentStatus.CLOSED,
-                        models.AppointmentStatus.NOT_HOME,
-                        models.AppointmentStatus.NEEDS_RESCHEDULE,
-                    ]
-                ),
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at <= day_end,
-            )
-            .scalar()
-            or 0
-        )
+        free_slot_count = len(build_slots(db, availability_date))
+        occupied_slot_count = max(total_slot_count - free_slot_count, 0)
         label = (
             f"{availability_date.strftime('%d/%m/%Y')} "
-            f"({scheduled_count} planlagt ud af {slot_count} mulighed)"
+            f"({occupied_slot_count} optaget ud af {total_slot_count} muligheder)"
         )
         options.append(
             {
                 "value": availability_date.isoformat(),
                 "label": label,
-                "slot_count": slot_count,
+                "slot_count": total_slot_count,
+                "free_slot_count": free_slot_count,
             }
         )
     return options
+
+
+def latest_planning_commit_data(request: Request) -> dict[str, object] | None:
+    raw = request.session.get("latest_planning_commit")
+    if not isinstance(raw, dict):
+        return None
+    date_raw = raw.get("date")
+    appointment_ids = raw.get("appointment_ids")
+    if not isinstance(date_raw, str) or not isinstance(appointment_ids, list):
+        return None
+    filtered_ids = [value for value in appointment_ids if isinstance(value, int)]
+    return {"date": date_raw, "appointment_ids": filtered_ids}
+
+
+def committed_appointments_for_date(
+    db: Session, plan_date: date
+) -> list[dict[str, object]]:
+    rows = (
+        db.query(models.Appointment, models.Address, models.User)
+        .join(models.Address, models.Address.id == models.Appointment.address_id)
+        .join(models.User, models.User.id == models.Appointment.contractor_id)
+        .filter(
+            models.Appointment.starts_at >= datetime.combine(plan_date, time.min),
+            models.Appointment.starts_at <= datetime.combine(plan_date, time.max),
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                    models.AppointmentStatus.COMPLETED,
+                    models.AppointmentStatus.CLOSED,
+                    models.AppointmentStatus.NOT_HOME,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
+                ]
+            ),
+        )
+        .order_by(models.Appointment.starts_at, models.Address.street, models.Address.house_no)
+        .all()
+    )
+    committed_rows: list[dict[str, object]] = []
+    for appointment, address, contractor in rows:
+        committed_rows.append(
+            {
+                "appointment": appointment,
+                "address": address,
+                "contractor": contractor,
+                "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+                "letter_required": appointment.letter_required,
+                "is_buffer": not appointment.letter_required,
+                "letter_ready": appointment.status == models.AppointmentStatus.INFORMED,
+            }
+        )
+    return committed_rows
 
 
 @router.get("")
@@ -416,11 +523,28 @@ def planning_form(
     skipped_blocked: list[models.Address] = []
     skipped_buffer: list[models.Address] = []
     unavailable_entries: list[dict[str, object]] = []
-    scheduled_addresses: list[models.Address] = []
+    notice_waiting: list[models.Address] = []
+    committed_appointments: list[dict[str, object]] = []
+    latest_committed_appointments: list[dict[str, object]] = []
+    committed_letter_required_count = 0
+    committed_missing_letter_count = 0
+    latest_letter_required_count = 0
+    notice_days, within_notice_period = planning_notice_state(db, plan_date)
     if plan_date and preview:
         planned, unplanned, stock, slot_count, reschedule_ids = compute_plan(db, plan_date)
-        ordered_addresses, _ = fetch_addresses(db, plan_date)
-        skipped_blocked, skipped_buffer = fetch_skipped_addresses(db, plan_date)
+        planning_limit = min(slot_count, stock)
+        ordered_addresses, _, _ = fetch_addresses(
+            db,
+            plan_date,
+            limit=planning_limit,
+            notice_days=notice_days,
+        )
+        skipped_blocked, _, notice_waiting = fetch_skipped_addresses(
+            db,
+            plan_date,
+            notice_days=notice_days,
+        )
+        skipped_buffer = [address for address in unplanned if address.buffer_flag]
         unavailable_entries = fetch_unavailable_periods(db, plan_date)
         unavailable_ids = {entry["address"].id for entry in unavailable_entries}
         for address in skipped_blocked:
@@ -436,20 +560,37 @@ def planning_form(
             )
 
     if plan_date:
-        scheduled_rows = (
-            db.query(models.Address)
-            .join(models.Appointment, models.Appointment.address_id == models.Address.id)
-            .filter(
-                models.Appointment.status == models.AppointmentStatus.SCHEDULED,
-                models.Appointment.starts_at >= datetime.combine(plan_date, time.min),
-                models.Appointment.starts_at <= datetime.combine(plan_date, time.max),
-            )
-            .order_by(models.Appointment.starts_at)
-            .all()
+        committed_appointments = committed_appointments_for_date(db, plan_date)
+        committed_letter_required_count = sum(
+            1 for row in committed_appointments if row["letter_required"]
         )
-        scheduled_addresses = scheduled_rows
+        committed_missing_letter_count = sum(
+            1
+            for row in committed_appointments
+            if row["letter_required"] and not row["letter_ready"]
+        )
+        latest_commit = latest_planning_commit_data(request)
+        if latest_commit and latest_commit["date"] == plan_date.isoformat():
+            latest_ids = set(latest_commit["appointment_ids"])
+            latest_committed_appointments = [
+                row
+                for row in committed_appointments
+                if row["appointment"].id in latest_ids
+            ]
+            latest_letter_required_count = sum(
+                1 for row in latest_committed_appointments if row["letter_required"]
+            )
 
     total_addresses = len(planned) + len(unplanned)
+    workday_status = build_workday_status(db)
+    today_day_status = [
+        {**row, "planning_href": f"/admin/planning?date_query={row['date'].isoformat()}&preview=1", "is_selected": bool(plan_date and row["date"] == plan_date)}
+        for row in workday_status["today_day_status"]
+    ]
+    upcoming_day_status = [
+        {**row, "planning_href": f"/admin/planning?date_query={row['date'].isoformat()}&preview=1", "is_selected": bool(plan_date and row["date"] == plan_date)}
+        for row in workday_status["upcoming_day_status"]
+    ]
 
     return request.app.state.templates.TemplateResponse(
         "admin_planning.html",
@@ -467,7 +608,17 @@ def planning_form(
             "ordered_addresses": ordered_addresses,
             "unavailable_entries": unavailable_entries,
             "skipped_buffer": skipped_buffer,
-            "scheduled_addresses": scheduled_addresses,
+            "committed_appointments": committed_appointments,
+            "committed_letter_required_count": committed_letter_required_count,
+            "committed_missing_letter_count": committed_missing_letter_count,
+            "latest_committed_appointments": latest_committed_appointments,
+            "latest_letter_required_count": latest_letter_required_count,
+            "planning_notice_days": notice_days,
+            "within_notice_period": within_notice_period,
+            "notice_waiting": notice_waiting,
+            "reschedule_ids": reschedule_ids,
+            "today_day_status": today_day_status,
+            "upcoming_day_status": upcoming_day_status,
         },
     )
 
@@ -522,7 +673,16 @@ def commit_plan(
         if value.strip().isdigit()
     ]
     if ordered_ids:
-        addresses, _ = fetch_addresses(db, plan_date)
+        slots = build_slots(db, plan_date)
+        stock = available_stock(db)
+        planning_limit = min(len(slots), stock)
+        notice_days, _ = planning_notice_state(db, plan_date)
+        addresses, _, _ = fetch_addresses(
+            db,
+            plan_date,
+            limit=planning_limit,
+            notice_days=notice_days,
+        )
         address_map = {address.id: address for address in addresses}
         if any(address_id not in address_map for address_id in ordered_ids):
             flash(request, "Rækkefølgen indeholder ugyldige adresser", "error")
@@ -548,18 +708,20 @@ def commit_plan(
         flash(request, "Ingen slots kunne planlægges", "error")
         return RedirectResponse(f"/admin/planning?date_query={date_raw}&preview=1", status_code=303)
 
+    created_appointments: list[models.Appointment] = []
     for slot in planned:
-        db.add(
-            models.Appointment(
-                address_id=slot.address.id,
-                contractor_id=slot.contractor.id,
-                starts_at=slot.starts_at,
-                ends_at=slot.ends_at,
-                status=models.AppointmentStatus.SCHEDULED,
-                changed_date=datetime.utcnow(),
-                changed_by_user_id=user.id,
-            )
+        appointment = models.Appointment(
+            address_id=slot.address.id,
+            contractor_id=slot.contractor.id,
+            starts_at=slot.starts_at,
+            ends_at=slot.ends_at,
+            status=models.AppointmentStatus.SCHEDULED,
+            letter_required=slot.letter_required,
+            changed_date=datetime.utcnow(),
+            changed_by_user_id=user.id,
         )
+        db.add(appointment)
+        created_appointments.append(appointment)
 
     db.add(
         models.StockMovement(
@@ -569,6 +731,11 @@ def commit_plan(
             note=f"Auto-planlægning {plan_date.isoformat()}",
         )
     )
+    db.flush()
+    request.session["latest_planning_commit"] = {
+        "date": plan_date.isoformat(),
+        "appointment_ids": [appointment.id for appointment in created_appointments],
+    }
     db.commit()
 
     remaining = len(unplanned)
@@ -604,7 +771,7 @@ def manual_planning_form(
 
     if plan_date and plan_date.isoformat() in option_values:
         vvs_users = available_vvs_for_date(db, plan_date)
-        addresses, _ = fetch_addresses(db, plan_date)
+        addresses, _, _ = fetch_addresses(db, plan_date)
         if not vvs_users:
             flash(request, "VVS har ingen arbejdsdage", "error")
             return RedirectResponse("/admin/planning/manual", status_code=303)
@@ -613,7 +780,7 @@ def manual_planning_form(
             .join(models.Address, models.Address.id == models.Appointment.address_id)
             .filter(
                 models.Appointment.contractor_id.in_([user.id for user in vvs_users]),
-                models.Appointment.status == models.AppointmentStatus.SCHEDULED,
+                models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
                 models.Appointment.starts_at >= datetime.combine(plan_date, time.min),
                 models.Appointment.starts_at < datetime.combine(plan_date, time.max),
             )
@@ -758,6 +925,7 @@ def manual_planning_commit(
             starts_at=slot_start,
             ends_at=slot_end,
             status=models.AppointmentStatus.SCHEDULED,
+            letter_required=not address.buffer_flag,
             changed_date=datetime.utcnow(),
             changed_by_user_id=user.id,
         )

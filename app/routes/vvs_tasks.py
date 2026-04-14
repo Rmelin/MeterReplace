@@ -51,6 +51,14 @@ STATUS_KEYS = {
     models.AppointmentStatus.NEEDS_RESCHEDULE: "needs_reschedule",
 }
 
+SLOT_OCCUPYING_STATUSES = {
+    models.AppointmentStatus.SCHEDULED,
+    models.AppointmentStatus.INFORMED,
+    models.AppointmentStatus.COMPLETED,
+    models.AppointmentStatus.CLOSED,
+    models.AppointmentStatus.NOT_HOME,
+}
+
 
 def appointment_photos(
     db: Session, appointment_ids: list[int]
@@ -156,7 +164,7 @@ def has_conflict(
         .filter(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status == models.AppointmentStatus.SCHEDULED,
+            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -238,10 +246,20 @@ def vvs_tasks(
         for appt in appointments
         if appt.status in {models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED}
     ]
+    needs_reschedule = [
+        appt
+        for appt in appointments
+        if appt.status == models.AppointmentStatus.NEEDS_RESCHEDULE
+    ]
     done = [
         appt
         for appt in appointments
-        if appt.status not in {models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED}
+        if appt.status
+        not in {
+            models.AppointmentStatus.SCHEDULED,
+            models.AppointmentStatus.INFORMED,
+            models.AppointmentStatus.NEEDS_RESCHEDULE,
+        }
     ]
 
     return request.app.state.templates.TemplateResponse(
@@ -254,6 +272,7 @@ def vvs_tasks(
             "addresses": addresses,
             "photos": photos,
             "todo": todo,
+            "needs_reschedule": needs_reschedule,
             "done": done,
             "availability_dates": available_dates,
             "show_all_dates": show_all_dates,
@@ -261,7 +280,8 @@ def vvs_tasks(
             "photo_labels": PHOTO_LABELS,
             "status_labels": STATUS_LABELS,
             "done_count": len(done),
-            "total_count": len(appointments),
+            "total_count": len(todo) + len(done),
+            "needs_reschedule_count": len(needs_reschedule),
         },
     )
 

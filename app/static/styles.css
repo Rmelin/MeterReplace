@@ -453,6 +453,178 @@ a:hover {
     --item-rgb: var(--status-post-rgb);
 }
 
+.status-line-card {
+    display: grid;
+    gap: 1rem;
+}
+
+.status-line-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.status-line-header h2 {
+    margin: 0;
+}
+
+.status-line-header .hint {
+    margin: 0.35rem 0 0;
+}
+
+.status-line-total {
+    display: grid;
+    gap: 0.15rem;
+    text-align: right;
+}
+
+.status-line-total-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.status-line-total strong {
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+.status-line-bar {
+    display: flex;
+    width: 100%;
+    height: 14px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(var(--status-unplanned-rgb), 0.12);
+}
+
+.status-line-progress {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.status-line-progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.status-line-progress-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.status-line-segment {
+    height: 100%;
+}
+
+.status-line-segment-missing {
+    background: var(--status-unplanned);
+}
+
+.status-line-segment-planned {
+    background: var(--status-planned);
+}
+
+.status-line-segment-informed {
+    background: var(--status-informed);
+}
+
+.status-line-segment-completed {
+    background: var(--status-completed);
+}
+
+.status-line-segment-closed {
+    background: var(--status-closed);
+}
+
+.status-line-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+}
+
+.status-line-legend.compact {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+}
+
+.status-line-legend-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 12px;
+    border: 1px solid rgba(var(--status-unplanned-rgb), 0.18);
+    background: rgba(var(--status-unplanned-rgb), 0.05);
+}
+
+.status-line-legend-item.compact {
+    padding: 0.55rem 0.7rem;
+    gap: 0.35rem;
+}
+
+.status-line-legend-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: var(--status-unplanned);
+}
+
+.status-line-legend-label {
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.status-line-legend-item-missing {
+    border-color: rgba(var(--status-unplanned-rgb), 0.2);
+    background: rgba(var(--status-unplanned-rgb), 0.06);
+}
+
+.status-line-legend-item-missing .status-line-legend-dot {
+    background: var(--status-unplanned);
+}
+
+.status-line-legend-item-planned {
+    border-color: rgba(var(--status-planned-rgb), 0.2);
+    background: rgba(var(--status-planned-rgb), 0.06);
+}
+
+.status-line-legend-item-planned .status-line-legend-dot {
+    background: var(--status-planned);
+}
+
+.status-line-legend-item-informed {
+    border-color: rgba(var(--status-informed-rgb), 0.2);
+    background: rgba(var(--status-informed-rgb), 0.06);
+}
+
+.status-line-legend-item-informed .status-line-legend-dot {
+    background: var(--status-informed);
+}
+
+.status-line-legend-item-completed {
+    border-color: rgba(var(--status-completed-rgb), 0.2);
+    background: rgba(var(--status-completed-rgb), 0.06);
+}
+
+.status-line-legend-item-completed .status-line-legend-dot {
+    background: var(--status-completed);
+}
+
+.status-line-legend-item-closed {
+    border-color: rgba(var(--status-closed-rgb), 0.2);
+    background: rgba(var(--status-closed-rgb), 0.06);
+}
+
+.status-line-legend-item-closed .status-line-legend-dot {
+    background: var(--status-closed);
+}
+
 .day-status-sections {
     display: grid;
     gap: 1.25rem;

@@ -185,6 +185,7 @@ def planned_dates(db: Session) -> list[str]:
     rows = (
         db.query(func.date(models.Appointment.starts_at))
         .filter(
+            models.Appointment.letter_required.is_(True),
             models.Appointment.status.in_(
                 [models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED]
             )
@@ -202,6 +203,18 @@ def planned_dates(db: Session) -> list[str]:
         else:
             values.append(value.isoformat())
     return values
+
+
+def latest_planning_commit_data(request: Request) -> dict[str, object] | None:
+    raw = request.session.get("latest_planning_commit")
+    if not isinstance(raw, dict):
+        return None
+    date_raw = raw.get("date")
+    appointment_ids = raw.get("appointment_ids")
+    if not isinstance(date_raw, str) or not isinstance(appointment_ids, list):
+        return None
+    filtered_ids = [value for value in appointment_ids if isinstance(value, int)]
+    return {"date": date_raw, "appointment_ids": filtered_ids}
 
 
 @router.get("/template")
@@ -378,6 +391,7 @@ def batch_pdf(
         db.query(models.Appointment, models.Address)
         .join(models.Address, models.Address.id == models.Appointment.address_id)
         .filter(
+            models.Appointment.letter_required.is_(True),
             models.Appointment.status.in_(
                 [models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED]
             ),
@@ -416,6 +430,72 @@ def batch_pdf(
         db.commit()
 
     filename = f"breve-{day.isoformat()}.pdf"
+    return Response(
+        pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/planning/latest/pdf")
+def latest_planning_batch_pdf(
+    request: Request,
+    date: str,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN)),
+):
+    latest_commit = latest_planning_commit_data(request)
+    if not latest_commit or not latest_commit["appointment_ids"]:
+        flash(request, "Ingen nye planlagte adresser fundet", "error")
+        return RedirectResponse(f"/admin/planning?date_query={date}", status_code=303)
+
+    if latest_commit["date"] != date:
+        flash(request, "Der er ikke gemt nye planlagte adresser for denne dato", "error")
+        return RedirectResponse(f"/admin/planning?date_query={date}", status_code=303)
+
+    rows = (
+        db.query(models.Appointment, models.Address)
+        .join(models.Address, models.Address.id == models.Appointment.address_id)
+        .filter(
+            models.Appointment.id.in_(latest_commit["appointment_ids"]),
+            models.Appointment.letter_required.is_(True),
+            models.Appointment.status.in_(
+                [models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED]
+            ),
+        )
+        .order_by(models.Appointment.starts_at)
+        .all()
+    )
+
+    if not rows:
+        flash(request, "Ingen nye planlagte adresser kræver brev", "error")
+        return RedirectResponse(f"/admin/planning?date_query={date}", status_code=303)
+
+    template = latest_template(db) or models.LetterTemplate(
+        body_markdown=DEFAULT_BODY,
+        include_resident_link=True,
+    )
+    base_url = public_base_url(request)
+    letters = [
+        letter_context(address, appointment, template, base_url, db)
+        for appointment, address in rows
+    ]
+    html = request.app.state.templates.get_template("letter_pdf.html").render(
+        letters=letters
+    )
+    pdf_bytes = render_pdf(html)
+
+    updated = False
+    for appointment, _ in rows:
+        if appointment.status != models.AppointmentStatus.INFORMED:
+            appointment.status = models.AppointmentStatus.INFORMED
+            appointment.changed_date = datetime.utcnow()
+            appointment.changed_by_user_id = user.id
+            updated = True
+    if updated:
+        db.commit()
+
+    filename = f"breve-nye-{date}.pdf"
     return Response(
         pdf_bytes,
         media_type="application/pdf",

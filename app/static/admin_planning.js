@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const orderInput = document.querySelector('[data-address-order]')
   const plannedTable = document.querySelector('[data-planned-table]')
   const addressFilter = document.querySelector('[data-address-filter]')
+  const plannedRows = Array.from(document.querySelectorAll('[data-plan-row]'))
+  const plannedFilterButtons = Array.from(document.querySelectorAll('[data-planned-filter]'))
+  const committedRows = Array.from(document.querySelectorAll('[data-committed-row]'))
+  const letterFilterButtons = Array.from(document.querySelectorAll('[data-letter-filter]'))
 
   const hidePanel = (panel) => {
     panel.classList.add('is-hidden')
@@ -150,6 +154,32 @@ document.addEventListener('DOMContentLoaded', () => {
     })
   }
 
+  const applyLetterFilter = (filterValue) => {
+    if (committedRows.length === 0) return
+    committedRows.forEach((row) => {
+      const rowStatus = row.getAttribute('data-letter-status') || 'na'
+      const matches = filterValue === 'all' || rowStatus === filterValue
+      row.style.display = matches ? '' : 'none'
+    })
+    letterFilterButtons.forEach((button) => {
+      const isActive = button.getAttribute('data-letter-filter') === filterValue
+      button.classList.toggle('is-active', isActive)
+    })
+  }
+
+  const applyPlannedFilter = (filterValue) => {
+    if (plannedRows.length === 0) return
+    plannedRows.forEach((row) => {
+      const rowStatus = row.getAttribute('data-plan-status') || 'other'
+      const matches = filterValue === 'all' || rowStatus === filterValue
+      row.style.display = matches ? '' : 'none'
+    })
+    plannedFilterButtons.forEach((button) => {
+      const isActive = button.getAttribute('data-planned-filter') === filterValue
+      button.classList.toggle('is-active', isActive)
+    })
+  }
+
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
       const target = button.getAttribute('data-toggle-panel')
@@ -162,8 +192,24 @@ document.addEventListener('DOMContentLoaded', () => {
     addressFilter.addEventListener('input', applyFilter)
   }
 
+  letterFilterButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const filterValue = button.getAttribute('data-letter-filter') || 'all'
+      applyLetterFilter(filterValue)
+    })
+  })
+
+  plannedFilterButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const filterValue = button.getAttribute('data-planned-filter') || 'all'
+      applyPlannedFilter(filterValue)
+    })
+  })
+
   updateOrderInput()
   updatePlannedTable()
   setupOrderListDrag()
   setupPlannedDrag()
+  applyLetterFilter('all')
+  applyPlannedFilter('all')
 })

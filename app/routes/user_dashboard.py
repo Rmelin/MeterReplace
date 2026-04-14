@@ -51,7 +51,6 @@ def user_dashboard(
                         models.AppointmentStatus.COMPLETED,
                         models.AppointmentStatus.CLOSED,
                         models.AppointmentStatus.NOT_HOME,
-                        models.AppointmentStatus.NEEDS_RESCHEDULE,
                     ]
                 ),
             )

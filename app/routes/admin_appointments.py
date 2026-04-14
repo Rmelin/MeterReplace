@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.workday_status import build_workday_status
 
 router = APIRouter(prefix="/admin/appointments", tags=["admin"])
 
@@ -40,6 +41,14 @@ STATUS_LABELS = {
     models.AppointmentStatus.CLOSED: "Afsluttet",
     models.AppointmentStatus.NOT_HOME: "Ikke hjemme",
     models.AppointmentStatus.NEEDS_RESCHEDULE: "Behov for ny dato",
+}
+
+SLOT_OCCUPYING_STATUSES = {
+    models.AppointmentStatus.SCHEDULED,
+    models.AppointmentStatus.INFORMED,
+    models.AppointmentStatus.COMPLETED,
+    models.AppointmentStatus.CLOSED,
+    models.AppointmentStatus.NOT_HOME,
 }
 
 
@@ -159,7 +168,7 @@ def has_conflict(
         .filter(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status == models.AppointmentStatus.SCHEDULED,
+            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -178,7 +187,7 @@ def has_conflict_for_user(
         db.query(models.Appointment)
         .filter(
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status == models.AppointmentStatus.SCHEDULED,
+            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -247,10 +256,53 @@ def appointment_overview(
         for appt in appointments
         if appt.status in {models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED}
     ]
+    needs_reschedule = [
+        appt
+        for appt in appointments
+        if appt.status == models.AppointmentStatus.NEEDS_RESCHEDULE
+    ]
     done = [
         appt
         for appt in appointments
-        if appt.status not in {models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED}
+        if appt.status
+        not in {
+            models.AppointmentStatus.SCHEDULED,
+            models.AppointmentStatus.INFORMED,
+            models.AppointmentStatus.NEEDS_RESCHEDULE,
+        }
+    ]
+    workday_status = build_workday_status(db)
+    today_day_status = [
+        {
+            **row,
+            "appointments_href": f"/admin/appointments?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["today_day_status"]
+    ]
+    upcoming_day_status = [
+        {
+            **row,
+            "appointments_href": f"/admin/appointments?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["upcoming_day_status"]
+    ]
+    recent_day_status = [
+        {
+            **row,
+            "appointments_href": f"/admin/appointments?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["recent_day_status"]
+    ]
+    older_day_status = [
+        {
+            **row,
+            "appointments_href": f"/admin/appointments?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["older_day_status"]
     ]
 
     return request.app.state.templates.TemplateResponse(
@@ -264,12 +316,17 @@ def appointment_overview(
             "contractors": contractors,
             "photos": photos,
             "todo": todo,
+            "needs_reschedule": needs_reschedule,
             "done": done,
             "availability_dates": dates,
             "selected_date": selected_date,
             "vvs_users": vvs_users,
             "photo_labels": PHOTO_LABELS,
             "status_labels": STATUS_LABELS,
+            "today_day_status": today_day_status,
+            "upcoming_day_status": upcoming_day_status,
+            "recent_day_status": recent_day_status,
+            "older_day_status": older_day_status,
         },
     )
 

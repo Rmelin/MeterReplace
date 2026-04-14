@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Indstillinger</h1>
+        <p>Styr standardregler for planlægning.</p>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Planlægning</h2>
+    <form method="post" action="/admin/settings" class="form-grid">
+        <label>
+            Varslingsperiode i dage
+            <input type="number" name="planning_notice_days_value" min="0" value="{{ planning_notice_days }}" required />
+        </label>
+        <p class="hint">Standard er {{ default_planning_notice_days }} dage. Datoer tættere på end varslingen bruger kun bufferadresser i auto-planlægning.</p>
+        <button type="submit" class="primary-button">Gem indstillinger</button>
+    </form>
+</section>
+{% endblock %}
