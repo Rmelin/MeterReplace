@@ -11,7 +11,7 @@ from starlette.responses import RedirectResponse
 from app import models
 from app.db import SessionLocal, init_db
 from app.dependencies import consume_flashes, get_optional_user
-from app.routes import admin_addresses, admin_appointments, admin_availability, admin_completed_import, admin_inventory, admin_letters, admin_messages, admin_missing_photos, admin_planning, admin_register_import, admin_status, admin_street_priority, admin_users, auth, resident, user_dashboard, vvs_availability, vvs_tasks
+from app.routes import admin_addresses, admin_appointments, admin_availability, admin_completed_import, admin_inventory, admin_letters, admin_messages, admin_missing_photos, admin_planning, admin_register_import, admin_settings, admin_status, admin_street_priority, admin_users, auth, resident, user_dashboard, vvs_availability, vvs_tasks
 
 app = FastAPI()
 
@@ -50,6 +50,7 @@ app.include_router(admin_letters.router)
 app.include_router(admin_messages.router)
 app.include_router(admin_missing_photos.router)
 app.include_router(admin_status.router)
+app.include_router(admin_settings.router)
 app.include_router(admin_street_priority.router)
 app.include_router(user_dashboard.router)
 app.include_router(resident.router)

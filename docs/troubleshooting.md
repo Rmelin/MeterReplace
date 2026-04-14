@@ -104,6 +104,37 @@ Tjek følgende:
 
 Auto-planlægning kræver en dato med gyldige arbejdsdage.
 
+## Alembic og database er ude af sync
+
+Typisk symptom:
+
+- Alembic fejler med fejl som `table already exists`
+- databasen har allerede en ny tabel eller kolonne, men `alembic_version` er bagud
+
+Det sker typisk hvis databasen er oprettet eller udvidet direkte fra modelkoden før migrationen er kørt.
+
+Checks:
+
+```bash
+sqlite3 data/data/app.db "select version_num from alembic_version;"
+sqlite3 data/data/app.db ".tables"
+python -m alembic upgrade head
+```
+
+Hvis tabellen allerede findes:
+
+- kontroller først at schemaet faktisk matcher migrationen
+- gør derefter migrationen idempotent hvis det er en kendt lokal driftssituation
+- kør `python -m alembic upgrade head` igen
+
+I dette projekt er det normalt bedst at:
+
+- undgå at slette lokal database unødigt
+- gøre migrationen robust mod eksisterende tabel lokalt
+- bruge `alembic_version` som sandhed for hvilke migrationer der mangler
+
+Hvis lokal database er teststøj og ikke vigtig, kan en ren lokal DB stadig være den hurtigste løsning.
+
 ## Import fejler
 
 Vanlige årsager:

@@ -1,10 +1,90 @@
 {% extends "base.html" %}
+{% macro render_appointment_day_card(row) %}
+    <a class="day-status-card day-status-card-{{ row.state_key }}{% if row.is_selected %} is-selected{% endif %}" href="{{ row.appointments_href }}"{% if row.is_selected %} style="border: 2px solid #1f4f7a; box-shadow: inset 0 0 0 1px #1f4f7a;"{% endif %}>
+        <div class="day-status-card-header">
+            <div>
+                <h4>{{ row.date.strftime('%d/%m/%Y') }}</h4>
+                <p class="hint">{{ row.relative_label }}</p>
+            </div>
+        </div>
+        <div class="day-status-metrics">
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Booket</span>
+                <strong>{{ row.booked }}</strong>
+            </div>
+            <div class="day-status-metric">
+                <span class="day-status-metric-label">Ledig tid</span>
+                <strong>{{ row.display_free_slots if row.day_offset > 0 else row.free_slots }}</strong>
+            </div>
+        </div>
+    </a>
+{% endmacro %}
 {% block content %}
 <section class="page-header">
     <div>
         <h1>Opgaver & fotos</h1>
         <p>To do og Done pr. arbejdsdag.</p>
     </div>
+</section>
+
+<section class="card">
+    <h2>Arbejdsdage status</h2>
+    <p class="hint">Klik på en arbejdsdag for at se opgaver og historik for den dag.</p>
+    {% if today_day_status or upcoming_day_status or recent_day_status or older_day_status %}
+        <div class="day-status-sections">
+            {% if today_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>I dag</h3>
+                        <span class="chip">{{ today_day_status|length }} arbejdsdag{% if today_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in today_day_status %}
+                            {{ render_appointment_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if upcoming_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Kommende arbejdsdage</h3>
+                        <span class="chip">{{ upcoming_day_status|length }} arbejdsdag{% if upcoming_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in upcoming_day_status %}
+                            {{ render_appointment_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if recent_day_status %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Seneste 7 dage</h3>
+                        <span class="chip">{{ recent_day_status|length }} arbejdsdag{% if recent_day_status|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in recent_day_status %}
+                            {{ render_appointment_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if older_day_status %}
+                <details class="day-status-older">
+                    <summary>Ældre arbejdsdage ({{ older_day_status|length }})</summary>
+                    <div class="day-status-grid">
+                        {% for row in older_day_status %}
+                            {{ render_appointment_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
+        </div>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
 </section>
 
 <section class="card">
@@ -122,6 +202,37 @@
         {% endfor %}
     {% else %}
         <p class="hint">Ingen opgaver på dagen.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Behov for ny dato</h2>
+    {% if needs_reschedule %}
+        <p class="hint" style="margin-bottom: 1rem;">{{ needs_reschedule|length }} adresse(r) afventer ny plan i Preview/Commit.</p>
+    {% endif %}
+    {% if needs_reschedule %}
+        {% for appointment in needs_reschedule %}
+            {% set address = addresses.get(appointment.id) %}
+            {% set contractor = contractors.get(appointment.id) %}
+            <div class="card task-card{% if not address %} task-no-address{% endif %}">
+                <div class="task-head">
+                    {% if address %}
+                        <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
+                    {% else %}
+                        <span class="task-flag">Opgave uden adresse</span>
+                    {% endif %}
+                </div>
+                <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
+                <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
+                {% if appointment.notes %}
+                    <p class="hint">Opgave: {{ appointment.notes }}</p>
+                {% endif %}
+                <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
+                <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="hint">Ingen adresser afventer ny dato.</p>
     {% endif %}
 </section>
 

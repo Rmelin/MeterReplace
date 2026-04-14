@@ -154,6 +154,7 @@ class Appointment(Base):
         default=AppointmentStatus.DRAFT,
         nullable=False,
     )
+    letter_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
     old_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     new_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -176,6 +177,17 @@ class StreetPriority(Base):
     street: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    value: Mapped[str] = mapped_column(String(255), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )

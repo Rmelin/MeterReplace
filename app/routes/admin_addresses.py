@@ -61,6 +61,9 @@ STATUS_FILTERS = [
     {"value": "not_home_history", "label": "Ikke hjemme (historik)"},
     {"value": "needs_reschedule", "label": "Behov for ny dato"},
     {"value": "unplanned", "label": "Ikke planlagt"},
+    {"value": "blocked", "label": "Fejl ved stophane"},
+    {"value": "buffer", "label": "Målerbrønd"},
+    {"value": "unplanned_buffer", "label": "Ikke planlagt + målerbrønd"},
 ]
 
 
@@ -280,6 +283,7 @@ def list_addresses(
     not_home_history_map: dict[int, int] = {}
     photo_map: dict[int, int] = {}
     resident_response_map: dict[int, dict[str, str]] = {}
+    letter_available_ids: set[int] = set()
     current_year = datetime.utcnow().year
     if address_ids:
         appointments = (
@@ -360,6 +364,20 @@ def list_addresses(
         )
         photo_map = {address_id: count for address_id, count in photo_rows}
 
+        letter_rows = (
+            db.query(models.Appointment.address_id)
+            .filter(
+                models.Appointment.address_id.in_(address_ids),
+                models.Appointment.letter_required.is_(True),
+                models.Appointment.status.in_(
+                    [models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED]
+                ),
+            )
+            .distinct()
+            .all()
+        )
+        letter_available_ids = {address_id for address_id, in letter_rows}
+
         responses = (
             db.query(models.ResidentResponse)
             .filter(models.ResidentResponse.address_id.in_(address_ids))
@@ -391,6 +409,18 @@ def list_addresses(
                 for address in addresses
                 if status_status_map.get(address.id) in {None, models.AppointmentStatus.NOT_SCHEDULED}
             ]
+        elif selected_status == "blocked":
+            addresses = [address for address in addresses if address.blocked_reason]
+        elif selected_status == "buffer":
+            addresses = [address for address in addresses if address.buffer_flag]
+        elif selected_status == "unplanned_buffer":
+            addresses = [
+                address
+                for address in addresses
+                if address.buffer_flag
+                and status_status_map.get(address.id)
+                in {None, models.AppointmentStatus.NOT_SCHEDULED}
+            ]
         elif selected_status == "not_home_history":
             addresses = [
                 address for address in addresses if address.id in not_home_history_map
@@ -415,6 +445,7 @@ def list_addresses(
             "status_filters": STATUS_FILTERS,
             "selected_status": selected_status,
             "AppointmentStatus": models.AppointmentStatus,
+            "letter_available_ids": letter_available_ids,
             "not_home_history_map": not_home_history_map,
             "photo_map": photo_map,
             "resident_response_map": resident_response_map,
@@ -552,6 +583,7 @@ def edit_address_form(
         db.query(models.Appointment)
         .filter(
             models.Appointment.address_id == address_id,
+            models.Appointment.letter_required.is_(True),
             models.Appointment.status.in_(
                 [models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED]
             ),
@@ -822,6 +854,18 @@ def address_map_data(
                 if status_map.get(address.id)
                 in {None, models.AppointmentStatus.NOT_SCHEDULED}
             ]
+        elif selected_status == "blocked":
+            addresses = [address for address in addresses if address.blocked_reason]
+        elif selected_status == "buffer":
+            addresses = [address for address in addresses if address.buffer_flag]
+        elif selected_status == "unplanned_buffer":
+            addresses = [
+                address
+                for address in addresses
+                if address.buffer_flag
+                and status_map.get(address.id)
+                in {None, models.AppointmentStatus.NOT_SCHEDULED}
+            ]
         elif selected_status == "not_home_history":
             not_home_rows = (
                 db.query(models.Appointment.address_id)
@@ -1011,6 +1055,7 @@ def upload_address_photo(
             starts_at=starts_at,
             ends_at=starts_at + timedelta(hours=1),
             status=models.AppointmentStatus.SCHEDULED,
+            letter_required=not address.buffer_flag,
         )
         db.add(appointment)
         db.flush()
@@ -1217,6 +1262,7 @@ def mark_needs_reschedule(
                 starts_at=reschedule_start,
                 ends_at=reschedule_end,
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
+                letter_required=appointment.letter_required,
                 notes=note_value,
                 changed_date=datetime.utcnow(),
                 changed_by_user_id=user.id,

@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% macro render_day_status_card(row) %}
-    <article class="day-status-card day-status-card-{{ row.state_key }}">
+    {% if row.day_offset > 0 %}
+        <a class="day-status-card day-status-card-{{ row.state_key }}" href="/admin/planning?date_query={{ row.date.isoformat() }}">
+    {% else %}
+        <article class="day-status-card day-status-card-{{ row.state_key }}">
+    {% endif %}
         <div class="day-status-card-header">
             <div>
                 <h4>{{ row.date.strftime('%d/%m/%Y') }}</h4>
@@ -8,46 +12,84 @@
             </div>
             <span class="chip day-status-chip day-status-chip-{{ row.state_key }}">{{ row.state_label }}</span>
         </div>
-        <div class="day-status-progress">
-            <div class="day-status-progress-meta">
-                <span class="day-status-progress-label">Fremdrift</span>
-                <strong>{{ row.done }}/{{ row.total }}</strong>
+        {% if row.day_offset > 0 %}
+            <div class="day-status-progress">
+                <div class="day-status-progress-meta">
+                    <span class="day-status-progress-label">Booket</span>
+                    <strong>{{ row.booked }}/{{ row.slot_total }}</strong>
+                </div>
+                <div class="day-status-progress-bar" aria-hidden="true">
+                    <span style="width: {{ row.booking_pct }}%"></span>
+                </div>
             </div>
-            <div class="day-status-progress-bar" aria-hidden="true">
-                <span style="width: {{ row.completion_pct }}%"></span>
+            <div class="day-status-metrics">
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">I alt</span>
+                    <strong>{{ row.display_total }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Planlagt</span>
+                    <strong>{{ row.planned }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Informeret</span>
+                    <strong>{{ row.informed }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Behov for ny dato</span>
+                    <strong>{{ row.needs_reschedule }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Ledig tid</span>
+                    <strong>{{ row.display_free_slots }}</strong>
+                </div>
             </div>
-        </div>
-        <div class="day-status-metrics">
-            <div class="day-status-metric">
-                <span class="day-status-metric-label">I alt</span>
-                <strong>{{ row.total }}</strong>
+        {% else %}
+            <div class="day-status-progress">
+                <div class="day-status-progress-meta">
+                    <span class="day-status-progress-label">Fremdrift</span>
+                    <strong>{{ row.done }}/{{ row.total }}</strong>
+                </div>
+                <div class="day-status-progress-bar" aria-hidden="true">
+                    <span style="width: {{ row.completion_pct }}%"></span>
+                </div>
             </div>
-            <div class="day-status-metric">
-                <span class="day-status-metric-label">Planlagt</span>
-                <strong>{{ row.planned }}</strong>
+            <div class="day-status-metrics">
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">I alt</span>
+                    <strong>{{ row.total }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Planlagt</span>
+                    <strong>{{ row.planned }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Informeret</span>
+                    <strong>{{ row.informed }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Skiftet</span>
+                    <strong>{{ row.completed }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Afsluttet</span>
+                    <strong>{{ row.closed }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Ikke hjemme</span>
+                    <strong>{{ row.not_home }}</strong>
+                </div>
+                <div class="day-status-metric">
+                    <span class="day-status-metric-label">Mangler</span>
+                    <strong>{{ row.remaining }}</strong>
+                </div>
             </div>
-            <div class="day-status-metric">
-                <span class="day-status-metric-label">Informeret</span>
-                <strong>{{ row.informed }}</strong>
-            </div>
-            <div class="day-status-metric">
-                <span class="day-status-metric-label">Skiftet</span>
-                <strong>{{ row.completed }}</strong>
-            </div>
-            <div class="day-status-metric">
-                <span class="day-status-metric-label">Afsluttet</span>
-                <strong>{{ row.closed }}</strong>
-            </div>
-            <div class="day-status-metric">
-                <span class="day-status-metric-label">Ikke hjemme</span>
-                <strong>{{ row.not_home }}</strong>
-            </div>
-            <div class="day-status-metric">
-                <span class="day-status-metric-label">Mangler</span>
-                <strong>{{ row.remaining }}</strong>
-            </div>
-        </div>
-    </article>
+        {% endif %}
+    {% if row.day_offset > 0 %}
+        </a>
+    {% else %}
+        </article>
+    {% endif %}
 {% endmacro %}
 {% macro render_street_progress_card(row) %}
     <article class="street-progress-card street-progress-card-{{ row.state_key }}">
@@ -144,6 +186,17 @@
             </div>
         </div>
     </a>
+    <a class="card card-link status-card status-card-open-slots" href="/admin/planning">
+        <div class="metric-container">
+            <div>
+                <h2>Ledige tider på arbejdsdage</h2>
+                <p class="metric">{{ available_workday_slots }}</p>
+            </div>
+            <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M3 10h18"></path><path d="M12 14v4"></path><path d="M10 16h4"></path></svg>
+            </div>
+        </div>
+    </a>
     <a class="card card-link status-card status-card-total" href="/admin/addresses">
         <div class="metric-container">
             <div>
@@ -190,9 +243,42 @@
     </a>
 </section>
 
+<section class="card status-line-card">
+    <div class="status-line-header">
+        <h2>Statuslinje for målerudskiftning</h2>
+        <div class="status-line-total">
+            <span class="status-line-total-label">Total</span>
+            <strong>{{ total }}</strong>
+        </div>
+    </div>
+    <div class="status-line-progress">
+        <div class="status-line-progress-meta">
+            <span class="status-line-progress-label">Status</span>
+        </div>
+        <div class="status-line-bar" aria-hidden="true">
+            {% for segment in status_line_segments %}
+                {% if segment.pct > 0 %}
+                    <span class="status-line-segment status-line-segment-{{ segment.style }}" style="width: {{ segment.pct }}%"></span>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    <div class="status-line-legend compact">
+        {% for segment in status_line_segments %}
+            <div class="status-line-legend-item status-line-legend-item-{{ segment.style }} compact">
+                <span class="status-line-legend-dot"></span>
+                <span class="status-line-legend-label">{{ segment.label }}</span>
+                <strong>{{ segment.count }}</strong>
+                <span class="hint">{{ segment.pct }}%</span>
+            </div>
+        {% endfor %}
+    </div>
+    <p class="hint">Lager rækker til {{ stock_coverable_missing }} af {{ status_line_missing }} manglende adresser ({{ stock_coverage_pct }}%).</p>
+</section>
+
 <section class="card">
     <h2>Arbejdsdage status</h2>
-    <p class="hint">Kommende arbejdsdage vises først. Dage ældre end 7 dage er foldet sammen nederst.</p>
+    <p class="hint">Kommende arbejdsdage vises først med kapacitet, booking og ledige tider. Dage ældre end 7 dage er foldet sammen nederst.</p>
     {% if today_day_status or upcoming_day_status or recent_day_status or older_day_status %}
         <div class="day-status-sections">
             {% if today_day_status %}

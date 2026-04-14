@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, time, timedelta
-
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -10,6 +8,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, require_role
+from app.workday_status import build_workday_status
 
 router = APIRouter(prefix="/admin/status", tags=["admin"])
 
@@ -17,18 +16,6 @@ COMPLETED_STATUSES = {models.AppointmentStatus.COMPLETED}
 INFORMED_STATUSES = {models.AppointmentStatus.INFORMED}
 CLOSED_STATUSES = {models.AppointmentStatus.CLOSED}
 PLANNED_STATUSES = {models.AppointmentStatus.SCHEDULED}
-
-
-def relative_day_label(day_offset: int) -> str:
-    if day_offset == 0:
-        return "I dag"
-    if day_offset == 1:
-        return "Om 1 dag"
-    if day_offset > 1:
-        return f"Om {day_offset} dage"
-    if day_offset == -1:
-        return "1 dag siden"
-    return f"{abs(day_offset)} dage siden"
 
 
 def latest_status_map(
@@ -129,6 +116,50 @@ def status_dashboard(
     )
     not_home_history_count = not_home_total
     stock = db.query(func.coalesce(func.sum(models.StockMovement.quantity), 0)).scalar() or 0
+    status_line_missing = max(total - planned - informed - completed - closed, 0)
+    status_line_segments = [
+        {
+            "key": "missing",
+            "label": "Mangler",
+            "count": status_line_missing,
+            "pct": round((status_line_missing / total) * 100) if total else 0,
+            "style": "missing",
+        },
+        {
+            "key": "planned",
+            "label": "Planlagt",
+            "count": planned,
+            "pct": round((planned / total) * 100) if total else 0,
+            "style": "planned",
+        },
+        {
+            "key": "informed",
+            "label": "Informeret",
+            "count": informed,
+            "pct": round((informed / total) * 100) if total else 0,
+            "style": "informed",
+        },
+        {
+            "key": "completed",
+            "label": "Skiftet",
+            "count": completed,
+            "pct": round((completed / total) * 100) if total else 0,
+            "style": "completed",
+        },
+        {
+            "key": "closed",
+            "label": "Afsluttet",
+            "count": closed,
+            "pct": round((closed / total) * 100) if total else 0,
+            "style": "closed",
+        },
+    ]
+    stock_coverable_missing = min(stock, status_line_missing)
+    stock_coverage_pct = (
+        round((stock_coverable_missing / status_line_missing) * 100)
+        if status_line_missing
+        else 100
+    )
     message_count = (
         db.query(func.count(func.distinct(models.ResidentResponse.address_id)))
         .filter(models.ResidentResponse.message.is_not(None))
@@ -174,127 +205,7 @@ def status_dashboard(
     active_street_progress = [row for row in street_progress if not row["is_complete"]]
     completed_street_progress = [row for row in street_progress if row["is_complete"]]
 
-    availability_dates = [
-        row[0]
-        for row in db.query(models.VvsAvailability.date)
-        .distinct()
-        .order_by(models.VvsAvailability.date.desc())
-        .all()
-    ]
-    today = datetime.now().date()
-    day_status = []
-    for day in availability_dates:
-        day_start = datetime.combine(day, time.min)
-        day_end = day_start + timedelta(days=1)
-        total_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-            )
-            .scalar()
-            or 0
-        )
-        planned_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(PLANNED_STATUSES),
-            )
-            .scalar()
-            or 0
-        )
-        completed_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(COMPLETED_STATUSES),
-            )
-            .scalar()
-            or 0
-        )
-        closed_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(CLOSED_STATUSES),
-            )
-            .scalar()
-            or 0
-        )
-        informed_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(INFORMED_STATUSES),
-            )
-            .scalar()
-            or 0
-        )
-        day_not_home_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status == models.AppointmentStatus.NOT_HOME,
-            )
-            .scalar()
-            or 0
-        )
-        done_count = completed_count + closed_count
-        remaining_count = max(total_count - done_count, 0)
-        completion_pct = round((done_count / total_count) * 100) if total_count else 0
-        day_offset = (day - today).days
-        if day_offset > 0:
-            state_key = "upcoming"
-            state_label = "Kommende"
-        elif day_offset == 0:
-            state_key = "today"
-            state_label = "I dag"
-        elif remaining_count == 0 and total_count > 0:
-            state_key = "done"
-            state_label = "Færdig"
-        else:
-            state_key = "history"
-            state_label = "Historik"
-        day_status.append(
-            {
-                "date": day,
-                "planned": planned_count,
-                "completed": completed_count,
-                "closed": closed_count,
-                "informed": informed_count,
-                "not_home": day_not_home_count,
-                "done": done_count,
-                "remaining": remaining_count,
-                "completion_pct": completion_pct,
-                "day_offset": day_offset,
-                "relative_label": relative_day_label(day_offset),
-                "state_key": state_key,
-                "state_label": state_label,
-                "total": total_count,
-            }
-        )
-
-    today_day_status = [row for row in day_status if row["day_offset"] == 0]
-    upcoming_day_status = sorted(
-        [row for row in day_status if row["day_offset"] > 0],
-        key=lambda row: row["date"],
-    )
-    recent_day_status = sorted(
-        [row for row in day_status if -7 <= row["day_offset"] < 0],
-        key=lambda row: row["date"],
-        reverse=True,
-    )
-    older_day_status = sorted(
-        [row for row in day_status if row["day_offset"] < -7],
-        key=lambda row: row["date"],
-        reverse=True,
-    )
+    workday_status = build_workday_status(db)
 
     return request.app.state.templates.TemplateResponse(
         "admin_status.html",
@@ -312,13 +223,18 @@ def status_dashboard(
             "not_home": not_home_history_count,
             "needs_reschedule": needs_reschedule,
             "remaining": remaining,
+            "status_line_segments": status_line_segments,
+            "status_line_missing": status_line_missing,
             "stock": stock,
+            "stock_coverable_missing": stock_coverable_missing,
+            "stock_coverage_pct": stock_coverage_pct,
             "message_count": message_count,
+            "available_workday_slots": workday_status["available_workday_slots"],
             "active_street_progress": active_street_progress,
             "completed_street_progress": completed_street_progress,
-            "today_day_status": today_day_status,
-            "upcoming_day_status": upcoming_day_status,
-            "recent_day_status": recent_day_status,
-            "older_day_status": older_day_status,
+            "today_day_status": workday_status["today_day_status"],
+            "upcoming_day_status": workday_status["upcoming_day_status"],
+            "recent_day_status": workday_status["recent_day_status"],
+            "older_day_status": workday_status["older_day_status"],
         },
     )
