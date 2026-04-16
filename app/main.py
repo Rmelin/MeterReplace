@@ -71,6 +71,21 @@ def index(request: Request):
     return RedirectResponse("/vvs", status_code=303)
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> RedirectResponse:
+    return RedirectResponse("/static/favicon.ico")
+
+
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+def apple_touch_icon() -> RedirectResponse:
+    return RedirectResponse("/static/icon-180.png")
+
+
+@app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
+def apple_touch_icon_precomposed() -> RedirectResponse:
+    return RedirectResponse("/static/icon-180.png")
+
+
 @app.exception_handler(403)
 def access_denied(request: Request, exc):
     with SessionLocal() as db:
