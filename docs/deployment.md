@@ -134,8 +134,11 @@ Sikring i produktion:
 cd /opt/meterreplace
 sudo -u meterreplace git pull
 sudo -u meterreplace /opt/meterreplace/.venv/bin/pip install -r /opt/meterreplace/requirements.txt
+sudo -u meterreplace /opt/meterreplace/.venv/bin/python -m alembic upgrade head
 sudo systemctl restart meterreplace
 ```
+
+Kør altid Alembic via appens `.venv` i produktion. Brug ikke `python3 -m alembic ...`, da den kan bruge systemets globale pakker i stedet for projektets dependencies. Se også [Fejlsøgning: Alembic og database er ude af sync](troubleshooting.md#alembic-og-database-er-ude-af-sync).
 
 ## Verifikation efter deploy
 
