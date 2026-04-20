@@ -290,6 +290,7 @@ def vvs_tasks(
 def vvs_tasks_map_data(
     q: str | None = None,
     status: str | None = None,
+    buffer: int | None = None,
     date: str | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.VVS)),
@@ -347,6 +348,9 @@ def vvs_tasks_map_data(
     if status in status_filter:
         query = query.filter(models.Appointment.status == status_filter[status])
 
+    if buffer:
+        query = query.filter(models.Address.buffer_flag.is_(True))
+
     payload = []
     for appointment, address in query.all():
         if not address:
@@ -362,6 +366,7 @@ def vvs_tasks_map_data(
                 "city": address.city,
                 "latitude": float(address.latitude) if address.latitude is not None else None,
                 "longitude": float(address.longitude) if address.longitude is not None else None,
+                "has_buffer": bool(address.buffer_flag),
                 "status": status_key,
                 "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
                 "starts_at": appointment.starts_at.strftime("%H:%M"),
