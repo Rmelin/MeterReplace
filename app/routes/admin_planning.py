@@ -793,6 +793,7 @@ def manual_planning_form(
                     "starts_at": appointment.starts_at,
                     "ends_at": appointment.ends_at,
                     "address": f"{address.street} {address.house_no}, {address.zip} {address.city}",
+                    "note": appointment.notes,
                 }
             )
 
@@ -818,6 +819,7 @@ def manual_planning_commit(
     address_id: int = Form(0),
     contractor_id: int = Form(0),
     start_raw: str = Form(""),
+    notes: str = Form(""),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN)),
 ):
@@ -839,6 +841,8 @@ def manual_planning_commit(
         return RedirectResponse(
             f"/admin/planning/manual?date_query={date_raw}", status_code=303
         )
+
+    note_value = notes.strip() or None
 
     if address_id <= 0 or contractor_id <= 0:
         flash(request, "Vælg adresse og VVS", "error")
@@ -926,6 +930,7 @@ def manual_planning_commit(
             ends_at=slot_end,
             status=models.AppointmentStatus.SCHEDULED,
             letter_required=not address.buffer_flag,
+            notes=note_value,
             changed_date=datetime.utcnow(),
             changed_by_user_id=user.id,
         )

@@ -1077,6 +1077,36 @@ a.chip:hover {
     margin: 0.5rem 0 0.75rem;
 }
 
+.task-card-has-note {
+    border-color: rgba(249, 115, 22, 0.45);
+    box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.12), var(--shadow);
+}
+
+.task-note-banner {
+    margin: 0.75rem 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(249, 115, 22, 0.28);
+    border-left: 6px solid #f97316;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(249, 115, 22, 0.06));
+}
+
+.task-note-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #ea580c;
+}
+
+.task-note-text {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
 .photo-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

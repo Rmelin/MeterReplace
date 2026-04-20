@@ -154,9 +154,16 @@
                     {% endif %}
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
-                {% if appointment.notes %}
-                    <p class="hint">Opgave: {{ appointment.notes }}</p>
-                {% endif %}
+                <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
+                    {% if selected_date %}
+                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                    {% endif %}
+                    <label>
+                        Note
+                        <textarea name="note" rows="2" placeholder="Fx Kom omkring frokost">{{ appointment.notes or '' }}</textarea>
+                    </label>
+                    <button type="submit" class="ghost-button">Gem note</button>
+                </form>
                 {% if appointment.old_meter_no or appointment.new_meter_no %}
                     <p class="hint">Målernr: {{ appointment.old_meter_no or '-' }} → {{ appointment.new_meter_no or '-' }}</p>
                 {% endif %}
@@ -224,9 +231,16 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
-                {% if appointment.notes %}
-                    <p class="hint">Opgave: {{ appointment.notes }}</p>
-                {% endif %}
+                <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
+                    {% if selected_date %}
+                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                    {% endif %}
+                    <label>
+                        Note
+                        <textarea name="note" rows="2" placeholder="Fx Kom omkring frokost">{{ appointment.notes or '' }}</textarea>
+                    </label>
+                    <button type="submit" class="ghost-button">Gem note</button>
+                </form>
                 <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
             </div>
@@ -252,9 +266,16 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
-                {% if appointment.notes %}
-                    <p class="hint">Opgave: {{ appointment.notes }}</p>
-                {% endif %}
+                <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
+                    {% if selected_date %}
+                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                    {% endif %}
+                    <label>
+                        Note
+                        <textarea name="note" rows="2" placeholder="Fx Kom omkring frokost">{{ appointment.notes or '' }}</textarea>
+                    </label>
+                    <button type="submit" class="ghost-button">Gem note</button>
+                </form>
                 {% if appointment.old_meter_no or appointment.new_meter_no %}
                     <p class="hint">Målernr: {{ appointment.old_meter_no or '-' }} → {{ appointment.new_meter_no or '-' }}</p>
                 {% endif %}

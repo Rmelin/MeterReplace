@@ -105,7 +105,7 @@
     {% if todo %}
         {% for appointment in todo %}
             {% set address = addresses.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -134,10 +134,13 @@
                         <span class="task-flag">Opgave uden adresse</span>
                     {% endif %}
                 </div>
-                <p class="hint"><strong>Tid: {{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</strong></p>
                 {% if appointment.notes %}
-                    <p class="hint">Note: {{ appointment.notes }}</p>
+                    <div class="task-note-banner">
+                        <span class="task-note-label">Vigtig note fra admin</span>
+                        <div class="task-note-text">{{ appointment.notes }}</div>
+                    </div>
                 {% endif %}
+                <p class="hint"><strong>Tid: {{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</strong></p>
                 {% if address and address.buffer_flag and address.buffer_note %}
                     <p class="hint"><strong>Brønd: {{ address.buffer_note }}</strong></p>
                 {% endif %}
@@ -212,7 +215,7 @@
         <p class="hint" style="margin-bottom: 1rem;">Disse besøg er taget ud af dagens plan og afventer admin i Preview/Commit.</p>
         {% for appointment in needs_reschedule %}
             {% set address = addresses.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -221,11 +224,14 @@
                         <span class="task-flag">Opgave uden adresse</span>
                     {% endif %}
                 </div>
+                {% if appointment.notes %}
+                    <div class="task-note-banner">
+                        <span class="task-note-label">Vigtig note fra admin</span>
+                        <div class="task-note-text">{{ appointment.notes }}</div>
+                    </div>
+                {% endif %}
                 <p class="hint">Tid: {{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint"><strong>Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</strong></p>
-                {% if appointment.notes %}
-                    <p class="hint">Note: {{ appointment.notes }}</p>
-                {% endif %}
                 <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
                     <a class="ghost-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}" style="flex: 1; font-size: 0.8rem; padding: 0.4rem;">Ret status</a>
                 </div>
@@ -242,7 +248,7 @@
     {% if done %}
         {% for appointment in done %}
             {% set address = addresses.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -259,11 +265,14 @@
                         <span class="task-flag">Opgave uden adresse</span>
                     {% endif %}
                 </div>
+                {% if appointment.notes %}
+                    <div class="task-note-banner">
+                        <span class="task-note-label">Vigtig note fra admin</span>
+                        <div class="task-note-text">{{ appointment.notes }}</div>
+                    </div>
+                {% endif %}
                 <p class="hint">Tid: {{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint"><strong>Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</strong></p>
-                {% if appointment.notes %}
-                    <p class="hint">Note: {{ appointment.notes }}</p>
-                {% endif %}
                 
                 <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
                     <a class="ghost-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}" style="flex: 1; font-size: 0.8rem; padding: 0.4rem;">Ret status</a>

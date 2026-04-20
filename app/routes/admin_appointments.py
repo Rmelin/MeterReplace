@@ -529,6 +529,32 @@ def upload_photo(
     return RedirectResponse(redirect_target, status_code=303)
 
 
+@router.post("/{appointment_id}/note")
+def update_appointment_note(
+    request: Request,
+    appointment_id: int,
+    note: str = Form(""),
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    appointment.notes = note.strip() or None
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/admin/appointments"
+    if date_query:
+        redirect_target = f"/admin/appointments?date_query={date_query}"
+
+    flash(request, "Note gemt", "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
 def appointment_edit_context(
     db: Session, appointment_id: int
 ) -> dict[str, object] | None:

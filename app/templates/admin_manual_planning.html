@@ -62,6 +62,10 @@
                 </select>
             </label>
             <label>Starttid<input type="time" name="start_raw" step="1800" required /></label>
+            <label>
+                Note til opgaven
+                <textarea name="notes" rows="3" placeholder="Fx Kom omkring frokost"></textarea>
+            </label>
             <button type="submit" class="primary-button">Planlæg</button>
         </form>
         <p class="hint">VVS skal være tilgængelig på datoen. Varighed: 30 min.</p>
@@ -76,7 +80,10 @@
             {% if scheduled_map.get(vvs_user.id) %}
                 <ul class="list">
                     {% for appt in scheduled_map.get(vvs_user.id) %}
-                        <li>{{ appt.starts_at.strftime('%H:%M') }}-{{ appt.ends_at.strftime('%H:%M') }} — {{ appt.address }}</li>
+                        <li>
+                            {{ appt.starts_at.strftime('%H:%M') }}-{{ appt.ends_at.strftime('%H:%M') }} — {{ appt.address }}
+                            {% if appt.note %} ({{ appt.note }}){% endif %}
+                        </li>
                     {% endfor %}
                 </ul>
             {% else %}
