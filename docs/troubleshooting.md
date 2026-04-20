@@ -110,16 +110,28 @@ Typisk symptom:
 
 - Alembic fejler med fejl som `table already exists`
 - databasen har allerede en ny tabel eller kolonne, men `alembic_version` er bagud
+- `python3 -m alembic upgrade head` fejler med `ImportError` for `DeclarativeBase`
 
 Det sker typisk hvis databasen er oprettet eller udvidet direkte fra modelkoden før migrationen er kørt.
+
+I produktion kan det også ske hvis Alembic køres med systemets `python3` i stedet for projektets virtuelle miljø. Et typisk tegn er paths som `/usr/lib/python3/dist-packages/...` i tracebacken. Så bliver serverens globale SQLAlchemy brugt, og den kan være for gammel til `DeclarativeBase`.
 
 Checks:
 
 ```bash
 sqlite3 data/data/app.db "select version_num from alembic_version;"
 sqlite3 data/data/app.db ".tables"
+source .venv/bin/activate
 python -m alembic upgrade head
 ```
+
+I produktion uden aktiveret virtualenv skal du bruge den fulde sti:
+
+```bash
+sudo -u meterreplace /opt/meterreplace/.venv/bin/python -m alembic upgrade head
+```
+
+Brug ikke `python3 -m alembic upgrade head` i produktion, medmindre `python3` eksplicit peger på samme virtualenv.
 
 Hvis tabellen allerede findes:
 
