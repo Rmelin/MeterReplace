@@ -10,7 +10,10 @@
             <p class="hint">Opgave uden adresse</p>
         {% endif %}
         {% if appointment.notes %}
-            <p class="hint">Opgave: {{ appointment.notes }}</p>
+            <div class="task-note-banner">
+                <span class="task-note-label">Vigtig note fra admin</span>
+                <div class="task-note-text">{{ appointment.notes }}</div>
+            </div>
         {% endif %}
         {% if errors %}
             <div class="inline-errors">
@@ -57,7 +60,10 @@
         <h1>Opgave uden adresse</h1>
     {% endif %}
     {% if appointment.notes %}
-        <p class="hint">Opgave: {{ appointment.notes }}</p>
+        <div class="task-note-banner">
+            <span class="task-note-label">Vigtig note fra admin</span>
+            <div class="task-note-text">{{ appointment.notes }}</div>
+        </div>
     {% endif %}
     {% if address %}
         <div class="photo-upload-panel">
