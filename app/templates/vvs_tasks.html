@@ -200,7 +200,7 @@
                                 <label>Gammel nr<input type="text" name="old_meter_no" style="width: 100%;" /></label>
                                 <label>Ny nr<input type="text" name="new_meter_no" style="width: 100%;" /></label>
                             </div>
-                            <label>Foto<input type="file" name="file" accept="image/*" capture="environment" required /></label>
+                            <label>Foto<input type="file" name="file" accept="image/*" required /></label>
                             <button type="submit" class="primary-button">Upload</button>
                         </form>
                         {% if photo_list %}
@@ -328,7 +328,7 @@
                                     <label class="option-button"><input type="radio" name="photo_type" value="old" required style="display: none;" /><span>Gammel</span></label>
                                 </div>
                             </fieldset>
-                            <label>Foto<input type="file" name="file" accept="image/*" capture="environment" required /></label>
+                            <label>Foto<input type="file" name="file" accept="image/*" required /></label>
                             <button type="submit" class="ghost-button">Upload ekstra</button>
                         </form>
                         {% if photo_list %}
