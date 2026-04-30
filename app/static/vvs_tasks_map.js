@@ -100,7 +100,7 @@ if (!mapContainer) {
                     <option value="old">Gammel</option>
                   </select>
                 </label>
-                <label>Foto<input type="file" name="file" accept="image/*" capture="environment" required /></label>
+                <label>Foto<input type="file" name="file" accept="image/*" required /></label>
                 <button type="submit" class="ghost-button map-popup-button">Upload</button>
               </form>
             </details>`
