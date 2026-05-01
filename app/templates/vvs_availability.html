@@ -1,4 +1,24 @@
 {% extends "base.html" %}
+{% macro render_vvs_day_card(row) %}
+    {% set entry = row.entry %}
+    <a class="day-status-card day-status-card-{{ row.state_key }} card-link" href="{{ row.edit_href }}">
+        <div class="day-status-card-header">
+            <div>
+                <h4>{{ entry.date.strftime('%d/%m/%Y') }}</h4>
+                <p class="hint">{{ row.relative_label }}</p>
+            </div>
+            <span class="chip">Rediger</span>
+        </div>
+        <div class="vvs-workday-card-body">
+            <div class="vvs-workday-card-time">{{ entry.start_time.strftime('%H:%M') }}-{{ entry.end_time.strftime('%H:%M') }}</div>
+            {% if entry.note %}
+                <div class="vvs-workday-card-note">{{ entry.note }}</div>
+            {% else %}
+                <div class="hint">Ingen note</div>
+            {% endif %}
+        </div>
+    </a>
+{% endmacro %}
 {% block content %}
 <section class="page-header">
     <div>
@@ -20,31 +40,59 @@
 </section>
 
 <section class="card">
-    <h2>Seneste arbejdsdage</h2>
-    {% if entries %}
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Dato</th>
-                        <th>Start</th>
-                        <th>Slut</th>
-                        <th>Note</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in entries %}
-                        <tr>
-                            <td>{{ entry.date.strftime('%d-%m-%Y') }}</td>
-                            <td>{{ entry.start_time.strftime('%H:%M') }}</td>
-                            <td>{{ entry.end_time.strftime('%H:%M') }}</td>
-                            <td>{{ entry.note or '-' }}</td>
-                            <td><a class="link" href="/vvs/{{ entry.id }}/edit">Rediger</a></td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <h2>Arbejdsdage</h2>
+    <p class="hint">Se kommende og tidligere arbejdsdage. Hvert kort viser dato, hvor langt væk dagen er, arbejdstid og note.</p>
+    {% if today_entries or upcoming_entries or recent_entries or older_entries %}
+        <div class="day-status-sections">
+            {% if today_entries %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>I dag</h3>
+                        <span class="chip">{{ today_entries|length }} arbejdsdag{% if today_entries|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in today_entries %}
+                            {{ render_vvs_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if upcoming_entries %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Kommende arbejdsdage</h3>
+                        <span class="chip">{{ upcoming_entries|length }} arbejdsdag{% if upcoming_entries|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in upcoming_entries %}
+                            {{ render_vvs_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if recent_entries %}
+                <section class="day-status-group">
+                    <div class="day-status-group-header">
+                        <h3>Seneste 7 dage</h3>
+                        <span class="chip">{{ recent_entries|length }} arbejdsdag{% if recent_entries|length != 1 %}e{% endif %}</span>
+                    </div>
+                    <div class="day-status-grid">
+                        {% for row in recent_entries %}
+                            {{ render_vvs_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+            {% if older_entries %}
+                <details class="day-status-older">
+                    <summary>Ældre arbejdsdage ({{ older_entries|length }})</summary>
+                    <div class="day-status-grid">
+                        {% for row in older_entries %}
+                            {{ render_vvs_day_card(row) }}
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
         </div>
     {% else %}
         <p class="hint">Ingen arbejdsdage registreret endnu.</p>

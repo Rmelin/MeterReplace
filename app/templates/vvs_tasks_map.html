@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block head %}
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Mine adresser på kort</h1>
+        <p>Se dagens opgaver på kort og filtrer efter status.</p>
+    </div>
+    <div>
+        <a class="ghost-button" href="/vvs/tasks{% if selected_date %}?date_query={{ selected_date.isoformat() }}{% if show_all_dates %}&show_all=1{% endif %}{% endif %}">Tilbage til opgaver</a>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Arbejdsdag</h2>
+    {% if availability_dates %}
+        <form method="get" action="/vvs/tasks/map" class="form-grid">
+            <label>
+                Dato
+                <select name="date_query" id="map-date" required>
+                    {% for day in availability_dates %}
+                        <option value="{{ day.isoformat() }}" {% if selected_date and day == selected_date %}selected{% endif %}>
+                            {{ day.strftime('%d/%m/%Y') }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            {% if show_all_dates %}
+                <input type="hidden" name="show_all" value="1" />
+            {% endif %}
+            <button type="submit" class="primary-button">Vælg dag</button>
+        </form>
+        <div class="vvs-task-toolbar">
+            {% if show_all_dates %}
+                <a class="ghost-button" href="/vvs/tasks/map{% if selected_date %}?date_query={{ selected_date.isoformat() }}{% endif %}">Skjul ældre datoer</a>
+            {% else %}
+                <a class="ghost-button" href="/vvs/tasks/map?show_all=1{% if selected_date %}&date_query={{ selected_date.isoformat() }}{% endif %}">Vis ældre datoer</a>
+            {% endif %}
+        </div>
+    {% else %}
+        <p class="hint">Ingen arbejdsdage registreret endnu.</p>
+    {% endif %}
+</section>
+
+<section class="card map-card vvs-map-page">
+    <div class="map-toolbar">
+        <div class="map-filters" style="flex: 1;">
+            <label>
+                Søg
+                <input type="text" id="map-search" placeholder="Vej, kunde..." style="width: 200px;" />
+            </label>
+            <div class="map-filter-buttons option-buttons" id="map-status-buttons" aria-label="Status filter">
+                <button type="button" class="option-button map-filter-button is-active" data-status="all">
+                    <span class="map-filter-swatch"></span>
+                    Alle
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="planned">
+                    <span class="map-filter-swatch"></span>
+                    Planlagt
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="informed">
+                    <span class="map-filter-swatch"></span>
+                    Informeret
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="completed">
+                    <span class="map-filter-swatch"></span>
+                    Skiftet
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="closed">
+                    <span class="map-filter-swatch"></span>
+                    Afsluttet
+                </button>
+                <button type="button" class="option-button map-filter-button" data-status="not_home">
+                    <span class="map-filter-swatch"></span>
+                    Ikke hjemme
+                </button>
+            </div>
+            <div class="map-filter-buttons option-buttons" aria-label="Brønd filter">
+                <button type="button" class="option-button map-buffer-button" id="map-buffer-button">
+                    Kun brønd
+                </button>
+            </div>
+        </div>
+    </div>
+    {% if selected_date %}
+        <div class="map-layout">
+            <div id="vvs-task-map" class="address-map"></div>
+        </div>
+    {% else %}
+        <p class="hint">Vælg en arbejdsdag for at se kortet.</p>
+    {% endif %}
+</section>
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+    defer
+></script>
+<script src="/static/vvs_tasks_map.js" defer></script>
+{% endblock %}

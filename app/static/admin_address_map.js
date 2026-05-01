@@ -25,6 +25,8 @@ const STATUS_COLORS = {
 }
 
 const SELECTED_COLOR = cssVar('--status-selected', '#a855f7')
+const BUFFER_RING_COLOR = '#2563eb'
+const BLOCKED_RING_COLOR = cssVar('--error', '#ef4444')
 
 const MAP_DEFAULT = [56.2639, 9.5018]
 const MAP_ZOOM = 7
@@ -93,6 +95,12 @@ const normalizeStatus = (status) => (status || '').trim().toLowerCase()
 const statusColor = (status) =>
   STATUS_COLORS[normalizeStatus(status)] || STATUS_COLORS.unplanned
 
+const addAddressMarkerLayer = (latlng, options, popupContent) => {
+  const marker = L.circleMarker(latlng, options)
+  marker.bindPopup(popupContent)
+  markerLayer.addLayer(marker)
+}
+
 const loadSelectedIds = () => {
   try {
     const stored = window.localStorage.getItem(selectedStorageKey)
@@ -151,17 +159,10 @@ const updateMarkers = () => {
         row.status_label ||
         STATUS_LABELS[normalizeStatus(row.status)] ||
         row.status
-      const marker = L.circleMarker([row.latitude, row.longitude], {
-        radius: isSelected ? 9 : 7,
-        color: isSelected ? SELECTED_COLOR : statusColor(row.status),
-        weight: isSelected ? 4 : 2,
-        fillColor: statusColor(row.status),
-        fillOpacity: 0.8,
-      })
-      marker.bindPopup(
-        `<strong>${row.street} ${row.house_no}</strong><br>${row.zip} ${row.city}<br>${
-          statusLabel
-        }<br><div class="map-popup-actions">
+      const latlng = [row.latitude, row.longitude]
+      const popupContent = `<strong>${row.street} ${row.house_no}</strong><br>${row.zip} ${row.city}<br>${
+        statusLabel
+      }<br><div class="map-popup-actions">
           <button type="button" class="ghost-button map-popup-button" data-action="edit-coords" data-address-id="${
             row.id
           }">Rediger koordinat</button>
@@ -170,8 +171,49 @@ const updateMarkers = () => {
             row.id
           }">${isSelected ? 'Fjern markering' : 'Markér'}</button>
         </div>`
+      const ringLayers = []
+      let outerRadius = 7
+
+      if (row.has_buffer) {
+        outerRadius += 4
+        ringLayers.push({ radius: outerRadius, color: BUFFER_RING_COLOR, weight: 2 })
+      }
+      if (row.has_blocked) {
+        outerRadius += 3
+        ringLayers.push({ radius: outerRadius, color: BLOCKED_RING_COLOR, weight: 2 })
+      }
+      if (isSelected) {
+        ringLayers.push({ radius: outerRadius + 3, color: SELECTED_COLOR, weight: 3 })
+      }
+
+      ringLayers
+        .slice()
+        .reverse()
+        .forEach((layer) => {
+          addAddressMarkerLayer(
+            latlng,
+            {
+              radius: layer.radius,
+              color: layer.color,
+              weight: layer.weight,
+              fill: false,
+              opacity: 1,
+            },
+            popupContent
+          )
+        })
+
+      addAddressMarkerLayer(
+        latlng,
+        {
+          radius: 7,
+          color: statusColor(row.status),
+          weight: 2,
+          fillColor: statusColor(row.status),
+          fillOpacity: 0.8,
+        },
+        popupContent
       )
-      markerLayer.addLayer(marker)
     })
 }
 

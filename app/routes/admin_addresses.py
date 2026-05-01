@@ -897,6 +897,8 @@ def address_map_data(
                 "city": address.city,
                 "latitude": float(address.latitude) if address.latitude is not None else None,
                 "longitude": float(address.longitude) if address.longitude is not None else None,
+                "has_buffer": bool(address.buffer_flag),
+                "has_blocked": bool(address.blocked_reason),
                 "status": status_key,
                 "status_label": status_label,
                 "status_value": status_value.value.lower() if status_value else "unplanned",

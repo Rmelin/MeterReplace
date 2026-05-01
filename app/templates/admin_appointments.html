@@ -87,6 +87,62 @@
     {% endif %}
 </section>
 
+{% if selected_date %}
+<section class="card">
+    <div class="section-header">
+        <div>
+            <h2>Dagens adresser</h2>
+            <p class="hint">Enkel oversigt for {{ selected_date.strftime('%d/%m/%Y') }}. Klik på en adresse for at hoppe til detaljerne længere nede.</p>
+        </div>
+    </div>
+    {% if morning_overview or afternoon_overview or buffer_overview %}
+        <div class="appointment-outline-grid">
+            {% if morning_overview %}
+                <section class="appointment-outline-section">
+                    <h3>Formiddag</h3>
+                    <ul class="appointment-outline-list">
+                        {% for item in morning_overview %}
+                            <li>
+                                <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
+            {% if afternoon_overview %}
+                <section class="appointment-outline-section">
+                    <h3>Eftermiddag</h3>
+                    <ul class="appointment-outline-list">
+                        {% for item in afternoon_overview %}
+                            <li>
+                                <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
+            {% if buffer_overview %}
+                <section class="appointment-outline-section">
+                    <h3>Målerbrønd</h3>
+                    <ul class="appointment-outline-list">
+                        {% for item in buffer_overview %}
+                            <li>
+                                <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                                {% if item.buffer_note %}
+                                    <span class="hint">({{ item.buffer_note }})</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
+        </div>
+    {% else %}
+        <p class="hint">Ingen adresser på den valgte dag.</p>
+    {% endif %}
+</section>
+{% endif %}
+
 <section class="card">
     <h2>Arbejdsdag</h2>
     {% if availability_dates %}
@@ -145,7 +201,7 @@
         {% for appointment in todo %}
             {% set address = addresses.get(appointment.id) %}
             {% set contractor = contractors.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -221,7 +277,7 @@
         {% for appointment in needs_reschedule %}
             {% set address = addresses.get(appointment.id) %}
             {% set contractor = contractors.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -256,7 +312,7 @@
         {% for appointment in done %}
             {% set address = addresses.get(appointment.id) %}
             {% set contractor = contractors.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>

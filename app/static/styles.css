@@ -698,6 +698,23 @@ a:hover {
     margin: 0.25rem 0 0;
 }
 
+.vvs-workday-card-body {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.vvs-workday-card-time {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--day-color);
+}
+
+.vvs-workday-card-note {
+    color: var(--text);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
 .day-status-chip {
     border-color: rgba(var(--day-rgb), 0.3);
     background: rgba(var(--day-rgb), 0.12);
@@ -1082,6 +1099,77 @@ a.chip:hover {
     box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.12), var(--shadow);
 }
 
+.appointment-outline-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.appointment-outline-section {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
+    background: rgba(var(--accent-rgb), 0.04);
+}
+
+.appointment-outline-section h3 {
+    margin: 0 0 0.75rem;
+}
+
+.appointment-outline-list {
+    margin: 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.appointment-outline-link {
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.appointment-outline-link:hover {
+    color: var(--accent);
+}
+
+.appointment-outline-done {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-left: 0.35rem;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.14);
+    color: #15803d;
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.appointment-outline-note {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-left: 0.35rem;
+    border-radius: 999px;
+    background: rgba(249, 115, 22, 0.14);
+    color: #ea580c;
+    vertical-align: middle;
+}
+
+.appointment-outline-note svg {
+    flex: 0 0 auto;
+}
+
+.task-card[id] {
+    scroll-margin-top: 1rem;
+}
+
 .task-title-row {
     display: flex;
     align-items: center;
@@ -1158,8 +1246,110 @@ a.chip:hover {
     border: 1px solid var(--border);
 }
 
-@media (min-width: 721px) {
-    .photo-upload-form { display: none; }
+.vvs-task-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.vvs-task-card {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.vvs-task-card-compact {
+    gap: 0.7rem;
+}
+
+.vvs-task-address-actions,
+.vvs-task-primary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.vvs-task-action-button {
+    width: 100%;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.vvs-task-address-actions > :only-child,
+.vvs-task-primary-actions > :only-child {
+    grid-column: 1 / -1;
+}
+
+.vvs-task-quick-form {
+    margin: 0;
+}
+
+.vvs-task-photo-panel {
+    display: grid;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.vvs-task-photo-panel.is-compact {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.vvs-task-photo-form {
+    gap: 0.75rem;
+}
+
+.vvs-photo-type-fieldset {
+    border: 1px solid rgba(var(--accent-rgb), 0.18);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.03));
+    padding: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.vvs-photo-type-fieldset legend {
+    padding: 0 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+
+.vvs-photo-type-fieldset .option-buttons {
+    gap: 0.75rem;
+}
+
+.vvs-photo-type-fieldset .option-button {
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.45);
+    border-color: rgba(var(--accent-rgb), 0.12);
+}
+
+.vvs-photo-type-fieldset .option-button:hover {
+    border-color: rgba(var(--accent-rgb), 0.3);
+    background: rgba(var(--accent-rgb), 0.1);
+}
+
+.photo-upload-form .option-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.photo-upload-form .option-button {
+    width: 100%;
+}
+
+.vvs-task-meter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.vvs-map-page .address-map {
+    height: 65vh;
+    min-height: 420px;
 }
 
 /* Task edit time toggle */
@@ -1281,6 +1471,45 @@ a.chip:hover {
     .table-mobile-stacked td:before { content: attr(data-label); position: absolute; left: 1rem; font-weight: 700; color: var(--muted); }
     .table-mobile-stacked tr { display: block; border-bottom: 1px solid var(--border); padding: 1rem 0; }
     .table-mobile-stacked thead { display: none; }
+
+    .page-header {
+        gap: 0.75rem;
+    }
+
+    .page-header > div:last-child {
+        width: 100%;
+    }
+
+    .page-header > div:last-child .ghost-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .vvs-task-toolbar > * {
+        width: 100%;
+    }
+
+    .vvs-task-address-actions,
+    .vvs-task-primary-actions,
+    .vvs-task-meter-grid,
+    .photo-upload-form .option-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .vvs-map-page .address-map {
+        height: 58vh;
+        min-height: 320px;
+    }
+
+    .map-filters label,
+    .map-filters input,
+    .map-filters select {
+        width: 100%;
+    }
+
+    .map-filter-buttons {
+        width: 100%;
+    }
 
     .mobile-menu-overlay {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;

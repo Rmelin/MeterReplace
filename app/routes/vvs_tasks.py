@@ -139,6 +139,18 @@ def duration_minutes_between(starts_at: datetime, ends_at: datetime) -> int:
     return int((ends_at - starts_at).total_seconds() // 60)
 
 
+def period_label_for(starts_at: datetime) -> str:
+    return "Formiddag" if starts_at.time() < time(12, 0) else "Eftermiddag"
+
+
+def is_done_for_day(status: models.AppointmentStatus) -> bool:
+    return status in {
+        models.AppointmentStatus.COMPLETED,
+        models.AppointmentStatus.CLOSED,
+        models.AppointmentStatus.NOT_HOME,
+    }
+
+
 def availability_for_date(
     db: Session, user_id: int, plan_date: date
 ) -> models.VvsAvailability | None:
@@ -173,15 +185,15 @@ def has_conflict(
     )
 
 
-@router.get("")
-def vvs_tasks(
+def selected_vvs_task_date(
     request: Request,
-    date_query: str | None = None,
+    db: Session,
+    user_id: int,
+    date_query: str | None,
     show_all: int | None = None,
-    db: Session = Depends(get_db),
-    user: models.User = Depends(require_role(models.UserRole.VVS)),
-):
-    dates = availability_dates(db, user.id)
+    redirect_base: str = "/vvs/tasks",
+) -> tuple[list[date], bool, date | None] | RedirectResponse:
+    dates = availability_dates(db, user_id)
     show_all_dates = bool(show_all)
     cutoff_date = date.today() - timedelta(days=5)
     filtered_dates = [day for day in dates if day >= cutoff_date]
@@ -191,8 +203,7 @@ def vvs_tasks(
             selected_date = datetime.strptime(date_query, "%Y-%m-%d").date()
         except ValueError:
             flash(request, "Dato er ugyldig", "error")
-            return RedirectResponse("/vvs/tasks", status_code=303)
-
+            return RedirectResponse(redirect_base, status_code=303)
     elif filtered_dates:
         selected_date = closest_date(filtered_dates)
     elif dates:
@@ -202,54 +213,99 @@ def vvs_tasks(
 
     if selected_date and not show_all_dates and selected_date < cutoff_date:
         return RedirectResponse(
-            f"/vvs/tasks?date_query={selected_date.isoformat()}&show_all=1",
+            f"{redirect_base}?date_query={selected_date.isoformat()}&show_all=1",
             status_code=303,
         )
 
     if selected_date and selected_date not in dates:
         flash(request, "Vælg en arbejdsdag", "error")
-        return RedirectResponse("/vvs/tasks", status_code=303)
+        return RedirectResponse(redirect_base, status_code=303)
 
-    rows = []
-    if selected_date:
-        rows = (
-            db.query(models.Appointment, models.Address)
-            .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
-            .join(
-                models.VvsAvailability,
-                models.VvsAvailability.user_id == models.Appointment.contractor_id,
-            )
-            .filter(
-                models.Appointment.contractor_id == user.id,
-                models.Appointment.status.in_(
-                    [
-                        models.AppointmentStatus.SCHEDULED,
-                        models.AppointmentStatus.INFORMED,
-                        models.AppointmentStatus.COMPLETED,
-                        models.AppointmentStatus.CLOSED,
-                        models.AppointmentStatus.NOT_HOME,
-                        models.AppointmentStatus.NEEDS_RESCHEDULE,
-                    ]
-                ),
-                func.date(models.Appointment.starts_at) == models.VvsAvailability.date,
-                func.date(models.Appointment.starts_at) == selected_date,
-            )
-            .order_by(models.Appointment.starts_at)
-            .all()
+    return available_dates, show_all_dates, selected_date
+
+
+def task_rows_for_date(
+    db: Session, user_id: int, selected_date: date | None
+) -> list[tuple[models.Appointment, models.Address | None]]:
+    if not selected_date:
+        return []
+    return (
+        db.query(models.Appointment, models.Address)
+        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .join(
+            models.VvsAvailability,
+            models.VvsAvailability.user_id == models.Appointment.contractor_id,
         )
+        .filter(
+            models.Appointment.contractor_id == user_id,
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                    models.AppointmentStatus.COMPLETED,
+                    models.AppointmentStatus.CLOSED,
+                    models.AppointmentStatus.NOT_HOME,
+                ]
+            ),
+            func.date(models.Appointment.starts_at) == models.VvsAvailability.date,
+            func.date(models.Appointment.starts_at) == selected_date,
+        )
+        .order_by(models.Appointment.starts_at)
+        .all()
+    )
+
+
+def build_task_overview(
+    rows: list[tuple[models.Appointment, models.Address | None]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    morning_overview = []
+    afternoon_overview = []
+    buffer_overview = []
+    for appointment, address in rows:
+        if not address or appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
+            continue
+        entry = {
+            "appointment_id": appointment.id,
+            "street": address.street,
+            "house_no": address.house_no,
+            "buffer_note": address.buffer_note,
+            "is_done": is_done_for_day(appointment.status),
+            "has_note": bool((appointment.notes or "").strip()),
+        }
+        if address.buffer_flag:
+            buffer_overview.append(entry)
+        elif period_label_for(appointment.starts_at) == "Formiddag":
+            morning_overview.append(entry)
+        else:
+            afternoon_overview.append(entry)
+    return morning_overview, afternoon_overview, buffer_overview
+
+
+@router.get("")
+def vvs_tasks(
+    request: Request,
+    date_query: str | None = None,
+    show_all: int | None = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    selection = selected_vvs_task_date(request, db, user.id, date_query, show_all)
+    if isinstance(selection, RedirectResponse):
+        return selection
+    available_dates, show_all_dates, selected_date = selection
+    rows = task_rows_for_date(db, user.id, selected_date)
 
     appointments = [row[0] for row in rows]
     addresses = {row[0].id: row[1] for row in rows}
     photos = appointment_photos(db, [appointment.id for appointment in appointments])
+    morning_overview, afternoon_overview, buffer_overview = build_task_overview(rows)
+    period_labels = {
+        appointment.id: period_label_for(appointment.starts_at) for appointment in appointments
+    }
     todo = [
         appt
         for appt in appointments
         if appt.status in {models.AppointmentStatus.SCHEDULED, models.AppointmentStatus.INFORMED}
-    ]
-    needs_reschedule = [
-        appt
-        for appt in appointments
-        if appt.status == models.AppointmentStatus.NEEDS_RESCHEDULE
     ]
     done = [
         appt
@@ -258,7 +314,6 @@ def vvs_tasks(
         not in {
             models.AppointmentStatus.SCHEDULED,
             models.AppointmentStatus.INFORMED,
-            models.AppointmentStatus.NEEDS_RESCHEDULE,
         }
     ]
 
@@ -271,8 +326,11 @@ def vvs_tasks(
             "appointments": appointments,
             "addresses": addresses,
             "photos": photos,
+            "morning_overview": morning_overview,
+            "afternoon_overview": afternoon_overview,
+            "buffer_overview": buffer_overview,
+            "period_labels": period_labels,
             "todo": todo,
-            "needs_reschedule": needs_reschedule,
             "done": done,
             "availability_dates": available_dates,
             "show_all_dates": show_all_dates,
@@ -281,7 +339,33 @@ def vvs_tasks(
             "status_labels": STATUS_LABELS,
             "done_count": len(done),
             "total_count": len(todo) + len(done),
-            "needs_reschedule_count": len(needs_reschedule),
+        },
+    )
+
+
+@router.get("/map")
+def vvs_tasks_map(
+    request: Request,
+    date_query: str | None = None,
+    show_all: int | None = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    selection = selected_vvs_task_date(
+        request, db, user.id, date_query, show_all, redirect_base="/vvs/tasks/map"
+    )
+    if isinstance(selection, RedirectResponse):
+        return selection
+    available_dates, show_all_dates, selected_date = selection
+    return request.app.state.templates.TemplateResponse(
+        "vvs_tasks_map.html",
+        {
+            "request": request,
+            "current_user": user,
+            "flashes": consume_flashes(request),
+            "availability_dates": available_dates,
+            "show_all_dates": show_all_dates,
+            "selected_date": selected_date,
         },
     )
 
@@ -314,7 +398,6 @@ def vvs_tasks_map_data(
                     models.AppointmentStatus.COMPLETED,
                     models.AppointmentStatus.CLOSED,
                     models.AppointmentStatus.NOT_HOME,
-                    models.AppointmentStatus.NEEDS_RESCHEDULE,
                 ]
             ),
             func.date(models.Appointment.starts_at) == selected_date,
@@ -343,7 +426,6 @@ def vvs_tasks_map_data(
         "completed": models.AppointmentStatus.COMPLETED,
         "closed": models.AppointmentStatus.CLOSED,
         "not_home": models.AppointmentStatus.NOT_HOME,
-        "needs_reschedule": models.AppointmentStatus.NEEDS_RESCHEDULE,
     }
     if status in status_filter:
         query = query.filter(models.Appointment.status == status_filter[status])
@@ -369,6 +451,7 @@ def vvs_tasks_map_data(
                 "has_buffer": bool(address.buffer_flag),
                 "status": status_key,
                 "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+                "period_label": period_label_for(appointment.starts_at),
                 "starts_at": appointment.starts_at.strftime("%H:%M"),
                 "ends_at": appointment.ends_at.strftime("%H:%M"),
             }
@@ -543,6 +626,8 @@ def update_task(
     start_raw: str = Form(""),
     end_raw: str = Form(""),
     duration_minutes: int = Form(0),
+    old_meter_no: str = Form(""),
+    new_meter_no: str = Form(""),
     inline: bool = Form(False),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.VVS)),
@@ -592,7 +677,6 @@ def update_task(
         "completed": models.AppointmentStatus.COMPLETED,
         "closed": models.AppointmentStatus.CLOSED,
         "not_home": models.AppointmentStatus.NOT_HOME,
-        "needs_reschedule": models.AppointmentStatus.NEEDS_RESCHEDULE,
     }
     if status not in status_map:
         return handle_error("Vælg en gyldig status")
@@ -634,6 +718,9 @@ def update_task(
 
     if ends_at.time() > time(16, 0):
         return handle_error("Sluttid skal være senest 16:00")
+
+    appointment.old_meter_no = old_meter_no.strip() or None
+    appointment.new_meter_no = new_meter_no.strip() or None
 
     availability = availability_for_date(db, user.id, plan_date)
     if status_map[status] == models.AppointmentStatus.SCHEDULED:
@@ -689,4 +776,36 @@ def close_task(
         redirect_target = f"/vvs/tasks?date_query={date_query}"
 
     flash(request, "Opgave afsluttet", "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/{appointment_id}/not-home")
+def mark_not_home(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id == appointment_id,
+            models.Appointment.contractor_id == user.id,
+        )
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    appointment.status = models.AppointmentStatus.NOT_HOME
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/vvs/tasks"
+    if date_query:
+        redirect_target = f"/vvs/tasks?date_query={date_query}"
+
+    flash(request, "Opgave markeret som ikke hjemme", "success")
     return RedirectResponse(redirect_target, status_code=303)

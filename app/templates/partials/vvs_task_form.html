@@ -1,6 +1,6 @@
 {% if inline %}
     <div class="inline-edit-panel">
-        <h3>Rediger opgave</h3>
+        <h3>Mere</h3>
         {% if address %}
             <p class="hint">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
             {% if address.buffer_flag and address.buffer_note %}
@@ -11,7 +11,7 @@
         {% endif %}
         {% if appointment.notes %}
             <div class="task-note-banner">
-                <span class="task-note-label">Vigtig note fra admin</span>
+                <span class="task-note-label">NOTE</span>
                 <div class="task-note-text">{{ appointment.notes }}</div>
             </div>
         {% endif %}
@@ -33,9 +33,12 @@
                     <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>
                     <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>Afsluttet</option>
                     <option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
-                    <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
                 </select>
             </label>
+            <div class="vvs-task-meter-grid">
+                <label>Gammel nr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
+                <label>Ny nr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
+            </div>
             <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
             <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
             <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
@@ -61,7 +64,7 @@
     {% endif %}
     {% if appointment.notes %}
         <div class="task-note-banner">
-            <span class="task-note-label">Vigtig note fra admin</span>
+            <span class="task-note-label">NOTE</span>
             <div class="task-note-text">{{ appointment.notes }}</div>
         </div>
     {% endif %}
@@ -72,7 +75,7 @@
             {% set photo_complete = ('both' in photo_types) or (photos | length >= 2) %}
             <div class="photo-count-badge">Fotos: {{ photos | length }}/2{% if photo_complete %} · Komplet{% endif %}</div>
             <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form">
-                <fieldset class="option-field" required>
+                <fieldset class="option-field vvs-photo-type-fieldset" required>
                     <legend>Fototype</legend>
                     <div class="option-buttons">
                         <label class="option-button">
@@ -89,10 +92,6 @@
                         </label>
                     </div>
                 </fieldset>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                    <label>Gammel nr<input type="text" name="old_meter_no" /></label>
-                    <label>Ny nr<input type="text" name="new_meter_no" /></label>
-                </div>
                 <label>Foto<input type="file" name="file" accept="image/*" required /></label>
                 <button type="submit" class="primary-button">Upload</button>
             </form>
@@ -118,9 +117,12 @@
                 <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>
                 <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>Afsluttet</option>
                 <option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
-                <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
             </select>
         </label>
+        <div class="vvs-task-meter-grid">
+            <label>Gammel nr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
+            <label>Ny nr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
+        </div>
         <details class="task-time-panel">
             <summary>Ret tid</summary>
             <div class="task-time-fields">

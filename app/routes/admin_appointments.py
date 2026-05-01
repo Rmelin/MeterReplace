@@ -251,6 +251,24 @@ def appointment_overview(
     contractors = {row[0].id: row[2] for row in rows}
     photos = appointment_photos(db, [appointment.id for appointment in appointments])
     vvs_users = available_vvs_for_date(db, selected_date) if selected_date else []
+    morning_overview = []
+    afternoon_overview = []
+    buffer_overview = []
+    for appointment, address, _contractor in rows:
+        if not address or appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
+            continue
+        entry = {
+            "appointment_id": appointment.id,
+            "street": address.street,
+            "house_no": address.house_no,
+            "buffer_note": address.buffer_note,
+        }
+        if address.buffer_flag:
+            buffer_overview.append(entry)
+        elif appointment.starts_at.time() < time(12, 0):
+            morning_overview.append(entry)
+        else:
+            afternoon_overview.append(entry)
     todo = [
         appt
         for appt in appointments
@@ -315,6 +333,9 @@ def appointment_overview(
             "addresses": addresses,
             "contractors": contractors,
             "photos": photos,
+            "morning_overview": morning_overview,
+            "afternoon_overview": afternoon_overview,
+            "buffer_overview": buffer_overview,
             "todo": todo,
             "needs_reschedule": needs_reschedule,
             "done": done,
