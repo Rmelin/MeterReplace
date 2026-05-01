@@ -1082,6 +1082,44 @@ a.chip:hover {
     box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.12), var(--shadow);
 }
 
+.appointment-outline-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.appointment-outline-section {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
+    background: rgba(var(--accent-rgb), 0.04);
+}
+
+.appointment-outline-section h3 {
+    margin: 0 0 0.75rem;
+}
+
+.appointment-outline-list {
+    margin: 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.appointment-outline-link {
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.appointment-outline-link:hover {
+    color: var(--accent);
+}
+
+.task-card[id] {
+    scroll-margin-top: 1rem;
+}
+
 .task-title-row {
     display: flex;
     align-items: center;
