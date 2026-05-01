@@ -73,6 +73,11 @@
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
                                     </span>
                                 {% endif %}
+                                {% if item.is_meter_issue %}
+                                    <span class="appointment-outline-issue" aria-label="Fejl ved måler" title="Fejl ved måler">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+                                    </span>
+                                {% endif %}
                                 {% if item.is_done %}
                                     <span class="appointment-outline-done" aria-label="Done">✓</span>
                                 {% endif %}
@@ -93,6 +98,11 @@
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
                                     </span>
                                 {% endif %}
+                                {% if item.is_meter_issue %}
+                                    <span class="appointment-outline-issue" aria-label="Fejl ved måler" title="Fejl ved måler">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+                                    </span>
+                                {% endif %}
                                 {% if item.is_done %}
                                     <span class="appointment-outline-done" aria-label="Done">✓</span>
                                 {% endif %}
@@ -111,6 +121,11 @@
                                 {% if item.has_note %}
                                     <span class="appointment-outline-note" aria-label="Note">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_meter_issue %}
+                                    <span class="appointment-outline-issue" aria-label="Fejl ved måler" title="Fejl ved måler">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
                                     </span>
                                 {% endif %}
                                 {% if item.is_done %}
@@ -187,10 +202,16 @@
                 {% endif %}
                 <div class="vvs-task-primary-actions">
                     <a class="primary-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
-                    <form method="post" action="/vvs/tasks/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
-                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
-                        <button type="submit" class="ghost-button vvs-task-action-button">Ikke hjemme</button>
-                    </form>
+                    {% if address %}
+                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <button type="submit" class="ghost-button vvs-task-action-button">Ikke hjemme</button>
+                        </form>
+                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/blocked" class="vvs-task-quick-form">
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <button type="submit" class="ghost-button vvs-task-action-button">Fejl ved måler</button>
+                        </form>
+                    {% endif %}
                 </div>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
 
@@ -237,6 +258,69 @@
         <p class="hint">Ingen opgaver på dagen.</p>
     {% endif %}
 </section>
+
+{% if meter_issue_tasks %}
+<section class="card">
+    <h2>Fejl ved måler</h2>
+    {% for appointment in meter_issue_tasks %}
+        {% set address = addresses.get(appointment.id) %}
+        <div id="appointment-{{ appointment.id }}" class="card task-card vvs-task-card vvs-task-card-compact{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
+            <div class="task-head">
+                {% if address %}
+                    <div class="task-title-row">
+                        <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
+                        <span class="task-chip task-chip-meter-issue">Fejl ved måler</span>
+                        {% if address.buffer_flag %}
+                            <span class="task-chip" {% if address.buffer_note %}title="Placering af målerbrønd: {{ address.buffer_note }}"{% endif %}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M8 12h8"></path><path d="M12 8v8"></path></svg>
+                                Brønd
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="vvs-task-address-actions">
+                        {% if address.latitude and address.longitude %}
+                            <a href="https://www.google.com/maps/dir/?api=1&destination={{ address.latitude }},{{ address.longitude }}" target="_blank" class="ghost-button vvs-task-action-button">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                Maps
+                            </a>
+                        {% else %}
+                            <a href="https://www.google.com/maps/search/?api=1&query={{ address.street|urlencode }}+{{ address.house_no|urlencode }}+{{ address.zip|urlencode }}+{{ address.city|urlencode }}" target="_blank" class="ghost-button vvs-task-action-button">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                Maps
+                            </a>
+                        {% endif %}
+                        {% if address.customer_phone %}
+                            <a href="tel:{{ address.customer_phone }}" class="ghost-button vvs-task-action-button">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.21-2.21a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                Ring
+                            </a>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <h3>Opgave uden adresse</h3>
+                    <span class="task-flag">Opgave uden adresse</span>
+                {% endif %}
+            </div>
+            {% if appointment.notes %}
+                <div class="task-note-banner">
+                    <span class="task-note-label">NOTE</span>
+                    <div class="task-note-text">{{ appointment.notes }}</div>
+                </div>
+            {% endif %}
+            <p class="hint">{{ period_labels.get(appointment.id) }}</p>
+            <p class="hint"><strong>Fejl ved måler</strong></p>
+            <div class="vvs-task-primary-actions">
+                <a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
+                <form method="post" action="/vvs/tasks/{{ appointment.id }}/blocked/undo" class="vvs-task-quick-form">
+                    <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                    <button type="submit" class="ghost-button vvs-task-action-button">Fortryd</button>
+                </form>
+            </div>
+            <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
+        </div>
+    {% endfor %}
+</section>
+{% endif %}
 
 <section class="card">
     <h2>Done</h2>

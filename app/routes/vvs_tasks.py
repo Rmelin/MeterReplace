@@ -32,6 +32,8 @@ PHOTO_FILENAME = {
     "old": "gammel",
 }
 
+BLOCKED_REASON = "Fejl ved måler"
+
 STATUS_LABELS = {
     models.AppointmentStatus.NOT_SCHEDULED: "Ikke planlagt",
     models.AppointmentStatus.SCHEDULED: "Planlagt",
@@ -151,6 +153,40 @@ def is_done_for_day(status: models.AppointmentStatus) -> bool:
     }
 
 
+def is_meter_issue_row(
+    appointment: models.Appointment, address: models.Address | None
+) -> bool:
+    return bool(
+        address
+        and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE
+        and address.blocked_reason == BLOCKED_REASON
+    )
+
+
+def visible_task_rows(
+    rows: list[tuple[models.Appointment, models.Address | None]],
+) -> list[tuple[models.Appointment, models.Address | None]]:
+    latest_meter_issue_by_address: dict[int, tuple[models.Appointment, models.Address | None]] = {}
+    for appointment, address in rows:
+        if not is_meter_issue_row(appointment, address):
+            continue
+        if address is None:
+            continue
+        current = latest_meter_issue_by_address.get(address.id)
+        if not current or appointment.starts_at > current[0].starts_at:
+            latest_meter_issue_by_address[address.id] = (appointment, address)
+
+    visible_rows = []
+    for appointment, address in rows:
+        if address and address.id in latest_meter_issue_by_address:
+            latest_appointment, _latest_address = latest_meter_issue_by_address[address.id]
+            if appointment.id == latest_appointment.id:
+                visible_rows.append((appointment, address))
+            continue
+        visible_rows.append((appointment, address))
+    return visible_rows
+
+
 def availability_for_date(
     db: Session, user_id: int, plan_date: date
 ) -> models.VvsAvailability | None:
@@ -229,7 +265,7 @@ def task_rows_for_date(
 ) -> list[tuple[models.Appointment, models.Address | None]]:
     if not selected_date:
         return []
-    return (
+    rows = (
         db.query(models.Appointment, models.Address)
         .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
         .join(
@@ -245,6 +281,7 @@ def task_rows_for_date(
                     models.AppointmentStatus.COMPLETED,
                     models.AppointmentStatus.CLOSED,
                     models.AppointmentStatus.NOT_HOME,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
                 ]
             ),
             func.date(models.Appointment.starts_at) == models.VvsAvailability.date,
@@ -253,6 +290,7 @@ def task_rows_for_date(
         .order_by(models.Appointment.starts_at)
         .all()
     )
+    return visible_task_rows(rows)
 
 
 def build_task_overview(
@@ -262,7 +300,11 @@ def build_task_overview(
     afternoon_overview = []
     buffer_overview = []
     for appointment, address in rows:
-        if not address or appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
+        if not address:
+            continue
+        if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
+            appointment, address
+        ):
             continue
         entry = {
             "appointment_id": appointment.id,
@@ -270,6 +312,7 @@ def build_task_overview(
             "house_no": address.house_no,
             "buffer_note": address.buffer_note,
             "is_done": is_done_for_day(appointment.status),
+            "is_meter_issue": is_meter_issue_row(appointment, address),
             "has_note": bool((appointment.notes or "").strip()),
         }
         if address.buffer_flag:
@@ -302,6 +345,11 @@ def vvs_tasks(
     period_labels = {
         appointment.id: period_label_for(appointment.starts_at) for appointment in appointments
     }
+    meter_issue_tasks = [
+        appt
+        for appt in appointments
+        if is_meter_issue_row(appt, addresses.get(appt.id))
+    ]
     todo = [
         appt
         for appt in appointments
@@ -315,6 +363,7 @@ def vvs_tasks(
             models.AppointmentStatus.SCHEDULED,
             models.AppointmentStatus.INFORMED,
         }
+        and not is_meter_issue_row(appt, addresses.get(appt.id))
     ]
 
     return request.app.state.templates.TemplateResponse(
@@ -331,6 +380,7 @@ def vvs_tasks(
             "buffer_overview": buffer_overview,
             "period_labels": period_labels,
             "todo": todo,
+            "meter_issue_tasks": meter_issue_tasks,
             "done": done,
             "availability_dates": available_dates,
             "show_all_dates": show_all_dates,
@@ -338,7 +388,7 @@ def vvs_tasks(
             "photo_labels": PHOTO_LABELS,
             "status_labels": STATUS_LABELS,
             "done_count": len(done),
-            "total_count": len(todo) + len(done),
+            "total_count": len(todo) + len(done) + len(meter_issue_tasks),
         },
     )
 
@@ -398,6 +448,7 @@ def vvs_tasks_map_data(
                     models.AppointmentStatus.COMPLETED,
                     models.AppointmentStatus.CLOSED,
                     models.AppointmentStatus.NOT_HOME,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
                 ]
             ),
             func.date(models.Appointment.starts_at) == selected_date,
@@ -434,8 +485,12 @@ def vvs_tasks_map_data(
         query = query.filter(models.Address.buffer_flag.is_(True))
 
     payload = []
-    for appointment, address in query.all():
+    for appointment, address in visible_task_rows(query.all()):
         if not address:
+            continue
+        if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
+            appointment, address
+        ):
             continue
         status_key = STATUS_KEYS.get(appointment.status, "planned")
         payload.append(
@@ -450,7 +505,9 @@ def vvs_tasks_map_data(
                 "longitude": float(address.longitude) if address.longitude is not None else None,
                 "has_buffer": bool(address.buffer_flag),
                 "status": status_key,
-                "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+                "status_label": BLOCKED_REASON
+                if is_meter_issue_row(appointment, address)
+                else STATUS_LABELS.get(appointment.status, appointment.status.value),
                 "period_label": period_label_for(appointment.starts_at),
                 "starts_at": appointment.starts_at.strftime("%H:%M"),
                 "ends_at": appointment.ends_at.strftime("%H:%M"),
@@ -808,4 +865,143 @@ def mark_not_home(
         redirect_target = f"/vvs/tasks?date_query={date_query}"
 
     flash(request, "Opgave markeret som ikke hjemme", "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/{appointment_id}/blocked")
+def mark_blocked(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id == appointment_id,
+            models.Appointment.contractor_id == user.id,
+        )
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.address_id is None:
+        flash(request, "Opgave uden adresse kan ikke markeres som fejl ved måler", "error")
+        return RedirectResponse("/vvs/tasks", status_code=303)
+
+    address = (
+        db.query(models.Address)
+        .filter(models.Address.id == appointment.address_id)
+        .first()
+    )
+    if not address:
+        flash(request, "Adresse ikke fundet", "error")
+        return RedirectResponse("/vvs/tasks", status_code=303)
+
+    address.blocked_reason = BLOCKED_REASON
+    note_value = appointment.notes or BLOCKED_REASON
+    if appointment.status == models.AppointmentStatus.NOT_HOME:
+        db.add(
+            models.Appointment(
+                address_id=appointment.address_id,
+                contractor_id=appointment.contractor_id,
+                starts_at=appointment.starts_at + timedelta(seconds=1),
+                ends_at=appointment.ends_at + timedelta(seconds=1),
+                status=models.AppointmentStatus.NEEDS_RESCHEDULE,
+                letter_required=appointment.letter_required,
+                notes=note_value,
+                changed_date=datetime.utcnow(),
+                changed_by_user_id=user.id,
+            )
+        )
+    else:
+        appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
+        appointment.notes = note_value
+        appointment.changed_date = datetime.utcnow()
+        appointment.changed_by_user_id = user.id
+
+    db.commit()
+
+    redirect_target = "/vvs/tasks"
+    if date_query:
+        redirect_target = f"/vvs/tasks?date_query={date_query}"
+
+    flash(request, "Adresse markeret som fejl ved måler og sendt til ny plan", "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/{appointment_id}/blocked/undo")
+def undo_blocked(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id == appointment_id,
+            models.Appointment.contractor_id == user.id,
+        )
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.address_id is None:
+        flash(request, "Opgave uden adresse kan ikke fortrydes", "error")
+        return RedirectResponse("/vvs/tasks", status_code=303)
+
+    address = (
+        db.query(models.Address)
+        .filter(models.Address.id == appointment.address_id)
+        .first()
+    )
+    if not address:
+        flash(request, "Adresse ikke fundet", "error")
+        return RedirectResponse("/vvs/tasks", status_code=303)
+
+    if address.blocked_reason == BLOCKED_REASON:
+        address.blocked_reason = None
+
+    restored = False
+    previous_not_home = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id != appointment.id,
+            models.Appointment.address_id == appointment.address_id,
+            models.Appointment.contractor_id == appointment.contractor_id,
+            models.Appointment.status == models.AppointmentStatus.NOT_HOME,
+            models.Appointment.starts_at == appointment.starts_at - timedelta(seconds=1),
+            models.Appointment.ends_at == appointment.ends_at - timedelta(seconds=1),
+        )
+        .first()
+    )
+    if previous_not_home and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
+        previous_not_home.status = models.AppointmentStatus.SCHEDULED
+        previous_not_home.changed_date = datetime.utcnow()
+        previous_not_home.changed_by_user_id = user.id
+        if previous_not_home.notes == BLOCKED_REASON:
+            previous_not_home.notes = None
+        db.delete(appointment)
+        restored = True
+    else:
+        appointment.status = models.AppointmentStatus.SCHEDULED
+        appointment.changed_date = datetime.utcnow()
+        appointment.changed_by_user_id = user.id
+        if appointment.notes == BLOCKED_REASON:
+            appointment.notes = None
+        restored = True
+
+    db.commit()
+
+    redirect_target = "/vvs/tasks"
+    if date_query:
+        redirect_target = f"/vvs/tasks?date_query={date_query}"
+
+    if restored:
+        flash(request, "Fejl ved måler er fortrudt og opgaven er planlagt igen", "success")
+    else:
+        flash(request, "Kunne ikke fortryde fejl ved måler", "error")
     return RedirectResponse(redirect_target, status_code=303)

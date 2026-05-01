@@ -1166,6 +1166,23 @@ a.chip:hover {
     flex: 0 0 auto;
 }
 
+.appointment-outline-issue {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-left: 0.35rem;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.14);
+    color: #dc2626;
+    vertical-align: middle;
+}
+
+.appointment-outline-issue svg {
+    flex: 0 0 auto;
+}
+
 .task-card[id] {
     scroll-margin-top: 1rem;
 }
@@ -1197,6 +1214,12 @@ a.chip:hover {
 
 .task-chip svg {
     flex: 0 0 auto;
+}
+
+.task-chip-meter-issue {
+    border-color: rgba(239, 68, 68, 0.28);
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
 }
 
 .task-note-banner {
@@ -1265,8 +1288,16 @@ a.chip:hover {
 .vvs-task-address-actions,
 .vvs-task-primary-actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
+}
+
+.vvs-task-address-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.vvs-task-primary-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .vvs-task-action-button {
