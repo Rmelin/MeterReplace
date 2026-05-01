@@ -1,27 +1,32 @@
 {% extends "base.html" %}
-{% block head %}
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""
-    />
-{% endblock %}
 {% block content %}
 <section class="page-header">
     <div>
         <h1>Mine opgaver</h1>
         <p>Arbejdsdage med opgaver og status.</p>
     </div>
+    <div>
+        <a class="ghost-button" href="/vvs/tasks/map{% if selected_date %}?date_query={{ selected_date.isoformat() }}{% if show_all_dates %}&show_all=1{% endif %}{% endif %}">Kort</a>
+    </div>
 </section>
 
 <section class="card">
-    <h2>Arbejdsdag</h2>
+    <div class="section-header">
+        <div>
+            <h2>Arbejdsdag</h2>
+            {% if selected_date %}
+                <p class="hint">Status: {{ done_count }}/{{ total_count }} færdige</p>
+            {% endif %}
+        </div>
+        {% if selected_date %}
+            <a class="ghost-button" href="/vvs/tasks/map?date_query={{ selected_date.isoformat() }}{% if show_all_dates %}&show_all=1{% endif %}">Åbn kort</a>
+        {% endif %}
+    </div>
     {% if availability_dates %}
         <form method="get" action="/vvs/tasks" class="form-grid">
             <label>
                 Dato
-                <select name="date_query" id="map-date" required>
+                <select name="date_query" required>
                     {% for day in availability_dates %}
                         <option value="{{ day.isoformat() }}" {% if selected_date and day == selected_date %}selected{% endif %}>
                             {{ day.strftime('%d/%m/%Y') }}
@@ -34,83 +39,107 @@
             {% endif %}
             <button type="submit" class="primary-button">Vælg dag</button>
         </form>
-        <div class="action-row" style="margin-top: 0.75rem;">
+        <div class="vvs-task-toolbar">
             {% if show_all_dates %}
                 <a class="ghost-button" href="/vvs/tasks{% if selected_date %}?date_query={{ selected_date.isoformat() }}{% endif %}">Skjul ældre datoer</a>
             {% else %}
                 <a class="ghost-button" href="/vvs/tasks?show_all=1{% if selected_date %}&date_query={{ selected_date.isoformat() }}{% endif %}">Vis ældre datoer</a>
             {% endif %}
         </div>
-        {% if selected_date %}
-            <p class="hint" style="margin-top: 0.5rem;">
-                Status: {{ done_count }}/{{ total_count }} færdige
-                {% if needs_reschedule_count %}· {{ needs_reschedule_count }} afventer ny dato{% endif %}
-            </p>
-        {% endif %}
     {% else %}
         <p class="hint">Ingen arbejdsdage registreret endnu.</p>
     {% endif %}
 </section>
 
-<section class="card map-card vvs-map-card">
-    <div class="map-toolbar">
-        <div class="map-filters" style="flex: 1;">
-            <label>
-                Søg
-                <input type="text" id="map-search" placeholder="Vej, kunde..." style="width: 200px;" />
-            </label>
-            <div class="map-filter-buttons option-buttons" id="map-status-buttons" aria-label="Status filter">
-                <button type="button" class="option-button map-filter-button is-active" data-status="all">
-                    <span class="map-filter-swatch"></span>
-                    Alle
-                </button>
-                <button type="button" class="option-button map-filter-button" data-status="planned">
-                    <span class="map-filter-swatch"></span>
-                    Planlagt
-                </button>
-                <button type="button" class="option-button map-filter-button" data-status="informed">
-                    <span class="map-filter-swatch"></span>
-                    Informeret
-                </button>
-                <button type="button" class="option-button map-filter-button" data-status="completed">
-                    <span class="map-filter-swatch"></span>
-                    Skiftet
-                </button>
-                <button type="button" class="option-button map-filter-button" data-status="closed">
-                    <span class="map-filter-swatch"></span>
-                    Afsluttet
-                </button>
-                <button type="button" class="option-button map-filter-button" data-status="not_home">
-                    <span class="map-filter-swatch"></span>
-                    Ikke hjemme
-                </button>
-                <button type="button" class="option-button map-filter-button" data-status="needs_reschedule">
-                    <span class="map-filter-swatch"></span>
-                    Behov for ny dato
-                </button>
-            </div>
-            <div class="map-filter-buttons option-buttons" aria-label="Brønd filter">
-                <button type="button" class="option-button map-buffer-button" id="map-buffer-button">
-                    Kun brønd
-                </button>
-            </div>
+{% if selected_date %}
+<section class="card">
+    <div class="section-header">
+        <div>
+            <h2>Dagens adresser</h2>
+            <p class="hint">Klik på en adresse for at hoppe direkte til opgaven længere nede på siden.</p>
         </div>
     </div>
-    {% if selected_date %}
-        <div class="map-layout">
-            <div id="vvs-task-map" class="address-map"></div>
+    {% if morning_overview or afternoon_overview or buffer_overview %}
+        <div class="appointment-outline-grid">
+            {% if morning_overview %}
+                <section class="appointment-outline-section">
+                    <h3>Formiddag</h3>
+                    <ul class="appointment-outline-list">
+                        {% for item in morning_overview %}
+                            <li>
+                                <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                                {% if item.has_note %}
+                                    <span class="appointment-outline-note" aria-label="Note">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_done %}
+                                    <span class="appointment-outline-done" aria-label="Done">✓</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
+            {% if afternoon_overview %}
+                <section class="appointment-outline-section">
+                    <h3>Eftermiddag</h3>
+                    <ul class="appointment-outline-list">
+                        {% for item in afternoon_overview %}
+                            <li>
+                                <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                                {% if item.has_note %}
+                                    <span class="appointment-outline-note" aria-label="Note">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_done %}
+                                    <span class="appointment-outline-done" aria-label="Done">✓</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
+            {% if buffer_overview %}
+                <section class="appointment-outline-section">
+                    <h3>Målerbrønd</h3>
+                    <ul class="appointment-outline-list">
+                        {% for item in buffer_overview %}
+                            <li>
+                                <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                                {% if item.has_note %}
+                                    <span class="appointment-outline-note" aria-label="Note">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_done %}
+                                    <span class="appointment-outline-done" aria-label="Done">✓</span>
+                                {% endif %}
+                                {% if item.buffer_note %}
+                                    <span class="hint">({{ item.buffer_note }})</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
         </div>
     {% else %}
-        <p class="hint">Vælg en arbejdsdag for at se kortet.</p>
+        <p class="hint">Ingen adresser på den valgte dag.</p>
     {% endif %}
 </section>
+{% endif %}
 
 <section class="card">
     <h2>To do</h2>
     {% if todo %}
         {% for appointment in todo %}
             {% set address = addresses.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
+            {% set photo_list = photos.get(appointment.id, []) %}
+            {% set photo_types = photo_list | map(attribute='photo_type') | list %}
+            {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
+            <div id="appointment-{{ appointment.id }}" class="card task-card vvs-task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <div class="task-title-row">
@@ -122,21 +151,20 @@
                                 </span>
                             {% endif %}
                         </div>
-                        <div class="action-row" style="margin-top: 0.5rem; width: 100%;">
+                        <div class="vvs-task-address-actions">
                             {% if address.latitude and address.longitude %}
-                                <a href="https://www.google.com/maps/dir/?api=1&destination={{ address.latitude }},{{ address.longitude }}" target="_blank" class="ghost-button" style="flex: 1; gap: 0.5rem;">
+                                <a href="https://www.google.com/maps/dir/?api=1&destination={{ address.latitude }},{{ address.longitude }}" target="_blank" class="ghost-button vvs-task-action-button">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                                     Maps
                                 </a>
                             {% else %}
-                                <a href="https://www.google.com/maps/search/?api=1&query={{ address.street|urlencode }}+{{ address.house_no|urlencode }}+{{ address.zip|urlencode }}+{{ address.city|urlencode }}" target="_blank" class="ghost-button" style="flex: 1; gap: 0.5rem;">
+                                <a href="https://www.google.com/maps/search/?api=1&query={{ address.street|urlencode }}+{{ address.house_no|urlencode }}+{{ address.zip|urlencode }}+{{ address.city|urlencode }}" target="_blank" class="ghost-button vvs-task-action-button">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                                     Maps
                                 </a>
                             {% endif %}
-                            
                             {% if address.customer_phone %}
-                                <a href="tel:{{ address.customer_phone }}" class="ghost-button" style="flex: 1; gap: 0.5rem;">
+                                <a href="tel:{{ address.customer_phone }}" class="ghost-button vvs-task-action-button">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.21-2.21a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                                     Ring
                                 </a>
@@ -149,37 +177,29 @@
                 </div>
                 {% if appointment.notes %}
                     <div class="task-note-banner">
-                        <span class="task-note-label">Vigtig note fra admin</span>
+                        <span class="task-note-label">NOTE</span>
                         <div class="task-note-text">{{ appointment.notes }}</div>
                     </div>
                 {% endif %}
-                <p class="hint"><strong>Tid: {{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</strong></p>
+                <p class="hint"><strong>{{ period_labels.get(appointment.id) }}</strong></p>
                 {% if address and address.buffer_flag and address.buffer_note %}
                     <p class="hint"><strong>Brønd: {{ address.buffer_note }}</strong></p>
                 {% endif %}
-                
-                <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
-                    <a class="primary-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}" style="flex: 1;">Status / Tid</a>
+                <div class="vvs-task-primary-actions">
+                    <a class="primary-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
+                    <form method="post" action="/vvs/tasks/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
+                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                        <button type="submit" class="ghost-button vvs-task-action-button">Ikke hjemme</button>
+                    </form>
                 </div>
-                
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
 
                 {% if address %}
-                    {% set photo_list = photos.get(appointment.id, []) %}
-                    {% set photo_types = photo_list | map(attribute='photo_type') | list %}
-                    {% set photo_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
-                    <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photo_complete %} · Komplet{% endif %}</div>
-                    <details style="margin-top: 0.75rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem;">
-                        <summary style="cursor: pointer; font-weight: 600; color: var(--accent); padding: 0.25rem;">
-                            {% if photo_list %}
-                                Se/Upload fotos ({{ photo_list | length }})
-                            {% else %}
-                                Upload fotos
-                            {% endif %}
-                        </summary>
-                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form" style="margin-top: 1rem;">
+                    <div class="vvs-task-photo-panel">
+                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
+                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
-                            <fieldset class="option-field" required>
+                            <fieldset class="option-field vvs-photo-type-fieldset" required>
                                 <legend>Fototype</legend>
                                 <div class="option-buttons">
                                     <label class="option-button">
@@ -196,12 +216,8 @@
                                     </label>
                                 </div>
                             </fieldset>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                                <label>Gammel nr<input type="text" name="old_meter_no" style="width: 100%;" /></label>
-                                <label>Ny nr<input type="text" name="new_meter_no" style="width: 100%;" /></label>
-                            </div>
                             <label>Foto<input type="file" name="file" accept="image/*" required /></label>
-                            <button type="submit" class="primary-button">Upload</button>
+                            <button type="submit" class="primary-button">Upload foto</button>
                         </form>
                         {% if photo_list %}
                             <div class="photo-grid">
@@ -213,7 +229,7 @@
                                 {% endfor %}
                             </div>
                         {% endif %}
-                    </details>
+                    </div>
                 {% endif %}
             </div>
         {% endfor %}
@@ -223,53 +239,14 @@
 </section>
 
 <section class="card">
-    <h2>Behov for ny dato</h2>
-    {% if needs_reschedule %}
-        <p class="hint" style="margin-bottom: 1rem;">Disse besøg er taget ud af dagens plan og afventer admin i Preview/Commit.</p>
-        {% for appointment in needs_reschedule %}
-            {% set address = addresses.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
-                <div class="task-head">
-                    {% if address %}
-                        <div class="task-title-row">
-                            <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
-                            {% if address.buffer_flag %}
-                                <span class="task-chip" {% if address.buffer_note %}title="Placering af målerbrønd: {{ address.buffer_note }}"{% endif %}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M8 12h8"></path><path d="M12 8v8"></path></svg>
-                                    Brønd
-                                </span>
-                            {% endif %}
-                        </div>
-                    {% else %}
-                        <h3>Opgave uden adresse</h3>
-                        <span class="task-flag">Opgave uden adresse</span>
-                    {% endif %}
-                </div>
-                {% if appointment.notes %}
-                    <div class="task-note-banner">
-                        <span class="task-note-label">Vigtig note fra admin</span>
-                        <div class="task-note-text">{{ appointment.notes }}</div>
-                    </div>
-                {% endif %}
-                <p class="hint">Tid: {{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
-                <p class="hint"><strong>Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</strong></p>
-                <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
-                    <a class="ghost-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}" style="flex: 1; font-size: 0.8rem; padding: 0.4rem;">Ret status</a>
-                </div>
-                <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
-            </div>
-        {% endfor %}
-    {% else %}
-        <p class="hint">Ingen adresser afventer ny dato.</p>
-    {% endif %}
-</section>
-
-<section class="card">
     <h2>Done</h2>
     {% if done %}
         {% for appointment in done %}
             {% set address = addresses.get(appointment.id) %}
-            <div class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
+            {% set photo_list = photos.get(appointment.id, []) %}
+            {% set photo_types = photo_list | map(attribute='photo_type') | list %}
+            {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
+            <div id="appointment-{{ appointment.id }}" class="card task-card vvs-task-card vvs-task-card-compact{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <div class="task-title-row">
@@ -281,10 +258,10 @@
                                 </span>
                             {% endif %}
                         </div>
-                        <div class="action-row" style="margin-top: 0.5rem; width: 100%;">
+                        <div class="vvs-task-address-actions">
                             {% if address.latitude and address.longitude %}
-                                <a href="https://www.google.com/maps/dir/?api=1&destination={{ address.latitude }},{{ address.longitude }}" target="_blank" class="ghost-button" style="flex: 1; gap: 0.5rem; font-size: 0.8rem; padding: 0.4rem;">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                <a href="https://www.google.com/maps/dir/?api=1&destination={{ address.latitude }},{{ address.longitude }}" target="_blank" class="ghost-button vvs-task-action-button">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                                     Maps
                                 </a>
                             {% endif %}
@@ -296,51 +273,30 @@
                 </div>
                 {% if appointment.notes %}
                     <div class="task-note-banner">
-                        <span class="task-note-label">Vigtig note fra admin</span>
+                        <span class="task-note-label">NOTE</span>
                         <div class="task-note-text">{{ appointment.notes }}</div>
                     </div>
                 {% endif %}
-                <p class="hint">Tid: {{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
+                <p class="hint">{{ period_labels.get(appointment.id) }}</p>
                 <p class="hint"><strong>Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</strong></p>
-                
-                <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
-                    <a class="ghost-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}" style="flex: 1; font-size: 0.8rem; padding: 0.4rem;">Ret status</a>
+                <div class="vvs-task-primary-actions">
+                    <a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
                 </div>
-                
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
-
                 {% if address %}
-                    {% set photo_list = photos.get(appointment.id, []) %}
-                    {% set photo_types = photo_list | map(attribute='photo_type') | list %}
-                    {% set photo_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
-                    <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photo_complete %} · Komplet{% endif %}</div>
-                    <details style="margin-top: 0.5rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem; opacity: 0.8;">
-                        <summary style="cursor: pointer; font-size: 0.85rem; font-weight: 600; padding: 0.2rem;">
-                            Se fotos ({{ photo_list | length }})
-                        </summary>
-                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form" style="margin-top: 0.5rem;">
-                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
-                            <fieldset class="option-field">
-                                <legend>Tilføj foto</legend>
-                                <div class="option-buttons">
-                                    <label class="option-button"><input type="radio" name="photo_type" value="both" required style="display: none;" /><span>Begge</span></label>
-                                    <label class="option-button"><input type="radio" name="photo_type" value="new" required style="display: none;" /><span>Ny</span></label>
-                                    <label class="option-button"><input type="radio" name="photo_type" value="old" required style="display: none;" /><span>Gammel</span></label>
-                                </div>
-                            </fieldset>
-                            <label>Foto<input type="file" name="file" accept="image/*" required /></label>
-                            <button type="submit" class="ghost-button">Upload ekstra</button>
-                        </form>
+                    <div class="vvs-task-photo-panel is-compact">
+                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
                         {% if photo_list %}
-                            <div class="photo-grid" style="margin-top: 0.5rem;">
+                            <div class="photo-grid">
                                 {% for photo in photo_list %}
                                     <div class="photo-item">
-                                        <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb small" />
+                                        <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
+                                        <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
                                     </div>
                                 {% endfor %}
                             </div>
                         {% endif %}
-                    </details>
+                    </div>
                 {% endif %}
             </div>
         {% endfor %}
@@ -349,12 +305,5 @@
     {% endif %}
 </section>
 
-<script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-    defer
-></script>
-<script src="/static/vvs_tasks_map.js" defer></script>
 <script src="/static/vvs_tasks.js" defer></script>
 {% endblock %}

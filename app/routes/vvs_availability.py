@@ -10,6 +10,7 @@ from starlette.responses import RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.workday_status import relative_day_label
 
 router = APIRouter(prefix="/vvs", tags=["vvs"])
 
@@ -41,6 +42,42 @@ def has_scheduled_appointments(db: Session, user_id: int, entry_date) -> bool:
     )
 
 
+def availability_groups(
+    entries: list[models.VvsAvailability],
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    today = datetime.now().date()
+    grouped = []
+    for entry in entries:
+        day_offset = (entry.date - today).days
+        state_key = "today" if day_offset == 0 else "upcoming" if day_offset > 0 else "history"
+        grouped.append(
+            {
+                "entry": entry,
+                "day_offset": day_offset,
+                "relative_label": relative_day_label(day_offset),
+                "state_key": state_key,
+                "edit_href": f"/vvs/{entry.id}/edit",
+            }
+        )
+
+    today_entries = [row for row in grouped if row["day_offset"] == 0]
+    upcoming_entries = sorted(
+        [row for row in grouped if row["day_offset"] > 0],
+        key=lambda row: row["entry"].date,
+    )
+    recent_entries = sorted(
+        [row for row in grouped if -7 <= row["day_offset"] < 0],
+        key=lambda row: row["entry"].date,
+        reverse=True,
+    )
+    older_entries = sorted(
+        [row for row in grouped if row["day_offset"] < -7],
+        key=lambda row: row["entry"].date,
+        reverse=True,
+    )
+    return today_entries, upcoming_entries, recent_entries, older_entries
+
+
 @router.get("")
 def vvs_availability(
     request: Request,
@@ -51,8 +88,10 @@ def vvs_availability(
         db.query(models.VvsAvailability)
         .filter(models.VvsAvailability.user_id == user.id)
         .order_by(models.VvsAvailability.date.desc())
-        .limit(30)
         .all()
+    )
+    today_entries, upcoming_entries, recent_entries, older_entries = availability_groups(
+        entries
     )
     return request.app.state.templates.TemplateResponse(
         "vvs_availability.html",
@@ -60,7 +99,10 @@ def vvs_availability(
             "request": request,
             "current_user": user,
             "flashes": consume_flashes(request),
-            "entries": entries,
+            "today_entries": today_entries,
+            "upcoming_entries": upcoming_entries,
+            "recent_entries": recent_entries,
+            "older_entries": older_entries,
         },
     )
 
@@ -119,6 +161,41 @@ def edit_availability_form(
     if not entry:
         raise HTTPException(status_code=404, detail="Arbejdsdag ikke fundet")
 
+    has_conflict = has_scheduled_appointments(db, user.id, entry.date)
+
+    return request.app.state.templates.TemplateResponse(
+        "vvs_availability_edit.html",
+        {
+            "request": request,
+            "current_user": user,
+            "flashes": consume_flashes(request),
+            "entry": entry,
+            "has_conflict": has_conflict,
+        },
+    )
+
+
+@router.post("/{availability_id}/edit")
+def update_availability(
+    request: Request,
+    availability_id: int,
+    date_raw: str = Form(""),
+    start_raw: str = Form(""),
+    end_raw: str = Form(""),
+    note: str = Form(""),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    entry = (
+        db.query(models.VvsAvailability)
+        .filter(
+            models.VvsAvailability.id == availability_id,
+            models.VvsAvailability.user_id == user.id,
+        )
+        .first()
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Arbejdsdag ikke fundet")
 
     note = note.strip() or None
     try:

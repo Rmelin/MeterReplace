@@ -74,36 +74,22 @@ if (!mapContainer) {
           fillColor: statusColor(row.status),
           fillOpacity: 0.8,
         })
-        const timeLabel = row.starts_at && row.ends_at
-          ? `${row.starts_at} – ${row.ends_at}`
-          : ''
+        const periodLabel = row.period_label || ''
         const dateValue = dateInput && dateInput.value ? dateInput.value : ''
+        const taskHref = dateValue
+          ? `/vvs/tasks?date_query=${encodeURIComponent(dateValue)}#appointment-${row.appointment_id}`
+          : `/vvs/tasks#appointment-${row.appointment_id}`
         marker.bindPopup(
           `<div class="map-popup-heading">
               <strong class="map-popup-title">${row.street} ${row.house_no}</strong>
               ${bufferBadge}
             </div>
             <div class="map-popup-meta">${row.zip} ${row.city}</div>
-            <div class="map-popup-meta">${statusLabel}${timeLabel ? ` · ${timeLabel}` : ''}</div>
+            <div class="map-popup-meta">${periodLabel}${periodLabel ? ` · ${statusLabel}` : statusLabel}</div>
             <div class="map-popup-actions">
-              <a class="ghost-button map-popup-button" href="/vvs/tasks/${row.appointment_id}/edit">Åben opgave</a>
-            </div>
-            <details class="map-popup-upload">
-              <summary>Upload foto</summary>
-              <form method="post" action="/vvs/tasks/${row.appointment_id}/photos" enctype="multipart/form-data" class="map-popup-form">
-                <input type="hidden" name="date_query" value="${dateValue}" />
-                <label>Fototype
-                  <select name="photo_type" required>
-                    <option value="">Vælg</option>
-                    <option value="both">Begge</option>
-                    <option value="new">Ny</option>
-                    <option value="old">Gammel</option>
-                  </select>
-                </label>
-                <label>Foto<input type="file" name="file" accept="image/*" required /></label>
-                <button type="submit" class="ghost-button map-popup-button">Upload</button>
-              </form>
-            </details>`
+              <a class="ghost-button map-popup-button" href="${taskHref}">Mere info</a>
+              <a class="ghost-button map-popup-button" href="/vvs/tasks/${row.appointment_id}/edit">Ret status</a>
+            </div>`
         )
         markerLayer.addLayer(marker)
       })
