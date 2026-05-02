@@ -1551,6 +1551,8 @@ a.chip:hover {
         z-index: 2000;
         padding: 1.5rem;
         display: flex; flex-direction: column;
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     .mobile-menu-content {
@@ -1560,6 +1562,8 @@ a.chip:hover {
         display: flex;
         flex-direction: column;
         gap: 1rem;
+        min-height: 100%;
+        padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
     }
 
     .mobile-menu-header {
@@ -1567,6 +1571,11 @@ a.chip:hover {
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
+        position: sticky;
+        top: 0;
+        background: var(--bg);
+        padding-bottom: 0.5rem;
+        z-index: 1;
     }
 
     .mobile-menu-grid {
