@@ -59,7 +59,7 @@ let currentEditId = null
 let addresses = []
 let editLabel = ''
 let selectedIds = []
-let activeStatus = 'all'
+let activeStatuses = []
 let activeFilter = 'status'
 const selectedStorageKey = 'address_map_selected_ids'
 const sidebarStorageKey = 'address_map_hide_sidebar'
@@ -147,6 +147,24 @@ const getVisibleAddresses = () => {
     return addresses.filter((row) => selectedIds.includes(row.id))
   }
   return addresses
+}
+
+const updateFilterButtons = () => {
+  statusButtons.forEach((button) => {
+    const status = button.dataset.status || ''
+    const filter = button.dataset.filter
+    let isActive = false
+
+    if (filter === 'selected') {
+      isActive = activeFilter === 'selected'
+    } else if (status === 'all') {
+      isActive = activeFilter === 'status' && activeStatuses.length === 0
+    } else {
+      isActive = activeFilter === 'status' && activeStatuses.includes(status)
+    }
+
+    button.classList.toggle('is-active', isActive)
+  })
 }
 
 const updateMarkers = () => {
@@ -324,8 +342,8 @@ const loadMapData = async () => {
   if (searchInput.value.trim()) {
     params.set('q', searchInput.value.trim())
   }
-  if (activeFilter !== 'selected' && activeStatus !== 'all') {
-    params.set('status', activeStatus)
+  if (activeFilter !== 'selected') {
+    activeStatuses.forEach((status) => params.append('status', status))
   }
   if (dateInput && dateInput.value) {
     params.set('date', dateInput.value)
@@ -419,12 +437,21 @@ statusButtons.forEach((button) => {
     const filter = button.dataset.filter
     if (filter === 'selected') {
       activeFilter = 'selected'
-    } else {
-      activeFilter = 'status'
-      activeStatus = status || 'all'
+      updateFilterButtons()
+      loadMapData()
+      return
     }
-    statusButtons.forEach((node) => node.classList.remove('is-active'))
-    button.classList.add('is-active')
+
+    activeFilter = 'status'
+    if (!status || status === 'all') {
+      activeStatuses = []
+    } else {
+      activeStatuses = activeStatuses.includes(status)
+        ? activeStatuses.filter((value) => value !== status)
+        : [...activeStatuses, status]
+    }
+
+    updateFilterButtons()
     loadMapData()
   })
 })
@@ -476,6 +503,7 @@ const loadMapCenter = async () => {
 }
 
 applyFilterSwatches()
+updateFilterButtons()
 updateEditHint()
 loadSelectedIds()
 loadSidebarState()
