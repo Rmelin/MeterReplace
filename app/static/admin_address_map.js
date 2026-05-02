@@ -47,6 +47,7 @@ const selectedExport = document.getElementById('selected-export')
 const sidebarToggle = document.getElementById('map-sidebar-toggle')
 const mapLayout = document.querySelector('.map-layout')
 const mapSidebar = document.querySelector('.map-sidebar')
+const dayStatusCards = Array.from(document.querySelectorAll('[data-map-date-card]'))
 
 const map = L.map('address-map').setView(MAP_DEFAULT, MAP_ZOOM)
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -165,6 +166,23 @@ const updateFilterButtons = () => {
 
     button.classList.toggle('is-active', isActive)
   })
+}
+
+const updateDayStatusCards = (selectedDate) => {
+  dayStatusCards.forEach((card) => {
+    const isActive = Boolean(selectedDate) && card.dataset.dateValue === selectedDate
+    card.classList.toggle('is-selected', isActive)
+  })
+}
+
+const syncDateQueryInUrl = (selectedDate) => {
+  const nextUrl = new URL(window.location.href)
+  if (selectedDate) {
+    nextUrl.searchParams.set('date_query', selectedDate)
+  } else {
+    nextUrl.searchParams.delete('date_query')
+  }
+  window.history.replaceState({}, '', nextUrl)
 }
 
 const updateMarkers = () => {
@@ -429,7 +447,12 @@ const triggerSearch = () => {
 
 searchInput.addEventListener('input', triggerSearch)
 if (dateInput) {
-  dateInput.addEventListener('change', loadMapData)
+  dateInput.addEventListener('change', () => {
+    const selectedDate = dateInput.value || ''
+    syncDateQueryInUrl(selectedDate)
+    updateDayStatusCards(selectedDate)
+    loadMapData()
+  })
 }
 statusButtons.forEach((button) => {
   button.addEventListener('click', () => {
@@ -504,6 +527,7 @@ const loadMapCenter = async () => {
 
 applyFilterSwatches()
 updateFilterButtons()
+updateDayStatusCards(dateInput?.value || '')
 updateEditHint()
 loadSelectedIds()
 loadSidebarState()

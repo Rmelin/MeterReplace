@@ -21,6 +21,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.workday_status import build_workday_status
 
 PHOTO_LABELS = {
     "both": "Begge målere",
@@ -732,15 +733,52 @@ def update_address_fields(
 @router.get("/map")
 def address_map(
     request: Request,
+    date_query: str | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
 ):
+    selected_date = None
+    if date_query:
+        try:
+            selected_date = datetime.strptime(date_query, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = None
+
     availability_dates = [
         row[0]
         for row in db.query(models.VvsAvailability.date)
         .distinct()
         .order_by(models.VvsAvailability.date.desc())
         .all()
+    ]
+    workday_status = build_workday_status(db)
+    today_day_status = [
+        {
+            **row,
+            "map_href": f"/admin/addresses/map?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["today_day_status"]
+    ]
+    upcoming_day_status = [
+        {
+            **row,
+            "map_href": f"/admin/addresses/map?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["upcoming_day_status"]
+    ]
+    recent_14_day_status = [
+        {
+            **row,
+            "map_href": f"/admin/addresses/map?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in sorted(
+            [row for row in workday_status["day_status"] if -14 <= row["day_offset"] < 0],
+            key=lambda row: row["date"],
+            reverse=True,
+        )
     ]
     return request.app.state.templates.TemplateResponse(
         "admin_address_map.html",
@@ -750,6 +788,10 @@ def address_map(
             "flashes": consume_flashes(request),
             "status_filters": STATUS_FILTERS,
             "availability_dates": availability_dates,
+            "selected_date": selected_date,
+            "today_day_status": today_day_status,
+            "upcoming_day_status": upcoming_day_status,
+            "recent_14_day_status": recent_14_day_status,
         },
     )
 
