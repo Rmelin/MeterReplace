@@ -1,11 +1,15 @@
+const cssVar = (name, fallback) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim() ||
+  fallback
+
 const STATUS_COLORS = {
-  planned: '#f59e0b',
-  informed: '#38bdf8',
-  completed: '#22c55e',
-  closed: '#16a34a',
-  not_home: '#ef4444',
-  needs_reschedule: '#f97316',
-  unplanned: '#64748b',
+  planned: cssVar('--status-planned', '#2563eb'),
+  informed: cssVar('--status-informed', '#38bdf8'),
+  completed: cssVar('--status-completed', '#22c55e'),
+  closed: cssVar('--status-closed', '#16a34a'),
+  not_home: cssVar('--status-not-home', '#ef4444'),
+  needs_reschedule: cssVar('--status-needs-reschedule', '#f97316'),
+  unplanned: cssVar('--status-unplanned', '#64748b'),
 }
 
 const MAP_DEFAULT = [56.2639, 9.5018]

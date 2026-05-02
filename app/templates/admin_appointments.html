@@ -201,7 +201,7 @@
         {% for appointment in todo %}
             {% set address = addresses.get(appointment.id) %}
             {% set contractor = contractors.get(appointment.id) %}
-            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -210,13 +210,19 @@
                     {% endif %}
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
+                {% if appointment.notes %}
+                    <div class="task-note-banner">
+                        <span class="task-note-label">NOTE</span>
+                        <div class="task-note-text">{{ appointment.notes }}</div>
+                    </div>
+                {% endif %}
                 <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
                     {% if selected_date %}
                         <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                     {% endif %}
                     <label>
                         Note
-                        <textarea name="note" rows="2" placeholder="Fx Kom omkring frokost">{{ appointment.notes or '' }}</textarea>
+                        <textarea name="note" rows="2" placeholder="Lav note til VVS">{{ appointment.notes or '' }}</textarea>
                     </label>
                     <button type="submit" class="ghost-button">Gem note</button>
                 </form>
@@ -226,40 +232,46 @@
                 <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
                 {% if address %}
-                    <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
-                        {% if selected_date %}
-                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
-                        {% endif %}
-                        <fieldset class="option-field" required>
-                            <legend>Fototype</legend>
-                            <div class="option-buttons">
-                                <label class="option-button">
-                                    <input type="radio" name="photo_type" value="both" required style="display: none;" />
-                                    <span>Begge målere i ét foto</span>
-                                </label>
-                                <label class="option-button">
-                                    <input type="radio" name="photo_type" value="new" required style="display: none;" />
-                                    <span>Ny måler</span>
-                                </label>
-                                <label class="option-button">
-                                    <input type="radio" name="photo_type" value="old" required style="display: none;" />
-                                    <span>Gammel måler</span>
-                                </label>
-                            </div>
-                        </fieldset>
-                        <label>Foto<input type="file" name="file" accept="image/*" required /></label>
-                        <button type="submit" class="primary-button">Upload</button>
-                    </form>
-                    {% if photos.get(appointment.id) %}
-                        <div class="photo-grid">
-                            {% for photo in photos.get(appointment.id) %}
-                                <div class="photo-item">
-                                    <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
-                                    <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                    {% set photo_list = photos.get(appointment.id, []) %}
+                    {% set photo_types = photo_list | map(attribute='photo_type') | list %}
+                    {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
+                    <div class="vvs-task-photo-panel">
+                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
+                        <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
+                            {% if selected_date %}
+                                <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                            {% endif %}
+                            <fieldset class="option-field vvs-photo-type-fieldset" required>
+                                <legend>Fototype</legend>
+                                <div class="option-buttons">
+                                    <label class="option-button">
+                                        <input type="radio" name="photo_type" value="both" required style="display: none;" />
+                                        <span>Begge</span>
+                                    </label>
+                                    <label class="option-button">
+                                        <input type="radio" name="photo_type" value="new" required style="display: none;" />
+                                        <span>Ny</span>
+                                    </label>
+                                    <label class="option-button">
+                                        <input type="radio" name="photo_type" value="old" required style="display: none;" />
+                                        <span>Gammel</span>
+                                    </label>
                                 </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
+                            </fieldset>
+                            <label>Foto<input type="file" name="file" accept="image/*" required /></label>
+                            <button type="submit" class="primary-button">Upload foto</button>
+                        </form>
+                        {% if photo_list %}
+                            <div class="photo-grid">
+                                {% for photo in photo_list %}
+                                    <div class="photo-item">
+                                        <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
+                                        <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
                 {% endif %}
             </div>
         {% endfor %}
@@ -277,7 +289,7 @@
         {% for appointment in needs_reschedule %}
             {% set address = addresses.get(appointment.id) %}
             {% set contractor = contractors.get(appointment.id) %}
-            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -287,13 +299,19 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
+                {% if appointment.notes %}
+                    <div class="task-note-banner">
+                        <span class="task-note-label">NOTE</span>
+                        <div class="task-note-text">{{ appointment.notes }}</div>
+                    </div>
+                {% endif %}
                 <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
                     {% if selected_date %}
                         <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                     {% endif %}
                     <label>
                         Note
-                        <textarea name="note" rows="2" placeholder="Fx Kom omkring frokost">{{ appointment.notes or '' }}</textarea>
+                        <textarea name="note" rows="2" placeholder="Lav note til VVS">{{ appointment.notes or '' }}</textarea>
                     </label>
                     <button type="submit" class="ghost-button">Gem note</button>
                 </form>
@@ -312,7 +330,7 @@
         {% for appointment in done %}
             {% set address = addresses.get(appointment.id) %}
             {% set contractor = contractors.get(appointment.id) %}
-            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}">
+            <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
                         <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
@@ -322,13 +340,19 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
+                {% if appointment.notes %}
+                    <div class="task-note-banner">
+                        <span class="task-note-label">NOTE</span>
+                        <div class="task-note-text">{{ appointment.notes }}</div>
+                    </div>
+                {% endif %}
                 <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
                     {% if selected_date %}
                         <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                     {% endif %}
                     <label>
                         Note
-                        <textarea name="note" rows="2" placeholder="Fx Kom omkring frokost">{{ appointment.notes or '' }}</textarea>
+                        <textarea name="note" rows="2" placeholder="Lav note til VVS">{{ appointment.notes or '' }}</textarea>
                     </label>
                     <button type="submit" class="ghost-button">Gem note</button>
                 </form>
@@ -338,40 +362,46 @@
                 <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
                 {% if address %}
-                    <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
-                        {% if selected_date %}
-                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
-                        {% endif %}
-                        <fieldset class="option-field" required>
-                            <legend>Fototype</legend>
-                            <div class="option-buttons">
-                                <label class="option-button">
-                                    <input type="radio" name="photo_type" value="both" required style="display: none;" />
-                                    <span>Begge målere i ét foto</span>
-                                </label>
-                                <label class="option-button">
-                                    <input type="radio" name="photo_type" value="new" required style="display: none;" />
-                                    <span>Ny måler</span>
-                                </label>
-                                <label class="option-button">
-                                    <input type="radio" name="photo_type" value="old" required style="display: none;" />
-                                    <span>Gammel måler</span>
-                                </label>
-                            </div>
-                        </fieldset>
-                        <label>Foto<input type="file" name="file" accept="image/*" required /></label>
-                        <button type="submit" class="primary-button">Upload</button>
-                    </form>
-                    {% if photos.get(appointment.id) %}
-                        <div class="photo-grid">
-                            {% for photo in photos.get(appointment.id) %}
-                                <div class="photo-item">
-                                    <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
-                                    <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                    {% set photo_list = photos.get(appointment.id, []) %}
+                    {% set photo_types = photo_list | map(attribute='photo_type') | list %}
+                    {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
+                    <div class="vvs-task-photo-panel">
+                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
+                        <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
+                            {% if selected_date %}
+                                <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                            {% endif %}
+                            <fieldset class="option-field vvs-photo-type-fieldset" required>
+                                <legend>Fototype</legend>
+                                <div class="option-buttons">
+                                    <label class="option-button">
+                                        <input type="radio" name="photo_type" value="both" required style="display: none;" />
+                                        <span>Begge</span>
+                                    </label>
+                                    <label class="option-button">
+                                        <input type="radio" name="photo_type" value="new" required style="display: none;" />
+                                        <span>Ny</span>
+                                    </label>
+                                    <label class="option-button">
+                                        <input type="radio" name="photo_type" value="old" required style="display: none;" />
+                                        <span>Gammel</span>
+                                    </label>
                                 </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
+                            </fieldset>
+                            <label>Foto<input type="file" name="file" accept="image/*" required /></label>
+                            <button type="submit" class="primary-button">Upload foto</button>
+                        </form>
+                        {% if photo_list %}
+                            <div class="photo-grid">
+                                {% for photo in photo_list %}
+                                    <div class="photo-item">
+                                        <img src="/upload/{{ photo.file_path }}" alt="{{ photo_labels.get(photo.photo_type, photo.photo_type) }}" class="photo-thumb" />
+                                        <span>{{ photo_labels.get(photo.photo_type, photo.photo_type) }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
                 {% endif %}
             </div>
         {% endfor %}

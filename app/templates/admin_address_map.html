@@ -27,10 +27,56 @@
                 <select id="map-date">
                     <option value="">Alle</option>
                     {% for day in availability_dates %}
-                        <option value="{{ day.strftime('%Y-%m-%d') }}">{{ day.strftime('%d/%m/%Y') }}</option>
+                        <option value="{{ day.strftime('%Y-%m-%d') }}" {% if selected_date and day == selected_date %}selected{% endif %}>{{ day.strftime('%d/%m/%Y') }}</option>
                     {% endfor %}
                 </select>
             </label>
+            {% if today_day_status or upcoming_day_status or recent_14_day_status %}
+                <div class="map-date-shortcuts" aria-label="Hurtigvalg af arbejdsdato">
+                    {% if today_day_status %}
+                        <div class="map-date-shortcut-group">
+                            <span class="map-date-shortcut-label">I dag</span>
+                            {% for row in today_day_status %}
+                                <a
+                                    class="map-date-shortcut{% if row.is_selected %} is-selected{% endif %}"
+                                    href="{{ row.map_href }}"
+                                    data-map-date-card
+                                    data-date-value="{{ row.date.isoformat() }}"
+                                    title="{{ row.relative_label }}"
+                                >{{ row.date.strftime('%d/%m') }}</a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if upcoming_day_status %}
+                        <div class="map-date-shortcut-group">
+                            <span class="map-date-shortcut-label">Kommende</span>
+                            {% for row in upcoming_day_status %}
+                                <a
+                                    class="map-date-shortcut{% if row.is_selected %} is-selected{% endif %}"
+                                    href="{{ row.map_href }}"
+                                    data-map-date-card
+                                    data-date-value="{{ row.date.isoformat() }}"
+                                    title="{{ row.relative_label }}"
+                                >{{ row.date.strftime('%d/%m') }}</a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if recent_14_day_status %}
+                        <div class="map-date-shortcut-group">
+                            <span class="map-date-shortcut-label">Seneste 14 dage</span>
+                            {% for row in recent_14_day_status %}
+                                <a
+                                    class="map-date-shortcut{% if row.is_selected %} is-selected{% endif %}"
+                                    href="{{ row.map_href }}"
+                                    data-map-date-card
+                                    data-date-value="{{ row.date.isoformat() }}"
+                                    title="{{ row.relative_label }}"
+                                >{{ row.date.strftime('%d/%m') }}</a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
             <div class="map-filter-buttons option-buttons" id="map-status-buttons" aria-label="Status filter">
                 <button type="button" class="option-button map-filter-button is-active" data-status="all">
                     <span class="map-filter-swatch"></span>

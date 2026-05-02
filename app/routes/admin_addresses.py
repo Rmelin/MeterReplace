@@ -11,7 +11,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,6 +21,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.workday_status import build_workday_status
 
 PHOTO_LABELS = {
     "both": "Begge målere",
@@ -732,15 +733,52 @@ def update_address_fields(
 @router.get("/map")
 def address_map(
     request: Request,
+    date_query: str | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
 ):
+    selected_date = None
+    if date_query:
+        try:
+            selected_date = datetime.strptime(date_query, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = None
+
     availability_dates = [
         row[0]
         for row in db.query(models.VvsAvailability.date)
         .distinct()
         .order_by(models.VvsAvailability.date.desc())
         .all()
+    ]
+    workday_status = build_workday_status(db)
+    today_day_status = [
+        {
+            **row,
+            "map_href": f"/admin/addresses/map?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["today_day_status"]
+    ]
+    upcoming_day_status = [
+        {
+            **row,
+            "map_href": f"/admin/addresses/map?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in workday_status["upcoming_day_status"]
+    ]
+    recent_14_day_status = [
+        {
+            **row,
+            "map_href": f"/admin/addresses/map?date_query={row['date'].isoformat()}",
+            "is_selected": bool(selected_date and row["date"] == selected_date),
+        }
+        for row in sorted(
+            [row for row in workday_status["day_status"] if -14 <= row["day_offset"] < 0],
+            key=lambda row: row["date"],
+            reverse=True,
+        )
     ]
     return request.app.state.templates.TemplateResponse(
         "admin_address_map.html",
@@ -750,6 +788,10 @@ def address_map(
             "flashes": consume_flashes(request),
             "status_filters": STATUS_FILTERS,
             "availability_dates": availability_dates,
+            "selected_date": selected_date,
+            "today_day_status": today_day_status,
+            "upcoming_day_status": upcoming_day_status,
+            "recent_14_day_status": recent_14_day_status,
         },
     )
 
@@ -757,7 +799,7 @@ def address_map(
 @router.get("/map-data")
 def address_map_data(
     q: str | None = None,
-    status: str | None = None,
+    status: list[str] | None = Query(None),
     date: str | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
@@ -836,8 +878,11 @@ def address_map_data(
             appointment_map[address_id] = appointment
 
     allowed_filters = {item["value"] for item in STATUS_FILTERS}
-    selected_status = status if status in allowed_filters else "all"
-    if selected_status != "all":
+    selected_statuses: list[str] = []
+    for value in status or []:
+        if value in allowed_filters and value != "all" and value not in selected_statuses:
+            selected_statuses.append(value)
+    if selected_statuses:
         filter_map = {
             "planned": {models.AppointmentStatus.SCHEDULED},
             "informed": {models.AppointmentStatus.INFORMED},
@@ -846,41 +891,51 @@ def address_map_data(
             "not_home": {models.AppointmentStatus.NOT_HOME},
             "needs_reschedule": {models.AppointmentStatus.NEEDS_RESCHEDULE},
         }
-        allowed_statuses = filter_map.get(selected_status, set())
-        if selected_status == "unplanned":
-            addresses = [
-                address
-                for address in addresses
-                if status_map.get(address.id)
-                in {None, models.AppointmentStatus.NOT_SCHEDULED}
-            ]
-        elif selected_status == "blocked":
-            addresses = [address for address in addresses if address.blocked_reason]
-        elif selected_status == "buffer":
-            addresses = [address for address in addresses if address.buffer_flag]
-        elif selected_status == "unplanned_buffer":
-            addresses = [
-                address
-                for address in addresses
-                if address.buffer_flag
-                and status_map.get(address.id)
-                in {None, models.AppointmentStatus.NOT_SCHEDULED}
-            ]
-        elif selected_status == "not_home_history":
-            not_home_rows = (
-                db.query(models.Appointment.address_id)
-                .filter(models.Appointment.status == models.AppointmentStatus.NOT_HOME)
-                .distinct()
-                .all()
-            )
-            not_home_ids = {row[0] for row in not_home_rows}
-            addresses = [address for address in addresses if address.id in not_home_ids]
-        else:
-            addresses = [
-                address
-                for address in addresses
-                if status_map.get(address.id) in allowed_statuses
-            ]
+        not_home_ids: set[int] | None = None
+        matching_ids: set[int] = set()
+        for selected_status in selected_statuses:
+            if selected_status == "unplanned":
+                matching_ids.update(
+                    address.id
+                    for address in addresses
+                    if status_map.get(address.id)
+                    in {None, models.AppointmentStatus.NOT_SCHEDULED}
+                )
+            elif selected_status == "blocked":
+                matching_ids.update(
+                    address.id for address in addresses if address.blocked_reason
+                )
+            elif selected_status == "buffer":
+                matching_ids.update(
+                    address.id for address in addresses if address.buffer_flag
+                )
+            elif selected_status == "unplanned_buffer":
+                matching_ids.update(
+                    address.id
+                    for address in addresses
+                    if address.buffer_flag
+                    and status_map.get(address.id)
+                    in {None, models.AppointmentStatus.NOT_SCHEDULED}
+                )
+            elif selected_status == "not_home_history":
+                if not_home_ids is None:
+                    not_home_rows = (
+                        db.query(models.Appointment.address_id)
+                        .filter(models.Appointment.status == models.AppointmentStatus.NOT_HOME)
+                        .distinct()
+                        .all()
+                    )
+                    not_home_ids = {row[0] for row in not_home_rows}
+                matching_ids.update(not_home_ids)
+            else:
+                allowed_statuses = filter_map.get(selected_status, set())
+                matching_ids.update(
+                    address.id
+                    for address in addresses
+                    if status_map.get(address.id) in allowed_statuses
+                )
+
+        addresses = [address for address in addresses if address.id in matching_ids]
 
     payload = []
     for address in addresses:

@@ -14,7 +14,7 @@ const STATUS_LABELS = {
 }
 
 const STATUS_COLORS = {
-  planned: cssVar('--status-planned', '#f59e0b'),
+  planned: cssVar('--status-planned', '#2563eb'),
   notscheduled: cssVar('--status-unplanned', '#64748b'),
   informed: cssVar('--status-informed', '#38bdf8'),
   completed: cssVar('--status-completed', '#22c55e'),
@@ -47,6 +47,7 @@ const selectedExport = document.getElementById('selected-export')
 const sidebarToggle = document.getElementById('map-sidebar-toggle')
 const mapLayout = document.querySelector('.map-layout')
 const mapSidebar = document.querySelector('.map-sidebar')
+const dayStatusCards = Array.from(document.querySelectorAll('[data-map-date-card]'))
 
 const map = L.map('address-map').setView(MAP_DEFAULT, MAP_ZOOM)
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -59,7 +60,7 @@ let currentEditId = null
 let addresses = []
 let editLabel = ''
 let selectedIds = []
-let activeStatus = 'all'
+let activeStatuses = []
 let activeFilter = 'status'
 const selectedStorageKey = 'address_map_selected_ids'
 const sidebarStorageKey = 'address_map_hide_sidebar'
@@ -147,6 +148,41 @@ const getVisibleAddresses = () => {
     return addresses.filter((row) => selectedIds.includes(row.id))
   }
   return addresses
+}
+
+const updateFilterButtons = () => {
+  statusButtons.forEach((button) => {
+    const status = button.dataset.status || ''
+    const filter = button.dataset.filter
+    let isActive = false
+
+    if (filter === 'selected') {
+      isActive = activeFilter === 'selected'
+    } else if (status === 'all') {
+      isActive = activeFilter === 'status' && activeStatuses.length === 0
+    } else {
+      isActive = activeFilter === 'status' && activeStatuses.includes(status)
+    }
+
+    button.classList.toggle('is-active', isActive)
+  })
+}
+
+const updateDayStatusCards = (selectedDate) => {
+  dayStatusCards.forEach((card) => {
+    const isActive = Boolean(selectedDate) && card.dataset.dateValue === selectedDate
+    card.classList.toggle('is-selected', isActive)
+  })
+}
+
+const syncDateQueryInUrl = (selectedDate) => {
+  const nextUrl = new URL(window.location.href)
+  if (selectedDate) {
+    nextUrl.searchParams.set('date_query', selectedDate)
+  } else {
+    nextUrl.searchParams.delete('date_query')
+  }
+  window.history.replaceState({}, '', nextUrl)
 }
 
 const updateMarkers = () => {
@@ -324,8 +360,8 @@ const loadMapData = async () => {
   if (searchInput.value.trim()) {
     params.set('q', searchInput.value.trim())
   }
-  if (activeFilter !== 'selected' && activeStatus !== 'all') {
-    params.set('status', activeStatus)
+  if (activeFilter !== 'selected') {
+    activeStatuses.forEach((status) => params.append('status', status))
   }
   if (dateInput && dateInput.value) {
     params.set('date', dateInput.value)
@@ -411,7 +447,12 @@ const triggerSearch = () => {
 
 searchInput.addEventListener('input', triggerSearch)
 if (dateInput) {
-  dateInput.addEventListener('change', loadMapData)
+  dateInput.addEventListener('change', () => {
+    const selectedDate = dateInput.value || ''
+    syncDateQueryInUrl(selectedDate)
+    updateDayStatusCards(selectedDate)
+    loadMapData()
+  })
 }
 statusButtons.forEach((button) => {
   button.addEventListener('click', () => {
@@ -419,12 +460,21 @@ statusButtons.forEach((button) => {
     const filter = button.dataset.filter
     if (filter === 'selected') {
       activeFilter = 'selected'
-    } else {
-      activeFilter = 'status'
-      activeStatus = status || 'all'
+      updateFilterButtons()
+      loadMapData()
+      return
     }
-    statusButtons.forEach((node) => node.classList.remove('is-active'))
-    button.classList.add('is-active')
+
+    activeFilter = 'status'
+    if (!status || status === 'all') {
+      activeStatuses = []
+    } else {
+      activeStatuses = activeStatuses.includes(status)
+        ? activeStatuses.filter((value) => value !== status)
+        : [...activeStatuses, status]
+    }
+
+    updateFilterButtons()
     loadMapData()
   })
 })
@@ -476,6 +526,8 @@ const loadMapCenter = async () => {
 }
 
 applyFilterSwatches()
+updateFilterButtons()
+updateDayStatusCards(dateInput?.value || '')
 updateEditHint()
 loadSelectedIds()
 loadSidebarState()
