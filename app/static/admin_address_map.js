@@ -14,7 +14,7 @@ const STATUS_LABELS = {
 }
 
 const STATUS_COLORS = {
-  planned: cssVar('--status-planned', '#f59e0b'),
+  planned: cssVar('--status-planned', '#2563eb'),
   notscheduled: cssVar('--status-unplanned', '#64748b'),
   informed: cssVar('--status-informed', '#38bdf8'),
   completed: cssVar('--status-completed', '#22c55e'),
