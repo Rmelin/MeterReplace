@@ -940,9 +940,17 @@ def address_map_data(
     payload = []
     for address in addresses:
         status_value = status_map.get(address.id)
+        appointment = appointment_map.get(address.id)
         status_label, status_key = status_label_and_key(
-            appointment_map.get(address.id), current_year, address.register_closed
+            appointment, current_year, address.register_closed
         )
+        appointment_href = None
+        if appointment and appointment.status != models.AppointmentStatus.NOT_SCHEDULED:
+            appointment_date = appointment.starts_at.date().isoformat()
+            appointment_href = (
+                f"/admin/appointments?date_query={appointment_date}"
+                f"#appointment-{appointment.id}"
+            )
         payload.append(
             {
                 "id": address.id,
@@ -957,6 +965,7 @@ def address_map_data(
                 "status": status_key,
                 "status_label": status_label,
                 "status_value": status_value.value.lower() if status_value else "unplanned",
+                "appointment_href": appointment_href,
             }
         )
     return JSONResponse({"addresses": payload})

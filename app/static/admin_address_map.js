@@ -195,14 +195,18 @@ const updateMarkers = () => {
         row.status_label ||
         STATUS_LABELS[normalizeStatus(row.status)] ||
         row.status
+      const appointmentAction = row.appointment_href
+        ? `<a class="ghost-button map-popup-button" href="${row.appointment_href}">Åben opgave</a>`
+        : ''
       const latlng = [row.latitude, row.longitude]
       const popupContent = `<strong>${row.street} ${row.house_no}</strong><br>${row.zip} ${row.city}<br>${
         statusLabel
       }<br><div class="map-popup-actions">
-          <button type="button" class="ghost-button map-popup-button" data-action="edit-coords" data-address-id="${
+          <button type="button" class="map-popup-inline-action" data-action="edit-coords" data-address-id="${
             row.id
           }">Rediger koordinat</button>
           <a class="ghost-button map-popup-button" href="/admin/addresses/${row.id}/edit">Åben adresse</a>
+          ${appointmentAction}
           <button type="button" class="ghost-button map-popup-button" data-action="select-status" data-address-id="${
             row.id
           }">${isSelected ? 'Fjern markering' : 'Markér'}</button>
