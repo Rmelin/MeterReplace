@@ -104,6 +104,19 @@
                         {% for item in morning_overview %}
                             <li>
                                 <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                                {% if item.has_note %}
+                                    <span class="appointment-outline-note" aria-label="Note">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_meter_issue %}
+                                    <span class="appointment-outline-issue" aria-label="Fejl ved måler" title="Fejl ved måler">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_done %}
+                                    <span class="appointment-outline-done" aria-label="Done">✓</span>
+                                {% endif %}
                             </li>
                         {% endfor %}
                     </ul>
@@ -116,6 +129,19 @@
                         {% for item in afternoon_overview %}
                             <li>
                                 <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                                {% if item.has_note %}
+                                    <span class="appointment-outline-note" aria-label="Note">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_meter_issue %}
+                                    <span class="appointment-outline-issue" aria-label="Fejl ved måler" title="Fejl ved måler">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_done %}
+                                    <span class="appointment-outline-done" aria-label="Done">✓</span>
+                                {% endif %}
                             </li>
                         {% endfor %}
                     </ul>
@@ -128,6 +154,19 @@
                         {% for item in buffer_overview %}
                             <li>
                                 <a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.street }} {{ item.house_no }}</a>
+                                {% if item.has_note %}
+                                    <span class="appointment-outline-note" aria-label="Note">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_meter_issue %}
+                                    <span class="appointment-outline-issue" aria-label="Fejl ved måler" title="Fejl ved måler">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+                                    </span>
+                                {% endif %}
+                                {% if item.is_done %}
+                                    <span class="appointment-outline-done" aria-label="Done">✓</span>
+                                {% endif %}
                                 {% if item.buffer_note %}
                                     <span class="hint">({{ item.buffer_note }})</span>
                                 {% endif %}
