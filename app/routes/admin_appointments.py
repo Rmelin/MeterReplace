@@ -33,6 +33,8 @@ PHOTO_FILENAME = {
     "old": "gammel",
 }
 
+BLOCKED_REASON = "Fejl ved måler"
+
 STATUS_LABELS = {
     models.AppointmentStatus.NOT_SCHEDULED: "Ikke planlagt",
     models.AppointmentStatus.SCHEDULED: "Planlagt",
@@ -128,6 +130,24 @@ def parse_time(raw: str) -> time:
 
 def duration_minutes_between(starts_at: datetime, ends_at: datetime) -> int:
     return int((ends_at - starts_at).total_seconds() // 60)
+
+
+def is_done_for_day(status: models.AppointmentStatus) -> bool:
+    return status in {
+        models.AppointmentStatus.COMPLETED,
+        models.AppointmentStatus.CLOSED,
+        models.AppointmentStatus.NOT_HOME,
+    }
+
+
+def is_meter_issue_row(
+    appointment: models.Appointment, address: models.Address | None
+) -> bool:
+    return bool(
+        address
+        and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE
+        and address.blocked_reason == BLOCKED_REASON
+    )
 
 
 def availability_for_user(
@@ -255,13 +275,20 @@ def appointment_overview(
     afternoon_overview = []
     buffer_overview = []
     for appointment, address, _contractor in rows:
-        if not address or appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
+        if not address:
+            continue
+        if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
+            appointment, address
+        ):
             continue
         entry = {
             "appointment_id": appointment.id,
             "street": address.street,
             "house_no": address.house_no,
             "buffer_note": address.buffer_note,
+            "is_done": is_done_for_day(appointment.status),
+            "is_meter_issue": is_meter_issue_row(appointment, address),
+            "has_note": bool((appointment.notes or "").strip()),
         }
         if address.buffer_flag:
             buffer_overview.append(entry)
