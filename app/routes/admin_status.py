@@ -154,10 +154,11 @@ def status_dashboard(
             "style": "closed",
         },
     ]
-    stock_coverable_missing = min(stock, status_line_missing)
+    stock_coverable_missing = min(stock, remaining)
+    meters_missing_after_stock = max(remaining - stock, 0)
     stock_coverage_pct = (
-        round((stock_coverable_missing / status_line_missing) * 100)
-        if status_line_missing
+        round((stock_coverable_missing / remaining) * 100)
+        if remaining
         else 100
     )
     message_count = (
@@ -227,9 +228,16 @@ def status_dashboard(
             "status_line_missing": status_line_missing,
             "stock": stock,
             "stock_coverable_missing": stock_coverable_missing,
+            "meters_missing_after_stock": meters_missing_after_stock,
             "stock_coverage_pct": stock_coverage_pct,
             "message_count": message_count,
             "available_workday_slots": workday_status["available_workday_slots"],
+            "open_slots_on_active_planned_workdays": workday_status[
+                "open_slots_on_active_planned_workdays"
+            ],
+            "reschedule_on_active_planned_workdays": workday_status[
+                "reschedule_on_active_planned_workdays"
+            ],
             "active_street_progress": active_street_progress,
             "completed_street_progress": completed_street_progress,
             "today_day_status": workday_status["today_day_status"],

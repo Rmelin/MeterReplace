@@ -176,6 +176,19 @@ def build_workday_status(db: Session) -> dict[str, object]:
         for row in day_status
         if row["day_offset"] >= 0
     )
+    active_planned_workday_status = [
+        row
+        for row in day_status
+        if row["day_offset"] >= 0
+        and row["planned"] + row["informed"] + row["needs_reschedule"] > 0
+    ]
+    open_slots_on_active_planned_workdays = sum(
+        row["display_free_slots"] if row["day_offset"] > 0 else row["free_slots"]
+        for row in active_planned_workday_status
+    )
+    reschedule_on_active_planned_workdays = sum(
+        row["needs_reschedule"] for row in active_planned_workday_status
+    )
 
     return {
         "day_status": day_status,
@@ -184,4 +197,6 @@ def build_workday_status(db: Session) -> dict[str, object]:
         "recent_day_status": recent_day_status,
         "older_day_status": older_day_status,
         "available_workday_slots": available_workday_slots,
+        "open_slots_on_active_planned_workdays": open_slots_on_active_planned_workdays,
+        "reschedule_on_active_planned_workdays": reschedule_on_active_planned_workdays,
     }

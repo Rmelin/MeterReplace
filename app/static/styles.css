@@ -252,6 +252,13 @@ a:hover {
     margin: 0.5rem 0 0;
 }
 
+.metric-note {
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
 .metric-icon {
     padding: 0.75rem;
     border-radius: 12px;
@@ -308,6 +315,11 @@ a:hover {
     --status-rgb: var(--status-needs-reschedule-rgb);
 }
 
+.status-card-reschedule-slots {
+    --status-color: var(--status-needs-reschedule);
+    --status-rgb: var(--status-needs-reschedule-rgb);
+}
+
 .status-card-unplanned {
     --status-color: var(--status-unplanned);
     --status-rgb: var(--status-unplanned-rgb);
@@ -321,6 +333,11 @@ a:hover {
 .status-card-stock {
     --status-color: var(--status-stock);
     --status-rgb: var(--status-stock-rgb);
+}
+
+.status-card-stock-missing {
+    --status-color: var(--status-not-home);
+    --status-rgb: var(--status-not-home-rgb);
 }
 
 .status-card-messages {
