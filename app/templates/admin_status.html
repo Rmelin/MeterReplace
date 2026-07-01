@@ -231,6 +231,18 @@
             </div>
         </div>
     </a>
+    <a class="card card-link status-card status-card-workdays-estimate" href="/admin/planning">
+        <div class="metric-container">
+            <div>
+                <h2>Arbejdsdage med lager</h2>
+                <p class="metric">{{ estimated_workdays_with_stock }}</p>
+                <p class="metric-note">Arbejdsdage i alt: {{ estimated_total_workdays }}</p>
+            </div>
+            <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M3 10h18"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path><path d="M8 18h.01"></path><path d="M12 18h.01"></path></svg>
+            </div>
+        </div>
+    </a>
     <a class="card card-link status-card status-card-stock" href="/admin/inventory">
         <div class="metric-container">
             <div>

@@ -320,6 +320,11 @@ a:hover {
     --status-rgb: var(--status-needs-reschedule-rgb);
 }
 
+.status-card-workdays-estimate {
+    --status-color: var(--status-planned);
+    --status-rgb: var(--status-planned-rgb);
+}
+
 .status-card-unplanned {
     --status-color: var(--status-unplanned);
     --status-rgb: var(--status-unplanned-rgb);

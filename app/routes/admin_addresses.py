@@ -8,7 +8,7 @@ import time
 import unicodedata
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, time as datetime_time, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
@@ -176,6 +176,74 @@ def address_sort_key(
 
 def parse_datetime_local(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%dT%H:%M")
+
+
+def parse_date(value: str):
+    return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def parse_time_value(value: str):
+    return datetime.strptime(value, "%H:%M").time()
+
+
+SLOT_OCCUPYING_STATUSES = {
+    models.AppointmentStatus.SCHEDULED,
+    models.AppointmentStatus.INFORMED,
+    models.AppointmentStatus.COMPLETED,
+    models.AppointmentStatus.CLOSED,
+    models.AppointmentStatus.NOT_HOME,
+}
+
+
+def availability_for_user(db: Session, user_id: int, plan_date):
+    return (
+        db.query(models.VvsAvailability)
+        .filter(
+            models.VvsAvailability.user_id == user_id,
+            models.VvsAvailability.date == plan_date,
+        )
+        .first()
+    )
+
+
+def has_appointment_conflict(
+    db: Session,
+    appointment_id: int | None,
+    contractor_id: int,
+    starts_at: datetime,
+    ends_at: datetime,
+) -> bool:
+    query = db.query(models.Appointment).filter(
+        models.Appointment.contractor_id == contractor_id,
+        models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+        models.Appointment.starts_at < ends_at,
+        models.Appointment.ends_at > starts_at,
+    )
+    if appointment_id:
+        query = query.filter(models.Appointment.id != appointment_id)
+    return query.first() is not None
+
+
+def ensure_availability_for_upload(
+    db: Session, contractor_id: int, starts_at: datetime, ends_at: datetime
+) -> tuple[models.VvsAvailability, bool]:
+    plan_date = starts_at.date()
+    availability = availability_for_user(db, contractor_id, plan_date)
+    if availability:
+        return availability, False
+
+    start_time = min(datetime_time(8, 0), starts_at.time())
+    end_time = max(datetime_time(16, 0), ends_at.time())
+    availability = models.VvsAvailability(
+        user_id=contractor_id,
+        date=plan_date,
+        start_time=start_time,
+        end_time=end_time,
+        note="Oprettet fra adresse-upload",
+    )
+    db.add(availability)
+    db.flush()
+    return availability, True
 
 
 def photo_complete(photos: list[models.AppointmentPhoto]) -> bool:
@@ -598,6 +666,18 @@ def edit_address_form(
         .order_by(models.AppointmentPhoto.created_at.desc())
         .all()
     )
+    latest_appointment_duration_minutes = 30
+    if latest_appointment:
+        latest_appointment_duration_minutes = int(
+            (latest_appointment.ends_at - latest_appointment.starts_at).total_seconds()
+            // 60
+        )
+    vvs_users = (
+        db.query(models.User)
+        .filter(models.User.role == models.UserRole.VVS)
+        .order_by(models.User.username)
+        .all()
+    )
     photo_types = {photo.photo_type for photo in photos}
     photos_complete = "both" in photo_types or ("new" in photo_types and "old" in photo_types)
     missing_replacement_date = address.register_closed
@@ -629,10 +709,13 @@ def edit_address_form(
             "letter_available": bool(letter_appointment),
             "photos": photos,
             "photo_labels": PHOTO_LABELS,
+            "vvs_users": vvs_users,
             "resident_response": resident_response,
             "status_label": status_label,
             "status_key": status_key,
             "has_appointment": bool(latest_appointment),
+            "latest_appointment": latest_appointment,
+            "latest_appointment_duration_minutes": latest_appointment_duration_minutes,
             "photos_complete": photos_complete,
             "show_photo_upload": bool(edit_photos) or not photos_complete,
             "missing_replacement_date": missing_replacement_date,
@@ -1073,6 +1156,10 @@ def upload_address_photo(
     request: Request,
     address_id: int,
     photo_type: str = Form(""),
+    contractor_id: int = Form(0),
+    date_raw: str = Form(""),
+    start_raw: str = Form(""),
+    duration_minutes: int = Form(30),
     old_meter_no: str = Form(""),
     new_meter_no: str = Form(""),
     replacement_datetime: str | None = Form(None),
@@ -1104,27 +1191,8 @@ def upload_address_photo(
         .order_by(models.Appointment.starts_at.desc())
         .first()
     )
-
-    if not appointment:
-        replacement_value = (replacement_datetime or "").strip()
-        if not replacement_value:
-            flash(request, "Dato for udskiftning er påkrævet", "error")
-            return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
-        try:
-            starts_at = parse_datetime_local(replacement_value)
-        except ValueError:
-            flash(request, "Ugyldig dato for udskiftning", "error")
-            return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
-        appointment = models.Appointment(
-            address_id=address_id,
-            contractor_id=user.id,
-            starts_at=starts_at,
-            ends_at=starts_at + timedelta(hours=1),
-            status=models.AppointmentStatus.SCHEDULED,
-            letter_required=not address.buffer_flag,
-        )
-        db.add(appointment)
-        db.flush()
+    previous_status = appointment.status if appointment else None
+    created_appointment = appointment is None
 
     allowed_types = {"both", "new", "old"}
     if photo_type not in allowed_types:
@@ -1134,6 +1202,73 @@ def upload_address_photo(
     if not ensure_image(file):
         flash(request, "Kun billedfiler er tilladt", "error")
         return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    contractor = None
+    if contractor_id > 0:
+        contractor = db.query(models.User).filter(models.User.id == contractor_id).first()
+    if not contractor and appointment:
+        contractor = db.query(models.User).filter(models.User.id == appointment.contractor_id).first()
+    if not contractor or contractor.role != models.UserRole.VVS:
+        flash(request, "Vælg en gyldig VVS", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    try:
+        if date_raw and start_raw:
+            plan_date = parse_date(date_raw)
+            start_time = parse_time_value(start_raw)
+            starts_at = datetime.combine(plan_date, start_time)
+        else:
+            replacement_value = (replacement_datetime or "").strip()
+            if replacement_value:
+                starts_at = parse_datetime_local(replacement_value)
+            elif appointment:
+                starts_at = appointment.starts_at
+            else:
+                raise ValueError
+    except ValueError:
+        flash(request, "Dato eller tid for udskiftning er ugyldig", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    if duration_minutes <= 0:
+        duration_minutes = 30
+    ends_at = starts_at + timedelta(minutes=duration_minutes)
+    if ends_at.date() != starts_at.date():
+        flash(request, "Sluttid skal være samme dag som starttid", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    availability, created_availability = ensure_availability_for_upload(
+        db, contractor.id, starts_at, ends_at
+    )
+    if not created_availability and (
+        starts_at.time() < availability.start_time or ends_at.time() > availability.end_time
+    ):
+        flash(request, "Tidspunktet ligger udenfor VVS' arbejdsdag", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    appointment_id = appointment.id if appointment else None
+    if has_appointment_conflict(db, appointment_id, contractor.id, starts_at, ends_at):
+        flash(request, "VVS er allerede planlagt på dette tidspunkt", "error")
+        return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
+    if not appointment:
+        appointment = models.Appointment(
+            address_id=address_id,
+            contractor_id=contractor.id,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            status=models.AppointmentStatus.SCHEDULED,
+            letter_required=not address.buffer_flag,
+            changed_date=datetime.utcnow(),
+            changed_by_user_id=user.id,
+        )
+        db.add(appointment)
+        db.flush()
+    else:
+        appointment.contractor_id = contractor.id
+        appointment.starts_at = starts_at
+        appointment.ends_at = ends_at
+        appointment.changed_date = datetime.utcnow()
+        appointment.changed_by_user_id = user.id
 
     if force:
         db.query(models.AppointmentPhoto).filter(
@@ -1168,8 +1303,10 @@ def upload_address_photo(
     new_meter_value = new_meter_no.strip() or None
     if old_meter_value:
         appointment.old_meter_no = old_meter_value
+        address.old_meter_no = old_meter_value
     if new_meter_value:
         appointment.new_meter_no = new_meter_value
+        address.new_meter_no = new_meter_value
 
     file_path = save_photo(address, photo_type, file)
     photo = models.AppointmentPhoto(
@@ -1184,6 +1321,16 @@ def upload_address_photo(
 
     updated_photos = existing_photos + [photo]
     if photo_complete(updated_photos):
+        should_reserve_stock = created_appointment or previous_status == models.AppointmentStatus.NEEDS_RESCHEDULE
+        if should_reserve_stock:
+            db.add(
+                models.StockMovement(
+                    movement_type=models.InventoryMovementType.RESERVE,
+                    quantity=-1,
+                    created_by_user_id=user.id,
+                    note=f"Adresse-upload {address.street} {address.house_no}",
+                )
+            )
         appointment.status = models.AppointmentStatus.COMPLETED
         appointment.changed_date = datetime.utcnow()
         appointment.changed_by_user_id = user.id
