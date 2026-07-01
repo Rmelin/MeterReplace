@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import math
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -156,6 +157,13 @@ def status_dashboard(
     ]
     stock_coverable_missing = min(stock, remaining)
     meters_missing_after_stock = max(remaining - stock, 0)
+    meters_available_with_stock = min(remaining, stock)
+    estimated_workdays_with_stock = (
+        math.ceil(meters_available_with_stock / 16)
+        if meters_available_with_stock
+        else 0
+    )
+    estimated_total_workdays = math.ceil(remaining / 16) if remaining else 0
     stock_coverage_pct = (
         round((stock_coverable_missing / remaining) * 100)
         if remaining
@@ -229,6 +237,9 @@ def status_dashboard(
             "stock": stock,
             "stock_coverable_missing": stock_coverable_missing,
             "meters_missing_after_stock": meters_missing_after_stock,
+            "meters_available_with_stock": meters_available_with_stock,
+            "estimated_workdays_with_stock": estimated_workdays_with_stock,
+            "estimated_total_workdays": estimated_total_workdays,
             "stock_coverage_pct": stock_coverage_pct,
             "message_count": message_count,
             "available_workday_slots": workday_status["available_workday_slots"],

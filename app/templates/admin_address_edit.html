@@ -91,6 +91,28 @@
         {% if show_photo_upload %}
             <form method="post" action="/admin/addresses/{{ address.id }}/photos" enctype="multipart/form-data" class="form-grid card" style="background: rgba(var(--accent-rgb), 0.02); border-style: dashed;">
                 <div>
+                    <h3 style="margin-top: 0;">Dokumentér skift</h3>
+                    <p class="hint">Vælg VVS og dato. Hvis arbejdsdagen ikke findes, oprettes den automatisk.</p>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                    <label>
+                        VVS
+                        <select name="contractor_id" required>
+                            <option value="">Vælg VVS</option>
+                            {% for vvs_user in vvs_users %}
+                                <option value="{{ vvs_user.id }}" {% if latest_appointment and latest_appointment.contractor_id == vvs_user.id %}selected{% endif %}>{{ vvs_user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>Dato<input type="date" name="date_raw" value="{% if latest_appointment %}{{ latest_appointment.starts_at.date().isoformat() }}{% endif %}" required /></label>
+                    <label>Starttid<input type="time" name="start_raw" step="1800" value="{% if latest_appointment %}{{ latest_appointment.starts_at.strftime('%H:%M') }}{% endif %}" required /></label>
+                    <label>Varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ latest_appointment_duration_minutes }}" required /></label>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                    <label>Gammel måler nr<input type="text" name="old_meter_no" value="{% if latest_appointment and latest_appointment.old_meter_no %}{{ latest_appointment.old_meter_no }}{% else %}{{ address.old_meter_no or '' }}{% endif %}" /></label>
+                    <label>Ny måler nr<input type="text" name="new_meter_no" value="{% if latest_appointment and latest_appointment.new_meter_no %}{{ latest_appointment.new_meter_no }}{% else %}{{ address.new_meter_no or '' }}{% endif %}" /></label>
+                </div>
+                <div>
                     <label style="margin-bottom: 0.5rem; display: block; font-weight: 700;">Fototype</label>
                     <div class="option-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <label class="option-button">
@@ -108,8 +130,17 @@
                     </div>
                 </div>
                 <label>Vælg fil<input type="file" name="file" accept="image/*" required /></label>
-                <button type="submit" class="ghost-button">Upload billede</button>
+                <button type="submit" class="ghost-button" {% if not vvs_users %}disabled{% endif %}>Upload billede</button>
+                {% if not vvs_users %}
+                    <p class="hint">Opret en VVS-bruger før der kan uploades dokumentation.</p>
+                {% endif %}
             </form>
+        {% endif %}
+
+        {% set display_old_meter_no = latest_appointment.old_meter_no if latest_appointment and latest_appointment.old_meter_no else address.old_meter_no %}
+        {% set display_new_meter_no = latest_appointment.new_meter_no if latest_appointment and latest_appointment.new_meter_no else address.new_meter_no %}
+        {% if display_old_meter_no or display_new_meter_no %}
+            <p class="hint" style="margin-top: 1rem;">Målernr: {{ display_old_meter_no or '-' }} → {{ display_new_meter_no or '-' }}</p>
         {% endif %}
 
         {% if photos %}
