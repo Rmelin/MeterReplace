@@ -10,6 +10,7 @@ const STATUS_LABELS = {
   closed: 'Afsluttet',
   not_home: 'Ikke hjemme',
   needs_reschedule: 'Behov for ny dato',
+  action_required: 'Kræver handling',
   unplanned: 'Ikke planlagt',
 }
 
@@ -21,6 +22,7 @@ const STATUS_COLORS = {
   closed: cssVar('--status-closed', '#16a34a'),
   not_home: cssVar('--status-not-home', '#ef4444'),
   needs_reschedule: cssVar('--status-needs-reschedule', '#f97316'),
+  action_required: cssVar('--error', '#ef4444'),
   unplanned: cssVar('--status-unplanned', '#64748b'),
 }
 
@@ -39,6 +41,8 @@ const statusButtons = Array.from(
 const dateInput = document.getElementById('map-date')
 const missingList = document.getElementById('missing-list')
 const missingCount = document.getElementById('missing-count')
+const actionList = document.getElementById('action-list')
+const actionCount = document.getElementById('action-count')
 const editHint = document.getElementById('edit-hint')
 const selectedList = document.getElementById('selected-list')
 const selectedCount = document.getElementById('selected-count')
@@ -95,6 +99,13 @@ const applyFilterSwatches = () => {
 const normalizeStatus = (status) => (status || '').trim().toLowerCase()
 const statusColor = (status) =>
   STATUS_COLORS[normalizeStatus(status)] || STATUS_COLORS.unplanned
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
 
 const addAddressMarkerLayer = (latlng, options, popupContent) => {
   const marker = L.circleMarker(latlng, options)
@@ -198,10 +209,19 @@ const updateMarkers = () => {
       const appointmentAction = row.appointment_href
         ? `<a class="ghost-button map-popup-button" href="${row.appointment_href}">Åben opgave</a>`
         : ''
+      const appointmentDetails = [
+        row.appointment_time ? `Tid: ${escapeHtml(row.appointment_time)}` : '',
+        row.appointment_contractor ? `VVS: ${escapeHtml(row.appointment_contractor)}` : '',
+        row.action_reason ? `Handling: ${escapeHtml(row.action_reason)}` : '',
+        row.appointment_note ? `Note: ${escapeHtml(row.appointment_note)}` : '',
+      ]
+        .filter(Boolean)
+        .map((value) => `<span>${value}</span>`)
+        .join('')
       const latlng = [row.latitude, row.longitude]
-      const popupContent = `<strong>${row.street} ${row.house_no}</strong><br>${row.zip} ${row.city}<br>${
-        statusLabel
-      }<br><div class="map-popup-actions">
+      const popupContent = `<strong>${escapeHtml(row.street)} ${escapeHtml(row.house_no)}</strong><br>${escapeHtml(row.zip)} ${escapeHtml(row.city)}<br>${
+        escapeHtml(statusLabel)
+      }${appointmentDetails ? `<div class="map-popup-task-meta">${appointmentDetails}</div>` : ''}<div class="map-popup-actions">
           <button type="button" class="map-popup-inline-action" data-action="edit-coords" data-address-id="${
             row.id
           }">Rediger koordinat</button>
@@ -254,7 +274,44 @@ const updateMarkers = () => {
         },
         popupContent
       )
-    })
+  })
+}
+
+const renderActionList = () => {
+  if (!actionList || !actionCount) return
+  actionList.innerHTML = ''
+  const actionRows = getVisibleAddresses().filter((row) => row.action_required)
+  actionCount.textContent = String(actionRows.length)
+  actionRows.forEach((row) => {
+    const item = document.createElement('li')
+    item.className = 'map-list-item map-action-item'
+    item.dataset.addressId = row.id
+    const statusLabel =
+      row.action_reason ||
+      row.status_label ||
+      STATUS_LABELS[normalizeStatus(row.status)] ||
+      row.status
+    item.innerHTML = `
+      <div class="map-list-main">
+        <span>${escapeHtml(row.street)} ${escapeHtml(row.house_no)}</span>
+        <span class="hint">${escapeHtml(statusLabel)}</span>
+        ${
+          row.appointment_time
+            ? `<span class="hint">${escapeHtml(row.appointment_time)}</span>`
+            : ''
+        }
+      </div>
+      <div class="map-list-actions">
+        ${
+          row.appointment_href
+            ? `<a class="ghost-button" href="${row.appointment_href}">Opgave</a>`
+            : ''
+        }
+        <a class="ghost-button" href="/admin/addresses/${row.id}/edit">Adresse</a>
+      </div>
+    `
+    actionList.appendChild(item)
+  })
 }
 
 const fitMapToVisible = () => {
@@ -353,6 +410,7 @@ const renderSelectedList = () => {
       selectedIds = selectedIds.filter((id) => id !== row.id)
       saveSelectedIds()
       updateMarkers()
+      renderActionList()
       renderSelectedList()
     })
     selectedList.appendChild(item)
@@ -375,6 +433,7 @@ const loadMapData = async () => {
   addresses = data.addresses || []
   updateMarkers()
   renderMissingList()
+  renderActionList()
   renderSelectedList()
   fitMapToVisible()
 }
@@ -487,6 +546,7 @@ if (selectedClear) {
     selectedIds = []
     saveSelectedIds()
     updateMarkers()
+    renderActionList()
     renderSelectedList()
   })
 }

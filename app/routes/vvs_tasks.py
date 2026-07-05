@@ -324,6 +324,84 @@ def build_task_overview(
     return morning_overview, afternoon_overview, buffer_overview
 
 
+def build_day_checklist(
+    appointments: list[models.Appointment],
+    addresses: dict[int, models.Address | None],
+    photos: dict[int, list[models.AppointmentPhoto]],
+    period_labels: dict[int, str],
+) -> tuple[dict[str, int], list[dict[str, object]]]:
+    items = []
+    done_count = 0
+    missing_photo_count = 0
+    note_count = 0
+    meter_issue_count = 0
+    for appointment in appointments:
+        address = addresses.get(appointment.id)
+        photo_list = photos.get(appointment.id, [])
+        has_note = bool((appointment.notes or "").strip())
+        has_address = address is not None
+        is_meter_issue = is_meter_issue_row(appointment, address)
+        is_done = is_done_for_day(appointment.status) and not is_meter_issue
+        missing_photos = (
+            has_address
+            and appointment.status != models.AppointmentStatus.NOT_HOME
+            and not is_meter_issue
+            and not photo_complete(photo_list)
+        )
+        if is_done:
+            done_count += 1
+        if missing_photos:
+            missing_photo_count += 1
+        if has_note:
+            note_count += 1
+        if is_meter_issue:
+            meter_issue_count += 1
+
+        badges = []
+        if missing_photos:
+            badges.append("Mangler fotos")
+        if has_note:
+            badges.append("Note")
+        if is_meter_issue:
+            badges.append("Fejl ved måler")
+        if address and address.buffer_flag:
+            badges.append("Brønd")
+
+        items.append(
+            {
+                "appointment_id": appointment.id,
+                "address_label": (
+                    f"{address.street} {address.house_no}, {address.zip} {address.city}"
+                    if address else "Opgave uden adresse"
+                ),
+                "time_label": (
+                    f"{appointment.starts_at.strftime('%H:%M')} - "
+                    f"{appointment.ends_at.strftime('%H:%M')}"
+                ),
+                "period_label": period_labels.get(appointment.id, ""),
+                "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
+                "state": "done" if is_done else "attention" if is_meter_issue else "todo",
+                "badges": badges,
+                "href": f"#appointment-{appointment.id}",
+            }
+        )
+
+    total_count = len(appointments)
+    remaining_count = total_count - done_count
+    return (
+        {
+            "total": total_count,
+            "done": done_count,
+            "remaining": remaining_count,
+            "missing_photos": missing_photo_count,
+            "notes": note_count,
+            "meter_issues": meter_issue_count,
+            "progress": round((done_count / total_count) * 100) if total_count else 0,
+        },
+        items,
+    )
+
+
 @router.get("")
 def vvs_tasks(
     request: Request,
@@ -345,6 +423,9 @@ def vvs_tasks(
     period_labels = {
         appointment.id: period_label_for(appointment.starts_at) for appointment in appointments
     }
+    checklist_summary, checklist_items = build_day_checklist(
+        appointments, addresses, photos, period_labels
+    )
     meter_issue_tasks = [
         appt
         for appt in appointments
@@ -379,6 +460,8 @@ def vvs_tasks(
             "afternoon_overview": afternoon_overview,
             "buffer_overview": buffer_overview,
             "period_labels": period_labels,
+            "checklist_summary": checklist_summary,
+            "checklist_items": checklist_items,
             "todo": todo,
             "meter_issue_tasks": meter_issue_tasks,
             "done": done,

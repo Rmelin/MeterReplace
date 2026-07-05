@@ -110,6 +110,10 @@
                     <span class="map-filter-swatch"></span>
                     Behov for ny dato
                 </button>
+                <button type="button" class="option-button map-filter-button" data-status="action_required">
+                    <span class="map-filter-swatch"></span>
+                    Kræver handling
+                </button>
                 <button type="button" class="option-button map-filter-button" data-filter="selected">
                     <span class="map-filter-swatch"></span>
                     Markeret
@@ -128,6 +132,12 @@
             </div>
             <p class="hint" id="edit-hint">Vælg en adresse eller klik "Rediger koordinat" på en markør, og klik på kortet for at gemme.</p>
             <ul id="missing-list" class="map-list"></ul>
+            <div class="map-sidebar-header">
+                <h3>Kræver handling</h3>
+                <span class="hint" id="action-count">0</span>
+            </div>
+            <p class="hint">Adresser med ikke hjemme, behov for ny dato eller registreret blokering.</p>
+            <ul id="action-list" class="map-list"></ul>
             <div class="map-sidebar-header">
                 <h3>Markerede status-punkter</h3>
                 <span class="hint" id="selected-count">0</span>
