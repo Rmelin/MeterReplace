@@ -1298,6 +1298,134 @@ a.chip:hover {
     margin-top: 0.75rem;
 }
 
+.vvs-day-checklist {
+    display: grid;
+    gap: 1rem;
+}
+
+.vvs-checklist-progress {
+    width: 100%;
+    height: 0.7rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(var(--accent-rgb), 0.12);
+}
+
+.vvs-checklist-progress span {
+    display: block;
+    height: 100%;
+    min-width: 0;
+    border-radius: inherit;
+    background: var(--accent);
+}
+
+.vvs-checklist-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.vvs-checklist-metric {
+    display: grid;
+    gap: 0.15rem;
+    min-height: 4.2rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(var(--accent-rgb), 0.04);
+}
+
+.vvs-checklist-metric span {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.vvs-checklist-metric strong {
+    font-size: 1.45rem;
+    line-height: 1.1;
+}
+
+.vvs-checklist-list {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.vvs-checklist-item {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+    min-height: 4rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.vvs-checklist-item:hover {
+    border-color: rgba(var(--accent-rgb), 0.35);
+    background: rgba(var(--accent-rgb), 0.04);
+}
+
+.vvs-checklist-state {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgba(var(--accent-rgb), 0.12);
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.vvs-checklist-item-done .vvs-checklist-state {
+    background: rgba(34, 197, 94, 0.14);
+    color: #15803d;
+}
+
+.vvs-checklist-item-attention .vvs-checklist-state {
+    background: rgba(239, 68, 68, 0.14);
+    color: #dc2626;
+}
+
+.vvs-checklist-main {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.vvs-checklist-main strong,
+.vvs-checklist-main span {
+    overflow-wrap: anywhere;
+}
+
+.vvs-checklist-main span {
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.vvs-checklist-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+}
+
+.vvs-checklist-badges span {
+    border-radius: 999px;
+    background: rgba(var(--accent-rgb), 0.08);
+    color: var(--text);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+}
+
 .vvs-task-card {
     display: grid;
     gap: 0.9rem;
@@ -1542,6 +1670,19 @@ a.chip:hover {
         width: 100%;
     }
 
+    .vvs-checklist-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .vvs-checklist-item {
+        grid-template-columns: 2rem minmax(0, 1fr);
+    }
+
+    .vvs-checklist-badges {
+        grid-column: 2;
+        justify-content: flex-start;
+    }
+
     .vvs-task-address-actions,
     .vvs-task-primary-actions,
     .vvs-task-meter-grid,
@@ -1770,6 +1911,20 @@ a.chip:hover {
     flex-direction: column;
     gap: 0.5rem;
     margin-top: 0.5rem;
+}
+
+.leaflet-popup-content .map-popup-task-meta {
+    display: grid;
+    gap: 0.2rem;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.map-action-item {
+    border-left: 4px solid var(--error);
 }
 
 .leaflet-popup-content .map-popup-inline-action {

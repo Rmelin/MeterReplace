@@ -52,6 +52,63 @@
 </section>
 
 {% if selected_date %}
+<section class="card vvs-day-checklist">
+    <div class="section-header">
+        <div>
+            <h2>Dags-checkliste</h2>
+            <p class="hint">{{ checklist_summary.done }}/{{ checklist_summary.total }} færdige · {{ checklist_summary.remaining }} mangler</p>
+        </div>
+        <a class="ghost-button" href="#vvs-task-todo">Gå til To do</a>
+    </div>
+    <div class="vvs-checklist-progress" aria-label="Dagens fremdrift">
+        <span style="width: {{ checklist_summary.progress }}%;"></span>
+    </div>
+    <div class="vvs-checklist-metrics">
+        <div class="vvs-checklist-metric">
+            <span>Mangler</span>
+            <strong>{{ checklist_summary.remaining }}</strong>
+        </div>
+        <div class="vvs-checklist-metric">
+            <span>Mangler fotos</span>
+            <strong>{{ checklist_summary.missing_photos }}</strong>
+        </div>
+        <div class="vvs-checklist-metric">
+            <span>Noter</span>
+            <strong>{{ checklist_summary.notes }}</strong>
+        </div>
+        <div class="vvs-checklist-metric">
+            <span>Fejl ved måler</span>
+            <strong>{{ checklist_summary.meter_issues }}</strong>
+        </div>
+    </div>
+    {% if checklist_items %}
+        <div class="vvs-checklist-list">
+            {% for item in checklist_items %}
+                <a class="vvs-checklist-item vvs-checklist-item-{{ item.state }}" href="{{ item.href }}">
+                    <span class="vvs-checklist-state" aria-hidden="true">
+                        {% if item.state == "done" %}✓{% elif item.state == "attention" %}!{% else %}{{ loop.index }}{% endif %}
+                    </span>
+                    <span class="vvs-checklist-main">
+                        <strong>{{ item.address_label }}</strong>
+                        <span>{{ item.period_label }} · {{ item.time_label }} · {{ item.status_label }}</span>
+                    </span>
+                    {% if item.badges %}
+                        <span class="vvs-checklist-badges">
+                            {% for badge in item.badges %}
+                                <span>{{ badge }}</span>
+                            {% endfor %}
+                        </span>
+                    {% endif %}
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="hint">Ingen opgaver på den valgte dag.</p>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if selected_date %}
 <section class="card">
     <div class="section-header">
         <div>
@@ -146,7 +203,7 @@
 </section>
 {% endif %}
 
-<section class="card">
+<section class="card" id="vvs-task-todo">
     <h2>To do</h2>
     {% if todo %}
         {% for appointment in todo %}

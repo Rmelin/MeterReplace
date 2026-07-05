@@ -61,6 +61,7 @@ STATUS_FILTERS = [
     {"value": "not_home", "label": "Ikke hjemme (nuværende)"},
     {"value": "not_home_history", "label": "Ikke hjemme (historik)"},
     {"value": "needs_reschedule", "label": "Behov for ny dato"},
+    {"value": "action_required", "label": "Kræver handling"},
     {"value": "unplanned", "label": "Ikke planlagt"},
     {"value": "blocked", "label": "Fejl ved stophane"},
     {"value": "buffer", "label": "Målerbrønd"},
@@ -927,6 +928,7 @@ def address_map_data(
     current_year = datetime.utcnow().year
     appointment_map: dict[int, models.Appointment] = {}
     notscheduled_candidates: dict[int, models.Appointment] = {}
+    contractor_map: dict[int, str] = {}
     if address_ids:
         appointments = (
             db.query(models.Appointment)
@@ -959,6 +961,16 @@ def address_map_data(
             if address_id in appointment_map:
                 continue
             appointment_map[address_id] = appointment
+        contractor_ids = {
+            appointment.contractor_id for appointment in appointment_map.values()
+        }
+        if contractor_ids:
+            contractors = (
+                db.query(models.User)
+                .filter(models.User.id.in_(contractor_ids))
+                .all()
+            )
+            contractor_map = {contractor.id: contractor.username for contractor in contractors}
 
     allowed_filters = {item["value"] for item in STATUS_FILTERS}
     selected_statuses: list[str] = []
@@ -1010,6 +1022,17 @@ def address_map_data(
                     )
                     not_home_ids = {row[0] for row in not_home_rows}
                 matching_ids.update(not_home_ids)
+            elif selected_status == "action_required":
+                matching_ids.update(
+                    address.id
+                    for address in addresses
+                    if address.blocked_reason
+                    or status_map.get(address.id)
+                    in {
+                        models.AppointmentStatus.NOT_HOME,
+                        models.AppointmentStatus.NEEDS_RESCHEDULE,
+                    }
+                )
             else:
                 allowed_statuses = filter_map.get(selected_status, set())
                 matching_ids.update(
@@ -1034,6 +1057,21 @@ def address_map_data(
                 f"/admin/appointments?date_query={appointment_date}"
                 f"#appointment-{appointment.id}"
             )
+        action_required = bool(
+            address.blocked_reason
+            or status_value
+            in {
+                models.AppointmentStatus.NOT_HOME,
+                models.AppointmentStatus.NEEDS_RESCHEDULE,
+            }
+        )
+        action_reason = None
+        if address.blocked_reason:
+            action_reason = address.blocked_reason
+        elif status_value == models.AppointmentStatus.NEEDS_RESCHEDULE:
+            action_reason = "Behov for ny dato"
+        elif status_value == models.AppointmentStatus.NOT_HOME:
+            action_reason = "Ikke hjemme"
         payload.append(
             {
                 "id": address.id,
@@ -1049,6 +1087,18 @@ def address_map_data(
                 "status_label": status_label,
                 "status_value": status_value.value.lower() if status_value else "unplanned",
                 "appointment_href": appointment_href,
+                "appointment_time": (
+                    f"{appointment.starts_at.strftime('%d/%m %H:%M')} - "
+                    f"{appointment.ends_at.strftime('%H:%M')}"
+                    if appointment else None
+                ),
+                "appointment_contractor": (
+                    contractor_map.get(appointment.contractor_id)
+                    if appointment else None
+                ),
+                "appointment_note": appointment.notes if appointment else None,
+                "action_required": action_required,
+                "action_reason": action_reason,
             }
         )
     return JSONResponse({"addresses": payload})
