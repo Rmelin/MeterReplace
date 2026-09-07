@@ -8,14 +8,18 @@
 </section>
 
 <section class="card">
+    <div class="filter-chips message-folders">
+        {% for item in folders %}
+            <a class="chip {% if selected_folder == item.value %}is-active{% endif %}" href="{{ item.href }}">
+                {{ item.label }} <strong>{{ item.count }}</strong>
+            </a>
+        {% endfor %}
+    </div>
+
+    <p class="hint">Filtrér efter svartype</p>
     <div class="filter-chips">
         {% for item in filters %}
-            {% set is_active = (selected_type == item.value) %}
-            {% set url = "/admin/messages" %}
-            {% if item.value != 'all' %}
-                {% set url = url ~ "?response_type=" ~ item.value %}
-            {% endif %}
-            <a class="chip {% if is_active %}is-active{% endif %}" href="{{ url }}">{{ item.label }}</a>
+            <a class="chip {% if selected_type == item.value %}is-active{% endif %}" href="{{ item.href }}">{{ item.label }}</a>
         {% endfor %}
     </div>
 
@@ -27,21 +31,36 @@
                         <th>Dato</th>
                         <th>Kanal</th>
                         <th>Type</th>
+                        <th>Status</th>
                         <th>Besked</th>
                         <th>Adresse</th>
-                        <th>Link</th>
+                        <th>Handlinger</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in messages %}
-                        <tr class="{% if item.is_old %}message-old{% endif %}">
+                        <tr class="message-status-{{ item.status.value|lower }}">
                             <td data-label="Dato">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                             <td data-label="Kanal">{{ item.channel }}</td>
                             <td data-label="Type">{{ item.type_label }}</td>
+                            <td data-label="Status"><span class="message-status-badge message-status-badge-{{ item.status.value|lower }}">{{ item.status_label }}</span></td>
                             <td data-label="Besked">{{ item.message }}</td>
                             <td data-label="Adresse">{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}</td>
-                            <td data-label="Link">
+                            <td data-label="Handlinger">
                                 <a class="ghost-button" href="/admin/addresses/{{ item.address.id }}/edit" style="font-size: 0.85rem; padding: 0.35rem 0.6rem;">Adresse</a>
+                                <form method="post" action="/admin/messages/{{ item.id }}/status" class="message-status-form">
+                                    <input type="hidden" name="folder" value="{{ selected_folder }}" />
+                                    <input type="hidden" name="response_type" value="{{ selected_type }}" />
+                                    <label>
+                                        <span class="sr-only">Flyt besked</span>
+                                        <select name="mailbox_status" aria-label="Flyt besked til">
+                                            {% for status, label in statuses.items() %}
+                                                <option value="{{ status.value }}" {% if status == item.status %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+                                    <button type="submit" class="ghost-button">Flyt</button>
+                                </form>
                             </td>
                         </tr>
                     {% endfor %}
@@ -49,7 +68,7 @@
             </table>
         </div>
     {% else %}
-        <p class="hint">Ingen beskeder endnu.</p>
+        <p class="hint">Ingen beskeder i denne mappe.</p>
     {% endif %}
 </section>
 {% endblock %}

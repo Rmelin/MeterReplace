@@ -170,9 +170,11 @@ def status_dashboard(
         else 100
     )
     message_count = (
-        db.query(func.count(func.distinct(models.ResidentResponse.address_id)))
-        .filter(models.ResidentResponse.message.is_not(None))
-        .filter(models.ResidentResponse.message != "")
+        db.query(func.count(models.ResidentResponse.id))
+        .filter(
+            models.ResidentResponse.mailbox_status
+            == models.ResidentMessageStatus.NEW
+        )
         .scalar()
         or 0
     )

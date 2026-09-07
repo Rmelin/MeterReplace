@@ -124,6 +124,7 @@ def resident_submit(
         return RedirectResponse(f"/r/{token}", status_code=303)
 
     appointment = scheduled_appointment(db, address.id)
+    submitted_at = datetime.utcnow()
 
     if buffer_answer == "yes":
         if not message:
@@ -139,7 +140,9 @@ def resident_submit(
                 message=message,
                 phone=phone,
                 email=email,
-                created_at=datetime.utcnow(),
+                mailbox_status=models.ResidentMessageStatus.NEW,
+                mailbox_status_updated_at=submitted_at,
+                created_at=submitted_at,
             )
         )
 
@@ -152,7 +155,7 @@ def resident_submit(
                 message=None,
                 phone=phone,
                 email=email,
-                created_at=datetime.utcnow(),
+                created_at=submitted_at,
             )
         )
     else:
@@ -180,7 +183,11 @@ def resident_submit(
                 message=time_message,
                 phone=phone,
                 email=email,
-                created_at=datetime.utcnow(),
+                mailbox_status=(
+                    models.ResidentMessageStatus.NEW if time_message else None
+                ),
+                mailbox_status_updated_at=submitted_at if time_message else None,
+                created_at=submitted_at,
             )
         )
 
