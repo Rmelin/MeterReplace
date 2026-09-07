@@ -268,7 +268,13 @@
                 {% if appointment.old_meter_no or appointment.new_meter_no %}
                     <p class="hint">Målernr: {{ appointment.old_meter_no or '-' }} → {{ appointment.new_meter_no or '-' }}</p>
                 {% endif %}
-                <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
+                <div class="action-row" style="margin-top: 0.75rem;">
+                    <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
+                    {% if address and appointment.letter_required %}
+                        <a class="ghost-button" href="/admin/letters/address/{{ address.id }}?appointment_id={{ appointment.id }}">Se brev</a>
+                        <a class="ghost-button" href="/admin/letters/address/{{ address.id }}/pdf?appointment_id={{ appointment.id }}">Hent PDF</a>
+                    {% endif %}
+                </div>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
                 {% if address %}
                     {% set photo_list = photos.get(appointment.id, []) %}

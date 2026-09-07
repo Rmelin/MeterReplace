@@ -6,7 +6,7 @@
         <p>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
     </div>
     <div>
-        <a class="ghost-button" href="/admin/letters/address/{{ address.id }}/pdf">Download PDF</a>
+        <a class="ghost-button" href="{{ pdf_href }}">Download PDF</a>
     </div>
 </section>
 

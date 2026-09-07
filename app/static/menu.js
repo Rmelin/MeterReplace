@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
   const toggles = document.querySelectorAll('[data-nav-toggle]')
-  const storageKey = 'adminNavSection'
 
   const setOpen = (section) => {
     toggles.forEach((toggle) => {
@@ -12,17 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
         sectionEl.classList.toggle('is-hidden', !isActive)
       }
     })
-    if (section) {
-      localStorage.setItem(storageKey, section)
-    } else {
-      localStorage.removeItem(storageKey)
-    }
   }
 
-  const initial = localStorage.getItem(storageKey)
-  if (initial) {
-    setOpen(initial)
-  }
+  setOpen('')
+  window.addEventListener('pageshow', () => setOpen(''))
 
   toggles.forEach((toggle) => {
     toggle.addEventListener('click', () => {
