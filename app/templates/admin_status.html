@@ -268,8 +268,12 @@
     <a class="card card-link status-card status-card-messages" href="/admin/messages">
         <div class="metric-container">
             <div>
-                <h2>Nye beskeder</h2>
+                <h2>Beskeder</h2>
                 <p class="metric">{{ message_count }}</p>
+                <div class="status-message-summary">
+                    <span class="message-status-badge message-status-badge-new">Nye <strong>{{ new_message_count }}</strong></span>
+                    <span class="message-status-badge message-status-badge-todo">Todo <strong>{{ todo_message_count }}</strong></span>
+                </div>
             </div>
             <div class="metric-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path><path d="M7 8h10"></path><path d="M7 12h6"></path></svg>

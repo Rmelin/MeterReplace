@@ -1100,11 +1100,19 @@ a.chip:hover {
 
 .message-status-badge {
     display: inline-flex;
+    gap: 0.35rem;
     padding: 0.25rem 0.55rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     font-size: 0.8rem;
     font-weight: 700;
+}
+
+.status-message-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
 }
 
 .message-status-badge-new {
