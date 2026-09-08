@@ -98,13 +98,13 @@ def favicon() -> RedirectResponse:
 
 
 @app.get("/apple-touch-icon.png", include_in_schema=False)
-def apple_touch_icon() -> RedirectResponse:
-    return RedirectResponse("/static/icon-180.png")
+def apple_touch_icon() -> FileResponse:
+    return FileResponse(Path("app/static/icon-180.png"), media_type="image/png")
 
 
 @app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
-def apple_touch_icon_precomposed() -> RedirectResponse:
-    return RedirectResponse("/static/icon-180.png")
+def apple_touch_icon_precomposed() -> FileResponse:
+    return FileResponse(Path("app/static/icon-180.png"), media_type="image/png")
 
 
 @app.exception_handler(403)

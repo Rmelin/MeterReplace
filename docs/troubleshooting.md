@@ -64,6 +64,27 @@ Mulige løsninger:
 - genstart service og verificer filens indhold direkte
 - indfør cache-busting på CSS og JS
 
+## Webapp-ikon mangler på telefonen
+
+Kontroller først, at manifestet og ikonerne er offentligt tilgængelige over HTTPS:
+
+```bash
+curl -I "https://dit-domaene/static/site.webmanifest"
+curl -I "https://dit-domaene/static/icon-180.png"
+curl -I "https://dit-domaene/static/icon-192.png"
+curl -I "https://dit-domaene/static/icon-512.png"
+curl -I "https://dit-domaene/static/icon-maskable-512.png"
+curl -I "https://dit-domaene/apple-touch-icon.png"
+```
+
+Manifestet skal returnere `application/manifest+json`, og ikonerne skal returnere
+`image/png` uden login-redirect. Purge CDN eller reverse proxy cache, hvis gamle
+filer bliver returneret.
+
+På iPhone skal siden åbnes i Safari. Slet et eksisterende hjemmeskærmsikon før
+gentest, da iOS gemmer ikonmetadata aggressivt. Tilføj derefter appen igen via
+Del og `Føj til hjemmeskærm`.
+
 ## PDF eller links i breve er forkerte
 
 Tjek `PUBLIC_BASE_URL`.
