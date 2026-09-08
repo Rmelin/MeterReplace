@@ -83,6 +83,15 @@
                         <li>
                             {{ appt.starts_at.strftime('%H:%M') }}-{{ appt.ends_at.strftime('%H:%M') }} — {{ appt.address }}
                             {% if appt.note %} ({{ appt.note }}){% endif %}
+                            {% if appt.customer_email %}
+                                <div class="action-row" style="margin-top: 0.5rem;">
+                                    <a href="mailto:{{ appt.customer_email }}">{{ appt.customer_email }}</a>
+                                    {% if appt.can_create_letter %}
+                                        <a class="ghost-button" href="/admin/letters/address/{{ appt.address_id }}?appointment_id={{ appt.appointment_id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se PDF</a>
+                                        <a class="ghost-button" href="/admin/letters/address/{{ appt.address_id }}/pdf?appointment_id={{ appt.appointment_id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Hent PDF</a>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         </li>
                     {% endfor %}
                 </ul>

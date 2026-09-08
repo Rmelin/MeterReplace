@@ -490,6 +490,30 @@ def committed_appointments_for_date(
     return committed_rows
 
 
+def manual_schedule_map(
+    appointments: list[tuple[models.Appointment, models.Address]],
+) -> dict[int, list[dict[str, object]]]:
+    scheduled_map: dict[int, list[dict[str, object]]] = {}
+    for appointment, address in appointments:
+        scheduled_map.setdefault(appointment.contractor_id, []).append(
+            {
+                "starts_at": appointment.starts_at,
+                "ends_at": appointment.ends_at,
+                "address": f"{address.street} {address.house_no}, {address.zip} {address.city}",
+                "address_id": address.id,
+                "appointment_id": appointment.id,
+                "customer_email": address.customer_email,
+                "can_create_letter": appointment.status
+                in {
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                },
+                "note": appointment.notes,
+            }
+        )
+    return scheduled_map
+
+
 @router.get("")
 def planning_form(
     request: Request,
@@ -787,15 +811,7 @@ def manual_planning_form(
             .order_by(models.Appointment.starts_at)
             .all()
         )
-        for appointment, address in appointments:
-            scheduled_map.setdefault(appointment.contractor_id, []).append(
-                {
-                    "starts_at": appointment.starts_at,
-                    "ends_at": appointment.ends_at,
-                    "address": f"{address.street} {address.house_no}, {address.zip} {address.city}",
-                    "note": appointment.notes,
-                }
-            )
+        scheduled_map = manual_schedule_map(appointments)
 
     return request.app.state.templates.TemplateResponse(
         "admin_manual_planning.html",
