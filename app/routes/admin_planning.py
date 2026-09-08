@@ -371,7 +371,7 @@ def compute_plan_from_addresses(
                 ends_at=ends_at,
                 is_buffer=address.buffer_flag,
                 closes_street=address.id in closing_buffer_ids,
-                letter_required=not address.buffer_flag,
+                letter_required=True,
             )
         )
 
@@ -401,7 +401,7 @@ def compute_plan(db: Session, plan_date: date) -> tuple[list[PlannedSlot], list[
                 ends_at=ends_at,
                 is_buffer=address.buffer_flag,
                 closes_street=address.id in closing_buffer_ids,
-                letter_required=not address.buffer_flag,
+                letter_required=True,
             )
         )
 
@@ -483,7 +483,7 @@ def committed_appointments_for_date(
                 "contractor": contractor,
                 "status_label": STATUS_LABELS.get(appointment.status, appointment.status.value),
                 "letter_required": appointment.letter_required,
-                "is_buffer": not appointment.letter_required,
+                "is_buffer": address.buffer_flag,
                 "letter_ready": appointment.status == models.AppointmentStatus.INFORMED,
             }
         )
@@ -929,7 +929,7 @@ def manual_planning_commit(
             starts_at=slot_start,
             ends_at=slot_end,
             status=models.AppointmentStatus.SCHEDULED,
-            letter_required=not address.buffer_flag,
+            letter_required=True,
             notes=note_value,
             changed_date=datetime.utcnow(),
             changed_by_user_id=user.id,

@@ -122,26 +122,25 @@
                     </thead>
                     <tbody>
                         {% for row in committed_appointments %}
-                            {% if not row.letter_required %}
-                                {% set letter_status = 'buffer' %}
-                            {% elif row.letter_ready %}
+                            {% if row.letter_ready %}
                                 {% set letter_status = 'ready' %}
                             {% elif row.appointment.status.value == 'SCHEDULED' %}
                                 {% set letter_status = 'missing' %}
                             {% else %}
                                 {% set letter_status = 'na' %}
                             {% endif %}
-                            <tr data-committed-row data-letter-status="{{ letter_status }}">
-                                <td>{{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}</td>
+                            <tr data-committed-row data-letter-status="{{ letter_status }}" data-is-buffer="{{ 'true' if row.is_buffer else 'false' }}">
+                                <td>
+                                    {{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}
+                                    {% if row.is_buffer %}
+                                        <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Målerbrønd</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ row.contractor.username }}</td>
                                 <td>{{ row.appointment.starts_at.strftime('%H:%M') }} - {{ row.appointment.ends_at.strftime('%H:%M') }}</td>
                                 <td>{{ row.status_label }}</td>
                                 <td>
-                                    {% if not row.letter_required and row.letter_ready %}
-                                        <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet (buffer)</span>
-                                    {% elif not row.letter_required %}
-                                        <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Buffer - brev valgfrit</span>
-                                    {% elif row.letter_ready %}
+                                    {% if row.letter_ready %}
                                         <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet</span>
                                     {% elif row.appointment.status.value == 'SCHEDULED' %}
                                         <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV MANGLER</span>
@@ -150,14 +149,10 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if not row.letter_required and row.letter_ready %}
-                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
-                                    {% elif not row.letter_required %}
-                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev</a>
-                                    {% elif row.appointment.status.value == 'SCHEDULED' %}
-                                        <a class="primary-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev nu</a>
+                                    {% if row.appointment.status.value == 'SCHEDULED' %}
+                                        <a class="primary-button" href="/admin/letters/address/{{ row.address.id }}?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev nu</a>
                                     {% elif row.appointment.status.value == 'INFORMED' %}
-                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
                                     {% else %}
                                         <span class="hint">-</span>
                                     {% endif %}
@@ -182,9 +177,6 @@
             <a class="primary-button" href="/admin/letters/planning/latest/pdf?date={{ plan_date.isoformat() }}">Download PDF for nye planlagte</a>
         {% endif %}
     </div>
-    {% if not latest_letter_required_count %}
-        <p class="hint">De nye adresser er bufferbesøg og kræver ikke brev.</p>
-    {% endif %}
     <div class="table-wrapper">
         <table>
             <thead>
@@ -199,16 +191,17 @@
             <tbody>
                 {% for row in latest_committed_appointments %}
                     <tr>
-                        <td>{{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}</td>
+                        <td>
+                            {{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}
+                            {% if row.is_buffer %}
+                                <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Målerbrønd</span>
+                            {% endif %}
+                        </td>
                         <td>{{ row.contractor.username }}</td>
                         <td>{{ row.appointment.starts_at.strftime('%H:%M') }} - {{ row.appointment.ends_at.strftime('%H:%M') }}</td>
                         <td>{{ row.status_label }}</td>
                         <td>
-                            {% if not row.letter_required and row.letter_ready %}
-                                <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet (buffer)</span>
-                            {% elif not row.letter_required %}
-                                <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Buffer - brev valgfrit</span>
-                            {% elif row.letter_ready %}
+                            {% if row.letter_ready %}
                                 <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet</span>
                             {% else %}
                                 <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV MANGLER</span>
@@ -337,11 +330,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if item.letter_required %}
-                                <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV KRÆVES</span>
-                            {% else %}
-                                <span class="chip" style="font-weight: 700; color: #1f4f7a; background: #eef6ff; border-color: #9abde6;">Ingen brev nødvendig</span>
-                            {% endif %}
+                            <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV KRÆVES</span>
                         </td>
                     </tr>
                 {% endfor %}

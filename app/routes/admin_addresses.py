@@ -1307,7 +1307,7 @@ def upload_address_photo(
             starts_at=starts_at,
             ends_at=ends_at,
             status=models.AppointmentStatus.SCHEDULED,
-            letter_required=not address.buffer_flag,
+            letter_required=True,
             changed_date=datetime.utcnow(),
             changed_by_user_id=user.id,
         )

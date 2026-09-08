@@ -158,7 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (committedRows.length === 0) return
     committedRows.forEach((row) => {
       const rowStatus = row.getAttribute('data-letter-status') || 'na'
-      const matches = filterValue === 'all' || rowStatus === filterValue
+      const isBuffer = row.getAttribute('data-is-buffer') === 'true'
+      const matches = filterValue === 'all' || (filterValue === 'buffer' ? isBuffer : rowStatus === filterValue)
       row.style.display = matches ? '' : 'none'
     })
     letterFilterButtons.forEach((button) => {
