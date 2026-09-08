@@ -113,6 +113,7 @@
                     <thead>
                         <tr>
                             <th>Adresse</th>
+                            <th>E-mail</th>
                             <th>VVS</th>
                             <th>Tid</th>
                             <th>Status</th>
@@ -133,6 +134,13 @@
                             {% endif %}
                             <tr data-committed-row data-letter-status="{{ letter_status }}">
                                 <td>{{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}</td>
+                                <td>
+                                    {% if row.address.customer_email %}
+                                        <a href="mailto:{{ row.address.customer_email }}">{{ row.address.customer_email }}</a>
+                                    {% else %}
+                                        <span class="hint">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ row.contractor.username }}</td>
                                 <td>{{ row.appointment.starts_at.strftime('%H:%M') }} - {{ row.appointment.ends_at.strftime('%H:%M') }}</td>
                                 <td>{{ row.status_label }}</td>
@@ -151,15 +159,18 @@
                                 </td>
                                 <td>
                                     {% if not row.letter_required and row.letter_ready %}
-                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
                                     {% elif not row.letter_required %}
-                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev</a>
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev</a>
                                     {% elif row.appointment.status.value == 'SCHEDULED' %}
-                                        <a class="primary-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Lav brev nu</a>
+                                        <a class="primary-button" href="/admin/letters/address/{{ row.address.id }}?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se PDF</a>
                                     {% elif row.appointment.status.value == 'INFORMED' %}
-                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se brev</a>
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se PDF</a>
                                     {% else %}
                                         <span class="hint">-</span>
+                                    {% endif %}
+                                    {% if row.address.customer_email and row.appointment.status.value in ['SCHEDULED', 'INFORMED'] %}
+                                        <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}/pdf?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Hent PDF</a>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -190,16 +201,25 @@
             <thead>
                 <tr>
                     <th>Adresse</th>
+                    <th>E-mail</th>
                     <th>VVS</th>
                     <th>Tid</th>
                     <th>Status</th>
                     <th>Brev</th>
+                    <th>Handling</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in latest_committed_appointments %}
                     <tr>
                         <td>{{ row.address.street }} {{ row.address.house_no }}, {{ row.address.zip }} {{ row.address.city }}</td>
+                        <td>
+                            {% if row.address.customer_email %}
+                                <a href="mailto:{{ row.address.customer_email }}">{{ row.address.customer_email }}</a>
+                            {% else %}
+                                <span class="hint">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ row.contractor.username }}</td>
                         <td>{{ row.appointment.starts_at.strftime('%H:%M') }} - {{ row.appointment.ends_at.strftime('%H:%M') }}</td>
                         <td>{{ row.status_label }}</td>
@@ -212,6 +232,14 @@
                                 <span class="chip" style="font-weight: 700; color: #17643a; background: #e8fff1; border-color: #8ed0ac;">Brev lavet</span>
                             {% else %}
                                 <span class="chip status-error" style="font-weight: 800; letter-spacing: 0.03em;">BREV MANGLER</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.address.customer_email and row.appointment.status.value in ['SCHEDULED', 'INFORMED'] %}
+                                <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Se PDF</a>
+                                <a class="ghost-button" href="/admin/letters/address/{{ row.address.id }}/pdf?appointment_id={{ row.appointment.id }}" style="padding: 0.45rem 0.7rem; font-size: 0.85rem;">Hent PDF</a>
+                            {% else %}
+                                <span class="hint">-</span>
                             {% endif %}
                         </td>
                     </tr>
