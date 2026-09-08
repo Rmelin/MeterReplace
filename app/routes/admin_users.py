@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
@@ -131,10 +133,16 @@ def update_user(
         flash(request, "Brugernavn findes allerede", "error")
         return RedirectResponse(f"/admin/users/{user_id}/edit", status_code=303)
 
+    was_admin = target_user.role == models.UserRole.ADMIN
     target_user.username = username
     target_user.role = role_value
     if password:
         target_user.password_hash = auth.hash_password(password)
+    if was_admin and role_value != models.UserRole.ADMIN:
+        db.query(models.PushSubscription).filter(
+            models.PushSubscription.user_id == target_user.id,
+            models.PushSubscription.disabled_at.is_(None),
+        ).update({"disabled_at": datetime.utcnow()}, synchronize_session=False)
 
     db.commit()
     flash(request, "Bruger opdateret", "success")

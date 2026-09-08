@@ -9,6 +9,7 @@ from starlette.responses import RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash
+from app.push_notifications import enqueue_message_pushes
 
 router = APIRouter(prefix="/r", tags=["resident"])
 
@@ -122,29 +123,42 @@ def resident_submit(
     if buffer_answer not in {"yes", "no"} or time_answer not in {"yes", "no"}:
         flash(request, "Vælg et svar til begge spørgsmål", "error")
         return RedirectResponse(f"/r/{token}", status_code=303)
+    if buffer_answer == "yes" and not message:
+        flash(request, "Angiv placering af målerbrønd", "error")
+        return RedirectResponse(f"/r/{token}", status_code=303)
+
+    claimed = (
+        db.query(models.ResidentLink)
+        .filter(
+            models.ResidentLink.id == link.id,
+            models.ResidentLink.active.is_(True),
+        )
+        .update({"active": False}, synchronize_session=False)
+    )
+    if claimed != 1:
+        db.rollback()
+        return RedirectResponse(f"/r/{token}", status_code=303)
 
     appointment = scheduled_appointment(db, address.id)
     submitted_at = datetime.utcnow()
+    new_messages: list[models.ResidentResponse] = []
 
     if buffer_answer == "yes":
-        if not message:
-            flash(request, "Angiv placering af målerbrønd", "error")
-            return RedirectResponse(f"/r/{token}", status_code=303)
         address.buffer_flag = True
         address.buffer_note = message
-        db.add(
-            models.ResidentResponse(
-                address_id=address.id,
-                appointment_id=appointment.id if appointment else None,
-                response_type="buffer_note",
-                message=message,
-                phone=phone,
-                email=email,
-                mailbox_status=models.ResidentMessageStatus.NEW,
-                mailbox_status_updated_at=submitted_at,
-                created_at=submitted_at,
-            )
+        buffer_response = models.ResidentResponse(
+            address_id=address.id,
+            appointment_id=appointment.id if appointment else None,
+            response_type="buffer_note",
+            message=message,
+            phone=phone,
+            email=email,
+            mailbox_status=models.ResidentMessageStatus.NEW,
+            mailbox_status_updated_at=submitted_at,
+            created_at=submitted_at,
         )
+        db.add(buffer_response)
+        new_messages.append(buffer_response)
 
     if time_answer == "yes":
         db.add(
@@ -175,23 +189,24 @@ def resident_submit(
                     note=(time_message or "Beboer har ikke tid"),
                 )
             )
-        db.add(
-            models.ResidentResponse(
-                address_id=address.id,
-                appointment_id=appointment.id if appointment else None,
-                response_type="reschedule_request",
-                message=time_message,
-                phone=phone,
-                email=email,
-                mailbox_status=(
-                    models.ResidentMessageStatus.NEW if time_message else None
-                ),
-                mailbox_status_updated_at=submitted_at if time_message else None,
-                created_at=submitted_at,
-            )
+        reschedule_response = models.ResidentResponse(
+            address_id=address.id,
+            appointment_id=appointment.id if appointment else None,
+            response_type="reschedule_request",
+            message=time_message,
+            phone=phone,
+            email=email,
+            mailbox_status=(models.ResidentMessageStatus.NEW if time_message else None),
+            mailbox_status_updated_at=submitted_at if time_message else None,
+            created_at=submitted_at,
         )
+        db.add(reschedule_response)
+        if time_message:
+            new_messages.append(reschedule_response)
 
-    link.active = False
+    if new_messages:
+        # One form can create two mailbox rows; notify each device only once.
+        enqueue_message_pushes(db, new_messages[0])
     db.commit()
 
     return request.app.state.templates.TemplateResponse(

@@ -2,16 +2,23 @@ from __future__ import annotations
 
 from datetime import datetime
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import RedirectResponse
+from starlette.responses import FileResponse, RedirectResponse
 
 from app import models
 from app.db import SessionLocal, init_db
 from app.dependencies import consume_flashes, get_optional_user
-from app.routes import admin_addresses, admin_appointments, admin_availability, admin_completed_import, admin_inventory, admin_letters, admin_messages, admin_missing_photos, admin_planning, admin_register_import, admin_settings, admin_status, admin_street_priority, admin_users, auth, resident, user_dashboard, vvs_availability, vvs_tasks
+from app.routes import admin_addresses, admin_appointments, admin_availability, admin_completed_import, admin_inventory, admin_letters, admin_messages, admin_missing_photos, admin_planning, admin_register_import, admin_settings, admin_status, admin_street_priority, admin_users, auth, push, resident, user_dashboard, vvs_availability, vvs_tasks
+
+SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 app = FastAPI()
 
@@ -19,6 +26,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SECRET_KEY", "dev-secret"),
     session_cookie="vand_session",
+    https_only=SESSION_COOKIE_SECURE,
 )
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -53,9 +61,22 @@ app.include_router(admin_status.router)
 app.include_router(admin_settings.router)
 app.include_router(admin_street_priority.router)
 app.include_router(user_dashboard.router)
+app.include_router(push.router)
 app.include_router(resident.router)
 app.include_router(vvs_tasks.router)
 app.include_router(vvs_availability.router)
+
+
+@app.get("/service-worker.js", include_in_schema=False)
+def service_worker() -> FileResponse:
+    return FileResponse(
+        Path("app/static/service-worker.js"),
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "no-cache",
+            "Service-Worker-Allowed": "/",
+        },
+    )
 
 
 @app.get("/")

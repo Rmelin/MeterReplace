@@ -1,9 +1,12 @@
 {% extends "base.html" %}
+{% block head %}
+<script src="/static/push-settings.js" defer></script>
+{% endblock %}
 {% block content %}
 <section class="page-header">
     <div>
         <h1>Indstillinger</h1>
-        <p>Styr standardregler for planlægning.</p>
+        <p>Styr standardregler for planlægning og notifikationer.</p>
     </div>
 </section>
 
@@ -17,5 +20,16 @@
         <p class="hint">Standard er {{ default_planning_notice_days }} dage. Datoer tættere på end varslingen bruger kun bufferadresser i auto-planlægning.</p>
         <button type="submit" class="primary-button">Gem indstillinger</button>
     </form>
+</section>
+
+<section class="card" data-push-settings>
+    <h2>Notifikationer</h2>
+    <p>Få en notifikation på denne iPhone, når en beboer sender en ny besked.</p>
+    <p class="hint">Kræver iOS 16.4 eller nyere, HTTPS og at MeterReplace er åbnet fra hjemmeskærmen.</p>
+    <p data-push-status class="hint" role="status">Kontrollerer enheden...</p>
+    <div class="action-row">
+        <button type="button" class="primary-button" data-push-activate>Aktivér notifikationer</button>
+        <button type="button" class="ghost-button is-hidden" data-push-deactivate>Deaktivér på denne enhed</button>
+    </div>
 </section>
 {% endblock %}

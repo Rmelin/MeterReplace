@@ -16,17 +16,25 @@ Denne side beskriver et simpelt produktionssetup for MeterReplace.
 
 ## Miljøvariabler
 
-Opret en `.env`-fil med mindst:
+Opret en `.env`-fil med de relevante værdier:
 
 ```env
 SECRET_KEY=skift-denne-til-en-lang-tilfaeldig-vaerdi
 PUBLIC_BASE_URL=https://dit-domaene
+SESSION_COOKIE_SECURE=true
+VAPID_PRIVATE_KEY=/opt/meterreplace/secrets/vapid-private.pem
+VAPID_PUBLIC_KEY=indsæt-den-offentlige-nøgle
+VAPID_SUBJECT=mailto:drift@example.dk
 ```
 
 | Variabel | Påkrævet | Beskrivelse |
 |---|---|---|
 | `SECRET_KEY` | Ja | Bruges af sessions middleware |
 | `PUBLIC_BASE_URL` | Anbefalet | Bruges i links og PDF-breve |
+| `SESSION_COOKIE_SECURE` | Ja i produktion | Sæt til `true`, når appen kører over HTTPS |
+| `VAPID_PRIVATE_KEY` | Ved Web Push | Sti til den private VAPID PEM-fil |
+| `VAPID_PUBLIC_KEY` | Ved Web Push | Offentlig VAPID-nøgle til browseren |
+| `VAPID_SUBJECT` | Ved Web Push | Kontaktadresse, fx `mailto:drift@example.dk` |
 
 Hvis `PUBLIC_BASE_URL` ikke er sat, bruges requestens base URL som fallback.
 
@@ -39,7 +47,8 @@ Apple og andre push-tjenester. Nøgleparret består af:
 - en privat nøgle, som serveren bruger til at signere push-anmodninger
 
 Nøgleparret skal genereres én gang og derefter genbruges. Hvis privatnøglen
-udskiftes, skal alle telefoner som udgangspunkt aktivere notifikationer igen.
+udskiftes, registrerer indstillingssiden det gamle abonnement og beder hver
+telefon om at aktivere notifikationer igen.
 
 ### Generér nøgleparret
 
@@ -106,6 +115,7 @@ af miljøvariablerne.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python -m alembic upgrade head
 uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
 ```
 
@@ -125,15 +135,22 @@ sudo chown -R meterreplace:meterreplace /opt/meterreplace
 sudo -u meterreplace git clone https://github.com/Rmelin/MeterReplace.git /opt/meterreplace
 sudo -u meterreplace python -m venv /opt/meterreplace/.venv
 sudo -u meterreplace /opt/meterreplace/.venv/bin/pip install -r /opt/meterreplace/requirements.txt
+cd /opt/meterreplace
+sudo -u meterreplace /opt/meterreplace/.venv/bin/python -m alembic upgrade head
 ```
 
 ### 3. Opret miljøfil
 
-Opret `/opt/meterreplace/.env`:
+Generér først VAPID-nøgleparret som beskrevet ovenfor. Opret derefter
+`/opt/meterreplace/.env`:
 
 ```env
 SECRET_KEY=skift-denne-til-en-lang-tilfaeldig-vaerdi
 PUBLIC_BASE_URL=https://dit-domaene
+SESSION_COOKIE_SECURE=true
+VAPID_PRIVATE_KEY=/opt/meterreplace/secrets/vapid-private.pem
+VAPID_PUBLIC_KEY=indsæt-den-offentlige-nøgle
+VAPID_SUBJECT=mailto:drift@example.dk
 ```
 
 ### 4. Opret systemd service
@@ -158,18 +175,61 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-### 5. Start servicen
+### 5. Opret Web Push-worker
+
+Push-leveringer ligger i databasen, indtil en worker sender dem. Opret
+`/etc/systemd/system/meterreplace-push.service`:
+
+```ini
+[Unit]
+Description=Send MeterReplace Web Push notifications
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=meterreplace
+Group=meterreplace
+WorkingDirectory=/opt/meterreplace
+EnvironmentFile=/opt/meterreplace/.env
+ExecStart=/opt/meterreplace/.venv/bin/python -m app.push_worker
+```
+
+Opret derefter `/etc/systemd/system/meterreplace-push.timer`:
+
+```ini
+[Unit]
+Description=Run MeterReplace Web Push worker every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Workerens leveringskø genprøver midlertidige fejl. Kør kun én worker ad gangen,
+da standarddatabasen er SQLite. Serveren skal kunne oprette udgående
+HTTPS-forbindelser til `*.push.apple.com`. Leveringen er "at least once": Et
+processtop lige efter Apple har accepteret en push kan i sjældne tilfælde give
+en dublet, men beskeden går ikke tabt af den grund.
+
+### 6. Start services
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now meterreplace
+sudo systemctl enable --now meterreplace-push.timer
 sudo systemctl status meterreplace
+sudo systemctl status meterreplace-push.timer
 ```
 
-### 6. Se logs
+### 7. Se logs
 
 ```bash
 journalctl -u meterreplace -f
+journalctl -u meterreplace-push -f
 ```
 
 ## Reverse proxy
@@ -181,6 +241,8 @@ Vigtigt i drift:
 - appen serverer selv `/static`
 - appen serverer selv `/upload`
 - aggressiv cache på CSS og JS kan give gammelt UI efter deployment
+- HTTPS skal håndhæves, gerne med HSTS
+- port `8000` bør kun være tilgængelig fra reverse proxyen eller det interne net
 
 Hvis du bruger CDN eller reverse proxy cache, bør du have en strategi for cache-busting eller cache purge ved release.
 
@@ -219,6 +281,10 @@ Efter deploy bør du kontrollere:
 3. at `/admin/status` og `/admin/addresses` virker
 4. at CSS og JavaScript er opdateret
 5. at uploads og PDF-generering stadig virker
+6. at `python -m alembic current` viser revision `0026`
+7. at `meterreplace-push.timer` er aktiv
+8. at notifikationer kan aktiveres fra den installerede app på en fysisk iPhone
+9. at en ny beboerbesked opretter en levering og viser en notifikation
 
 ## Kendte driftsfælder
 
