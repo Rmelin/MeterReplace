@@ -1090,6 +1090,10 @@ a.chip:hover {
     margin-bottom: 1rem;
 }
 
+.message-folders .chip {
+    gap: 0.35rem;
+}
+
 .message-status-new td {
     background: rgba(var(--status-messages-rgb), 0.05);
 }

@@ -11,7 +11,7 @@
     <div class="filter-chips message-folders">
         {% for item in folders %}
             <a class="chip {% if selected_folder == item.value %}is-active{% endif %}" href="{{ item.href }}">
-                {{ item.label }} <strong>{{ item.count }}</strong>
+                <span>{{ item.label }}</span><strong>{{ item.count }}</strong>
             </a>
         {% endfor %}
     </div>
