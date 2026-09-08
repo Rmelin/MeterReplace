@@ -30,6 +30,76 @@ PUBLIC_BASE_URL=https://dit-domaene
 
 Hvis `PUBLIC_BASE_URL` ikke er sat, bruges requestens base URL som fallback.
 
+## VAPID-nøgler til Web Push
+
+Web Push bruger et VAPID-nøglepar til at identificere MeterReplace over for
+Apple og andre push-tjenester. Nøgleparret består af:
+
+- en offentlig nøgle, som sendes til browseren ved oprettelse af et abonnement
+- en privat nøgle, som serveren bruger til at signere push-anmodninger
+
+Nøgleparret skal genereres én gang og derefter genbruges. Hvis privatnøglen
+udskiftes, skal alle telefoner som udgangspunkt aktivere notifikationer igen.
+
+### Generér nøgleparret
+
+Kør dette på produktionsserveren efter installation af projektets dependencies:
+
+```bash
+sudo install -d -m 700 -o meterreplace -g meterreplace /opt/meterreplace/secrets
+cd /opt/meterreplace
+sudo -u meterreplace /opt/meterreplace/.venv/bin/python - <<'PY'
+import base64
+from pathlib import Path
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+private_key = ec.generate_private_key(ec.SECP256R1())
+private_pem = private_key.private_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption(),
+)
+private_path = Path("/opt/meterreplace/secrets/vapid-private.pem")
+private_path.write_bytes(private_pem)
+private_path.chmod(0o600)
+
+public_key = private_key.public_key().public_bytes(
+    encoding=serialization.Encoding.X962,
+    format=serialization.PublicFormat.UncompressedPoint,
+)
+print(base64.urlsafe_b64encode(public_key).rstrip(b"=").decode("ascii"))
+PY
+```
+
+Kommandoen gemmer privatnøglen i
+`/opt/meterreplace/secrets/vapid-private.pem` og udskriver den offentlige nøgle.
+Den offentlige nøgle er ikke hemmelig og må sendes til browseren.
+
+Kør ikke kommandoen igen ved almindelige deployments. Tag en krypteret backup
+af privatnøglen, og begræns adgangen til systembrugeren `meterreplace`.
+
+### Konfigurér miljøvariablerne
+
+Tilføj følgende til `/opt/meterreplace/.env`:
+
+```env
+VAPID_PRIVATE_KEY=/opt/meterreplace/secrets/vapid-private.pem
+VAPID_PUBLIC_KEY=indsæt-den-offentlige-nøgle-fra-kommandoen
+VAPID_SUBJECT=mailto:drift@example.dk
+```
+
+`VAPID_PRIVATE_KEY` indeholder filstien i stedet for selve PEM-teksten.
+`pywebpush` kan læse nøglen direkte fra filen, og løsningen undgår en skrøbelig
+multiline-hemmelighed i systemd-miljøfilen. Privatnøglen må aldrig placeres i
+Git, databasen, logs eller sendes til browseren. `.gitignore` udelukker allerede
+filer med endelserne `.pem` og `.key`.
+
+`VAPID_SUBJECT` er kontaktoplysningen i de signerede push-anmodninger. Brug en
+aktiv driftsmailadresse. Genstart applikationen og push-workeren efter ændring
+af miljøvariablerne.
+
 ## Lokal udvikling
 
 ```bash
