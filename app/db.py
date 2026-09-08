@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
@@ -35,7 +35,8 @@ def init_db() -> None:
     from app import models
     from app.auth import hash_password
 
-    Base.metadata.create_all(bind=engine)
+    if not inspect(engine).has_table("users"):
+        raise RuntimeError("Databasen mangler. Kør 'python -m alembic upgrade head'.")
     with SessionLocal() as db:
         if not db.query(models.User).first():
             admin = models.User(

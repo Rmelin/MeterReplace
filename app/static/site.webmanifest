@@ -1,6 +1,7 @@
 {
   "name": "MeterReplace",
   "short_name": "MeterReplace",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
