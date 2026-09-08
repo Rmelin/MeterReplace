@@ -51,15 +51,11 @@
                                 <form method="post" action="/admin/messages/{{ item.id }}/status" class="message-status-form">
                                     <input type="hidden" name="folder" value="{{ selected_folder }}" />
                                     <input type="hidden" name="response_type" value="{{ selected_type }}" />
-                                    <label>
-                                        <span class="sr-only">Flyt besked</span>
-                                        <select name="mailbox_status" aria-label="Flyt besked til">
-                                            {% for status, label in statuses.items() %}
-                                                <option value="{{ status.value }}" {% if status == item.status %}selected{% endif %}>{{ label }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </label>
-                                    <button type="submit" class="ghost-button">Flyt</button>
+                                    {% for status, label in statuses.items() %}
+                                        {% if status != item.status %}
+                                            <button type="submit" name="mailbox_status" value="{{ status.value }}" class="ghost-button message-status-action message-status-action-{{ status.value|lower }}">{{ label }}</button>
+                                        {% endif %}
+                                    {% endfor %}
                                 </form>
                             </td>
                         </tr>
