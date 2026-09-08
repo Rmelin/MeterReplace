@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from app import models
 from app.db import get_db
-from app.dependencies import consume_flashes, require_role
+from app.dependencies import consume_flashes, flash, require_role
 
 router = APIRouter(prefix="/admin/messages", tags=["admin"])
 
@@ -22,36 +24,89 @@ FILTERS = [
     {"value": "all", "label": "Alle"},
     {"value": "reschedule_request", "label": "Tidspunkt passer ikke"},
     {"value": "buffer_note", "label": "Målerbrønd angivet"},
-    {"value": "confirm_time", "label": "Tidspunkt bekræftet"},
 ]
+
+FOLDERS = [
+    {"value": "new", "label": "Ny", "status": models.ResidentMessageStatus.NEW},
+    {"value": "todo", "label": "Todo", "status": models.ResidentMessageStatus.TODO},
+    {"value": "read", "label": "Læst", "status": models.ResidentMessageStatus.READ},
+    {
+        "value": "archived",
+        "label": "Arkiv",
+        "status": models.ResidentMessageStatus.ARCHIVED,
+    },
+]
+
+STATUS_LABELS = {
+    models.ResidentMessageStatus.NEW: "Ny",
+    models.ResidentMessageStatus.TODO: "Todo",
+    models.ResidentMessageStatus.READ: "Læst",
+    models.ResidentMessageStatus.ARCHIVED: "Arkiv",
+}
+
+
+def dashboard_url(folder: str, response_type: str) -> str:
+    params = {}
+    if folder != "new":
+        params["folder"] = folder
+    if response_type != "all":
+        params["response_type"] = response_type
+    query = urlencode(params)
+    return f"/admin/messages?{query}" if query else "/admin/messages"
 
 
 @router.get("")
 def message_dashboard(
     request: Request,
+    folder: str | None = None,
     response_type: str | None = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN)),
 ):
+    selected_folder = folder or "new"
     selected_type = response_type or "all"
+    folder_map = {item["value"]: item["status"] for item in FOLDERS}
+    if selected_folder not in folder_map:
+        return RedirectResponse("/admin/messages", status_code=303)
     allowed_types = {item["value"] for item in FILTERS}
     if selected_type not in allowed_types:
         return RedirectResponse("/admin/messages", status_code=303)
 
+    count_rows = (
+        db.query(
+            models.ResidentResponse.mailbox_status,
+            func.count(models.ResidentResponse.id),
+        )
+        .filter(models.ResidentResponse.mailbox_status.is_not(None))
+        .group_by(models.ResidentResponse.mailbox_status)
+        .all()
+    )
+    status_counts = {status: count for status, count in count_rows}
+    folders = [
+        {
+            **item,
+            "count": status_counts.get(item["status"], 0),
+            "href": dashboard_url(item["value"], selected_type),
+        }
+        for item in FOLDERS
+    ]
+    filters = [
+        {
+            **item,
+            "href": dashboard_url(selected_folder, item["value"]),
+        }
+        for item in FILTERS
+    ]
+
     query = (
         db.query(models.ResidentResponse, models.Address)
         .join(models.Address, models.Address.id == models.ResidentResponse.address_id)
-        .filter(models.ResidentResponse.message.is_not(None))
-        .filter(models.ResidentResponse.message != "")
+        .filter(models.ResidentResponse.mailbox_status == folder_map[selected_folder])
     )
     if selected_type != "all":
         query = query.filter(models.ResidentResponse.response_type == selected_type)
 
-    rows = (
-        query.order_by(models.ResidentResponse.created_at.desc())
-        .all()
-    )
-    cutoff = datetime.utcnow() - timedelta(days=7)
+    rows = query.order_by(models.ResidentResponse.created_at.desc()).all()
 
     messages = []
     for response, address in rows:
@@ -64,7 +119,8 @@ def message_dashboard(
                 "message": response.message or "",
                 "address": address,
                 "channel": "Brevlink/QR",
-                "is_old": response.created_at < cutoff,
+                "status": response.mailbox_status,
+                "status_label": STATUS_LABELS[response.mailbox_status],
             }
         )
 
@@ -75,7 +131,53 @@ def message_dashboard(
             "current_user": user,
             "flashes": consume_flashes(request),
             "messages": messages,
-            "filters": FILTERS,
+            "folders": folders,
+            "filters": filters,
+            "statuses": STATUS_LABELS,
+            "selected_folder": selected_folder,
             "selected_type": selected_type,
         },
+    )
+
+
+@router.post("/{response_id}/status")
+def update_message_status(
+    request: Request,
+    response_id: int,
+    mailbox_status: str = Form(...),
+    folder: str = Form("new"),
+    response_type: str = Form("all"),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN)),
+):
+    allowed_statuses = {status.value: status for status in STATUS_LABELS}
+    status = allowed_statuses.get(mailbox_status)
+    if status is None:
+        raise HTTPException(status_code=400, detail="Ugyldig beskedstatus")
+
+    response = (
+        db.query(models.ResidentResponse)
+        .filter(
+            models.ResidentResponse.id == response_id,
+            models.ResidentResponse.mailbox_status.is_not(None),
+        )
+        .first()
+    )
+    if not response:
+        raise HTTPException(status_code=404, detail="Besked ikke fundet")
+
+    response.mailbox_status = status
+    response.mailbox_status_updated_at = datetime.utcnow()
+    response.mailbox_status_updated_by_user_id = user.id
+    db.commit()
+    flash(request, f"Beskeden er flyttet til {STATUS_LABELS[status]}", "success")
+
+    valid_folders = {item["value"] for item in FOLDERS}
+    valid_types = {item["value"] for item in FILTERS}
+    return RedirectResponse(
+        dashboard_url(
+            folder if folder in valid_folders else "new",
+            response_type if response_type in valid_types else "all",
+        ),
+        status_code=303,
     )

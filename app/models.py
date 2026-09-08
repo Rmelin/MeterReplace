@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -231,8 +232,22 @@ class ResidentLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class ResidentMessageStatus(str, enum.Enum):
+    NEW = "NEW"
+    TODO = "TODO"
+    READ = "READ"
+    ARCHIVED = "ARCHIVED"
+
+
 class ResidentResponse(Base):
     __tablename__ = "resident_responses"
+    __table_args__ = (
+        Index(
+            "ix_resident_responses_mailbox_status_created_at",
+            "mailbox_status",
+            "created_at",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     address_id: Mapped[int] = mapped_column(Integer, ForeignKey("addresses.id"), nullable=False)
@@ -243,4 +258,14 @@ class ResidentResponse(Base):
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     email: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    mailbox_status: Mapped[ResidentMessageStatus | None] = mapped_column(
+        Enum(ResidentMessageStatus, native_enum=False, create_constraint=False),
+        nullable=True,
+    )
+    mailbox_status_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    mailbox_status_updated_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

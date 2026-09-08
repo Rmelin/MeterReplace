@@ -169,13 +169,26 @@ def status_dashboard(
         if remaining
         else 100
     )
-    message_count = (
-        db.query(func.count(func.distinct(models.ResidentResponse.address_id)))
-        .filter(models.ResidentResponse.message.is_not(None))
-        .filter(models.ResidentResponse.message != "")
-        .scalar()
-        or 0
+    message_status_rows = (
+        db.query(
+            models.ResidentResponse.mailbox_status,
+            func.count(models.ResidentResponse.id),
+        )
+        .filter(
+            models.ResidentResponse.mailbox_status.in_(
+                [
+                    models.ResidentMessageStatus.NEW,
+                    models.ResidentMessageStatus.TODO,
+                ]
+            )
+        )
+        .group_by(models.ResidentResponse.mailbox_status)
+        .all()
     )
+    message_status_counts = dict(message_status_rows)
+    new_message_count = message_status_counts.get(models.ResidentMessageStatus.NEW, 0)
+    todo_message_count = message_status_counts.get(models.ResidentMessageStatus.TODO, 0)
+    message_count = new_message_count + todo_message_count
 
     street_totals: dict[str, int] = defaultdict(int)
     street_completed: dict[str, int] = defaultdict(int)
@@ -242,6 +255,8 @@ def status_dashboard(
             "estimated_total_workdays": estimated_total_workdays,
             "stock_coverage_pct": stock_coverage_pct,
             "message_count": message_count,
+            "new_message_count": new_message_count,
+            "todo_message_count": todo_message_count,
             "available_workday_slots": workday_status["available_workday_slots"],
             "open_slots_on_active_planned_workdays": workday_status[
                 "open_slots_on_active_planned_workdays"
