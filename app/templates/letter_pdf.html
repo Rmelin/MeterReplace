@@ -26,12 +26,9 @@
             <div class="body">{{ letter.body_html | safe }}</div>
             {% if letter.include_resident_link %}
                 <div class="response">
-                    <div>Giv os besked om målerbrønd eller behov for nyt tidspunkt:</div>
+                    <div>Giv os besked om målerbrønd, tidspunkt eller andre oplysninger:</div>
                     <div><a href="{{ letter.response_url }}">{{ letter.response_url }}</a></div>
                     <div class="qr"><img src="{{ letter.qr_data }}" alt="QR" /></div>
-                    {% if not letter.link_active %}
-                        <div>Linket er allerede brugt.</div>
-                    {% endif %}
                 </div>
             {% endif %}
         </section>

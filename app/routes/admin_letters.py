@@ -107,11 +107,16 @@ def logo_paths(template: models.LetterTemplate | None) -> tuple[str | None, str 
     return f"/upload/{relative_path}", file_path.as_uri()
 
 
-def get_or_create_link(db: Session, address: models.Address) -> models.ResidentLink:
+def get_or_create_link(
+    db: Session,
+    address: models.Address,
+    appointment: models.Appointment,
+) -> models.ResidentLink:
     link = (
         db.query(models.ResidentLink)
         .filter(
             models.ResidentLink.address_id == address.id,
+            models.ResidentLink.appointment_id == appointment.id,
             models.ResidentLink.active.is_(True),
         )
         .order_by(models.ResidentLink.created_at.desc())
@@ -119,8 +124,27 @@ def get_or_create_link(db: Session, address: models.Address) -> models.ResidentL
     )
     if link:
         return link
+    link = (
+        db.query(models.ResidentLink)
+        .filter(
+            models.ResidentLink.address_id == address.id,
+            models.ResidentLink.appointment_id.is_(None),
+            models.ResidentLink.active.is_(True),
+        )
+        .order_by(models.ResidentLink.created_at.desc())
+        .first()
+    )
+    if link:
+        link.appointment_id = appointment.id
+        db.commit()
+        return link
     token = uuid4().hex
-    link = models.ResidentLink(address_id=address.id, token=token, active=True)
+    link = models.ResidentLink(
+        address_id=address.id,
+        appointment_id=appointment.id,
+        token=token,
+        active=True,
+    )
     db.add(link)
     db.commit()
     return link
@@ -131,6 +155,7 @@ def response_label(response_type: str) -> str:
         "reschedule_request": "Tidspunkt passer ikke",
         "buffer_note": "Målerbrønd angivet",
         "confirm_time": "Tidspunkt bekræftet",
+        "message": "Besked",
     }
     return labels.get(response_type, "Svar modtaget")
 
@@ -159,12 +184,10 @@ def letter_context(
     )
     response_url = None
     qr_data = None
-    link_active = None
     if include_resident_link:
-        link = get_or_create_link(db, address)
+        link = get_or_create_link(db, address, appointment)
         response_url = f"{base_url}/r/{link.token}"
         qr_data = qr_image(response_url)
-        link_active = link.active
     return {
         "address": address,
         "appointment": appointment,
@@ -176,7 +199,6 @@ def letter_context(
         "include_resident_link": include_resident_link,
         "response_url": response_url,
         "qr_data": qr_data,
-        "link_active": link_active,
     }
 
 
@@ -317,7 +339,10 @@ def letter_preview(
     context = letter_context(address, appointment, template, base_url, db)
     latest_response = (
         db.query(models.ResidentResponse)
-        .filter(models.ResidentResponse.address_id == address.id)
+        .filter(
+            models.ResidentResponse.address_id == address.id,
+            models.ResidentResponse.appointment_id == appointment.id,
+        )
         .order_by(models.ResidentResponse.created_at.desc())
         .first()
     )

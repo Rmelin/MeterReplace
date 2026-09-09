@@ -103,6 +103,9 @@ Dokumentet beskriver krav og funktioner for admin- og VVS-flow, inkl. auto-planl
 - Beboerlink kan slås fra i brev-skabelonen (globalt).
 - Når slået fra, vises link/QR ikke i preview eller PDF.
 - Når PDF genereres, sættes status til "Beboer/kunde informeret".
+- Beboerlink er knyttet til den konkrete aftale og kan genbruges til at se og opdatere svar.
+- Målerbrønd, tidspunkt og fritekstbesked kan indsendes uafhængigt.
+- Ugyldige beboerlinks viser konfigurerede supportoplysninger fra admin-indstillinger.
 
 ---
 
