@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta
+import re
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
@@ -35,6 +38,70 @@ def scheduled_appointment(db: Session, address_id: int) -> models.Appointment | 
     )
 
 
+def appointment_for_link(
+    db: Session, link: models.ResidentLink
+) -> models.Appointment | None:
+    if link.appointment_id:
+        return (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.id == link.appointment_id,
+                models.Appointment.address_id == link.address_id,
+            )
+            .first()
+        )
+    appointment = scheduled_appointment(db, link.address_id)
+    if appointment:
+        link.appointment_id = appointment.id
+        db.commit()
+    return appointment
+
+
+def latest_link_response(
+    db: Session,
+    link_id: int,
+    response_types: tuple[str, ...],
+) -> models.ResidentResponse | None:
+    return (
+        db.query(models.ResidentResponse)
+        .filter(
+            models.ResidentResponse.resident_link_id == link_id,
+            models.ResidentResponse.response_type.in_(response_types),
+        )
+        .order_by(
+            models.ResidentResponse.created_at.desc(),
+            models.ResidentResponse.id.desc(),
+        )
+        .first()
+    )
+
+
+def resident_form_context(
+    db: Session,
+    link: models.ResidentLink,
+) -> dict[str, object]:
+    return {
+        "meter_pit_response": latest_link_response(db, link.id, ("buffer_note",)),
+        "time_response": latest_link_response(
+            db, link.id, ("confirm_time", "reschedule_request")
+        ),
+        "messages": (
+            db.query(models.ResidentResponse)
+            .filter(
+                models.ResidentResponse.resident_link_id == link.id,
+                models.ResidentResponse.response_type == "message",
+            )
+            .order_by(models.ResidentResponse.created_at.desc())
+            .limit(10)
+            .all()
+        ),
+    }
+
+
+def valid_request_id(value: str) -> bool:
+    return re.fullmatch(r"[a-f0-9]{32}", value) is not None
+
+
 def release_stock(db: Session, note: str) -> None:
     db.add(
         models.StockMovement(
@@ -59,19 +126,11 @@ def resident_form(
     if not address:
         raise HTTPException(status_code=404, detail="Adresse ikke fundet")
 
-    appointment = scheduled_appointment(db, address.id)
-
     if not link.active:
-        return request.app.state.templates.TemplateResponse(
-            "resident_response_done.html",
-            {
-                "request": request,
-                "current_user": None,
-                "flashes": consume_flashes(request),
-                "address": address,
-                "message": "Tak! Vi har allerede modtaget dit svar.",
-            },
-        )
+        raise HTTPException(status_code=404, detail="Link ikke fundet")
+
+    appointment = appointment_for_link(db, link)
+    responses = resident_form_context(db, link)
 
     return request.app.state.templates.TemplateResponse(
         "resident_response_form.html",
@@ -82,7 +141,22 @@ def resident_form(
             "address": address,
             "appointment": appointment,
             "token": token,
+            "saved": request.query_params.get("saved"),
+            "meter_pit_request_id": uuid4().hex,
+            "time_request_id": uuid4().hex,
+            "message_request_id": uuid4().hex,
+            "can_answer_time": bool(
+                appointment
+                and appointment.status
+                in {
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
+                }
+            ),
+            **responses,
         },
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
     )
 
 
@@ -90,10 +164,10 @@ def resident_form(
 def resident_submit(
     request: Request,
     token: str,
-    buffer_answer: str = Form(""),
-    time_answer: str = Form(""),
-    message: str | None = Form(""),
-    time_message: str | None = Form(""),
+    intent: str = Form(""),
+    request_id: str = Form(""),
+    answer: str = Form(""),
+    message: str = Form(""),
     phone: str | None = Form(""),
     email: str | None = Form(""),
     db: Session = Depends(get_db),
@@ -107,76 +181,88 @@ def resident_submit(
         raise HTTPException(status_code=404, detail="Adresse ikke fundet")
 
     if not link.active:
-        return RedirectResponse(f"/r/{token}", status_code=303)
+        raise HTTPException(status_code=404, detail="Link ikke fundet")
 
-    buffer_answer = buffer_answer.strip().lower()
-    time_answer = time_answer.strip().lower()
-    message = (message or "").strip() or None
-    time_message = (time_message or "").strip() or None
+    intent = intent.strip().lower()
+    request_id = request_id.strip().lower()
+    answer = answer.strip().lower()
+    message_value = message.strip() or None
     phone = (phone or "").strip() or None
     email = (email or "").strip() or None
-    if phone:
-        address.customer_phone = phone
-    if email:
-        address.customer_email = email
 
-    if buffer_answer not in {"yes", "no"} or time_answer not in {"yes", "no"}:
-        flash(request, "Vælg et svar til begge spørgsmål", "error")
+    if not valid_request_id(request_id):
+        flash(request, "Formularen er udløbet. Prøv igen.", "error")
         return RedirectResponse(f"/r/{token}", status_code=303)
-    if buffer_answer == "yes" and not message:
-        flash(request, "Angiv placering af målerbrønd", "error")
-        return RedirectResponse(f"/r/{token}", status_code=303)
-
-    claimed = (
-        db.query(models.ResidentLink)
-        .filter(
-            models.ResidentLink.id == link.id,
-            models.ResidentLink.active.is_(True),
-        )
-        .update({"active": False}, synchronize_session=False)
+    existing = (
+        db.query(models.ResidentResponse)
+        .filter(models.ResidentResponse.request_id == request_id)
+        .first()
     )
-    if claimed != 1:
-        db.rollback()
+    if existing:
+        return RedirectResponse(f"/r/{token}?saved={intent}", status_code=303)
+    if intent not in {"meter_pit", "time", "message"}:
+        flash(request, "Vælg hvad du vil sende", "error")
+        return RedirectResponse(f"/r/{token}", status_code=303)
+    if len(message_value or "") > 4000 or len(phone or "") > 50 or len(email or "") > 200:
+        flash(request, "Beskeden eller kontaktoplysningerne er for lange", "error")
+        return RedirectResponse(f"/r/{token}", status_code=303)
+    if email and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        flash(request, "E-mailadressen er ugyldig", "error")
         return RedirectResponse(f"/r/{token}", status_code=303)
 
-    appointment = scheduled_appointment(db, address.id)
+    appointment = appointment_for_link(db, link)
     submitted_at = datetime.utcnow()
-    new_messages: list[models.ResidentResponse] = []
+    response_type: str
+    mailbox_status: models.ResidentMessageStatus | None = None
 
-    if buffer_answer == "yes":
-        address.buffer_flag = True
-        address.buffer_note = message
-        buffer_response = models.ResidentResponse(
-            address_id=address.id,
-            appointment_id=appointment.id if appointment else None,
-            response_type="buffer_note",
-            message=message,
-            phone=phone,
-            email=email,
-            mailbox_status=models.ResidentMessageStatus.NEW,
-            mailbox_status_updated_at=submitted_at,
-            created_at=submitted_at,
+    if intent == "meter_pit":
+        if answer not in {"yes", "no"}:
+            flash(request, "Vælg ja eller nej til målerbrønd", "error")
+            return RedirectResponse(f"/r/{token}", status_code=303)
+        if answer == "yes" and not message_value:
+            flash(request, "Angiv placering af målerbrønd", "error")
+            return RedirectResponse(f"/r/{token}", status_code=303)
+        if len(message_value or "") > 255:
+            flash(request, "Placeringen må højst være 255 tegn", "error")
+            return RedirectResponse(f"/r/{token}", status_code=303)
+        address.buffer_flag = answer == "yes"
+        address.buffer_note = message_value if answer == "yes" else None
+        response_type = "buffer_note"
+        mailbox_status = models.ResidentMessageStatus.NEW
+    elif intent == "time":
+        if answer not in {"yes", "no"}:
+            flash(request, "Vælg om tidspunktet passer", "error")
+            return RedirectResponse(f"/r/{token}", status_code=303)
+        if not appointment:
+            flash(request, "Der er ikke længere en aftale på dette link", "error")
+            return RedirectResponse(f"/r/{token}", status_code=303)
+        previous = latest_link_response(
+            db, link.id, ("confirm_time", "reschedule_request")
         )
-        db.add(buffer_response)
-        new_messages.append(buffer_response)
-
-    if time_answer == "yes":
-        db.add(
-            models.ResidentResponse(
-                address_id=address.id,
-                appointment_id=appointment.id if appointment else None,
-                response_type="confirm_time",
-                message=None,
-                phone=phone,
-                email=email,
-                created_at=submitted_at,
+        response_type = "confirm_time" if answer == "yes" else "reschedule_request"
+        transitioned = 0
+        if answer == "no":
+            transitioned = (
+                db.query(models.Appointment)
+                .filter(
+                    models.Appointment.id == appointment.id,
+                    models.Appointment.status.in_(
+                        {
+                            models.AppointmentStatus.SCHEDULED,
+                            models.AppointmentStatus.INFORMED,
+                        }
+                    ),
+                )
+                .update(
+                    {
+                        "status": models.AppointmentStatus.NEEDS_RESCHEDULE,
+                        "changed_date": datetime.utcnow(),
+                        "changed_by_user_id": None,
+                    },
+                    synchronize_session=False,
+                )
             )
-        )
-    else:
-        if appointment:
-            appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
-            appointment.changed_date = datetime.utcnow()
-            appointment.changed_by_user_id = None
+        if transitioned == 1:
             release_stock(db, f"Beboer ønsker nyt tidspunkt {address.street} {address.house_no}")
             day = appointment.starts_at.date()
             starts_at = datetime.combine(day, time(8, 0))
@@ -186,36 +272,44 @@ def resident_submit(
                     address_id=address.id,
                     starts_at=starts_at,
                     ends_at=ends_at,
-                    note=(time_message or "Beboer har ikke tid"),
+                    note=(message_value or "Beboer har ikke tid"),
                 )
             )
-        reschedule_response = models.ResidentResponse(
-            address_id=address.id,
-            appointment_id=appointment.id if appointment else None,
-            response_type="reschedule_request",
-            message=time_message,
-            phone=phone,
-            email=email,
-            mailbox_status=(models.ResidentMessageStatus.NEW if time_message else None),
-            mailbox_status_updated_at=submitted_at if time_message else None,
-            created_at=submitted_at,
-        )
-        db.add(reschedule_response)
-        if time_message:
-            new_messages.append(reschedule_response)
+        if answer == "no" or message_value or (previous and previous.answer != answer):
+            mailbox_status = models.ResidentMessageStatus.NEW
+    else:
+        if not message_value:
+            flash(request, "Skriv en besked", "error")
+            return RedirectResponse(f"/r/{token}", status_code=303)
+        response_type = "message"
+        answer = ""
+        mailbox_status = models.ResidentMessageStatus.NEW
 
-    if new_messages:
-        # One form can create two mailbox rows; notify each device only once.
-        enqueue_message_pushes(db, new_messages[0])
-    db.commit()
-
-    return request.app.state.templates.TemplateResponse(
-        "resident_response_done.html",
-        {
-            "request": request,
-            "current_user": None,
-            "flashes": consume_flashes(request),
-            "address": address,
-            "message": "Tak! Vi har modtaget dit svar.",
-        },
+    if phone:
+        address.customer_phone = phone
+    if email:
+        address.customer_email = email
+    response = models.ResidentResponse(
+        address_id=address.id,
+        appointment_id=appointment.id if appointment else None,
+        resident_link_id=link.id,
+        response_type=response_type,
+        answer=answer or None,
+        request_id=request_id,
+        message=message_value,
+        phone=phone,
+        email=email,
+        mailbox_status=mailbox_status,
+        mailbox_status_updated_at=submitted_at if mailbox_status else None,
+        created_at=submitted_at,
     )
+    db.add(response)
+    if mailbox_status:
+        enqueue_message_pushes(db, response)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return RedirectResponse(f"/r/{token}?saved={intent}", status_code=303)
+
+    return RedirectResponse(f"/r/{token}?saved={intent}", status_code=303)

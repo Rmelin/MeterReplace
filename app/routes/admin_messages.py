@@ -18,12 +18,15 @@ RESPONSE_LABELS = {
     "reschedule_request": "Tidspunkt passer ikke",
     "buffer_note": "Målerbrønd angivet",
     "confirm_time": "Tidspunkt bekræftet",
+    "message": "Anden besked",
 }
 
 FILTERS = [
     {"value": "all", "label": "Alle"},
     {"value": "reschedule_request", "label": "Tidspunkt passer ikke"},
     {"value": "buffer_note", "label": "Målerbrønd angivet"},
+    {"value": "confirm_time", "label": "Tidspunkt bekræftet"},
+    {"value": "message", "label": "Anden besked"},
 ]
 
 FOLDERS = [
@@ -117,6 +120,7 @@ def message_dashboard(
                 "type": response.response_type,
                 "type_label": RESPONSE_LABELS.get(response.response_type, "Svar modtaget"),
                 "message": response.message or "",
+                "answer": response.answer,
                 "address": address,
                 "channel": "Brevlink/QR",
                 "status": response.mailbox_status,

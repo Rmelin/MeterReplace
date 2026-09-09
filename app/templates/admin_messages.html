@@ -44,7 +44,9 @@
                             <td data-label="Kanal">{{ item.channel }}</td>
                             <td data-label="Type">{{ item.type_label }}</td>
                             <td data-label="Status"><span class="message-status-badge message-status-badge-{{ item.status.value|lower }}">{{ item.status_label }}</span></td>
-                            <td data-label="Besked">{{ item.message }}</td>
+                            <td data-label="Besked">
+                                {% if item.answer %}<strong>{{ 'Ja' if item.answer == 'yes' else 'Nej' }}</strong>{% if item.message %} - {% endif %}{% endif %}{{ item.message }}
+                            </td>
                             <td data-label="Adresse">{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}</td>
                             <td data-label="Handlinger">
                                 <a class="ghost-button" href="/admin/addresses/{{ item.address.id }}/edit" style="font-size: 0.85rem; padding: 0.35rem 0.6rem;">Adresse</a>
