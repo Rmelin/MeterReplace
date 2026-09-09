@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from app import models
 
-PLANNING_DAY_START = time(8, 0)
-PLANNING_DAY_END = time(18, 0)
+PLANNING_DAY_START = time(6, 0)
+PLANNING_DAY_END = time(20, 0)
 
 SLOT_OCCUPYING_STATUSES = {
     models.AppointmentStatus.SCHEDULED,

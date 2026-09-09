@@ -10,6 +10,7 @@ from starlette.responses import RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.planning_slots import PLANNING_DAY_END, PLANNING_DAY_START
 
 router = APIRouter(prefix="/admin/availability", tags=["admin"])
 
@@ -23,9 +24,11 @@ def parse_time(time_raw: str):
 
 
 def validate_time_window(start: time, end: time) -> bool:
-    window_start = time(6, 0)
-    window_end = time(18, 0)
-    return start < end and window_start <= start <= window_end and window_start <= end <= window_end
+    return (
+        start < end
+        and PLANNING_DAY_START <= start <= PLANNING_DAY_END
+        and PLANNING_DAY_START <= end <= PLANNING_DAY_END
+    )
 
 
 def has_scheduled_appointments(db: Session, user_id: int, entry_date) -> bool:
@@ -105,7 +108,7 @@ def create_availability(
         return RedirectResponse("/admin/availability", status_code=303)
 
     if not validate_time_window(start_time, end_time):
-        flash(request, "Tid skal være mellem 06:00 og 18:00", "error")
+        flash(request, "Tid skal være mellem 06:00 og 20:00", "error")
         return RedirectResponse("/admin/availability", status_code=303)
 
     entry = models.VvsAvailability(
@@ -183,7 +186,7 @@ def update_availability(
         )
 
     if not validate_time_window(start_time, end_time):
-        flash(request, "Tid skal være mellem 06:00 og 18:00", "error")
+        flash(request, "Tid skal være mellem 06:00 og 20:00", "error")
         return RedirectResponse(
             f"/admin/availability/{availability_id}/edit", status_code=303
         )

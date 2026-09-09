@@ -921,7 +921,7 @@ def manual_planning_commit(
     window_end = PLANNING_DAY_END
 
     if not (window_start <= start_time < window_end):
-        flash(request, "Tid skal være mellem 08:00 og 18:00", "error")
+        flash(request, "Tid skal være mellem 06:00 og 20:00", "error")
         return RedirectResponse(
             f"/admin/planning/manual?date_query={date_raw}", status_code=303
         )

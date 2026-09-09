@@ -10,7 +10,9 @@ from starlette.requests import Request
 from app import models
 from app.db import Base
 from app.planning_slots import availability_slots, build_slots
+from app.routes.admin_availability import validate_time_window as admin_time_window_valid
 from app.routes.admin_planning import manual_planning_commit
+from app.routes.vvs_availability import validate_time_window as vvs_time_window_valid
 
 
 class PlanningSlotTests(unittest.TestCase):
@@ -84,17 +86,27 @@ class PlanningSlotTests(unittest.TestCase):
         self.assertEqual(len(slots), 16)
         self.assertEqual(slots[-1][2].time(), time(16, 0))
 
-    def test_planning_stops_at_allowed_end_of_day(self) -> None:
-        self.availability.end_time = time(18, 0)
+    def test_planning_uses_full_registered_workday(self) -> None:
+        self.availability.start_time = time(6, 30)
+        self.availability.end_time = time(20, 0)
         self.db.commit()
 
         slots = availability_slots(self.db, self.plan_date)
 
-        self.assertEqual(len(slots), 20)
-        self.assertEqual(slots[-1][1].time(), time(17, 30))
-        self.assertEqual(slots[-1][2].time(), time(18, 0))
+        self.assertEqual(len(slots), 27)
+        self.assertEqual(slots[0][1].time(), time(6, 30))
+        self.assertEqual(slots[-1][1].time(), time(19, 30))
+        self.assertEqual(slots[-1][2].time(), time(20, 0))
+
+    def test_admin_and_vvs_accept_workday_until_20(self) -> None:
+        for validator in (admin_time_window_valid, vvs_time_window_valid):
+            self.assertTrue(validator(time(6, 30), time(20, 0)))
+            self.assertFalse(validator(time(5, 30), time(16, 0)))
+            self.assertFalse(validator(time(8, 0), time(20, 30)))
 
     def test_manual_planning_accepts_extended_slot(self) -> None:
+        self.availability.start_time = time(6, 30)
+        self.availability.end_time = time(20, 0)
         self.db.add(
             models.StockMovement(
                 movement_type=models.InventoryMovementType.PURCHASE,
@@ -118,7 +130,7 @@ class PlanningSlotTests(unittest.TestCase):
             date_raw=self.plan_date.isoformat(),
             address_id=self.address.id,
             contractor_id=self.contractor.id,
-            start_raw="16:00",
+            start_raw="19:30",
             notes="",
             db=self.db,
             user=self.admin,
@@ -126,8 +138,8 @@ class PlanningSlotTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 303)
         appointment = self.db.query(models.Appointment).one()
-        self.assertEqual(appointment.starts_at.time(), time(16, 0))
-        self.assertEqual(appointment.ends_at.time(), time(16, 30))
+        self.assertEqual(appointment.starts_at.time(), time(19, 30))
+        self.assertEqual(appointment.ends_at.time(), time(20, 0))
 
 
 if __name__ == "__main__":
