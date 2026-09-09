@@ -55,6 +55,9 @@ Her opretter admin:
 - eventuel note
 
 Arbejdsdagene bruges senere af statusdashboardet og planlægningen.
+Planlægningen opretter hele 30-minutters slots inden for den registrerede
+arbejdsdag mellem 06:00 og 20:00. Standardvalget er 08:00-16:00, men en
+forlængelse fra 16:00 til 16:30 giver eksempelvis én ekstra mulighed.
 
 ## 4. Planlæg adresser automatisk
 

@@ -70,7 +70,7 @@ def render_body(body_markdown: str) -> str:
 
 
 def time_window(starts_at: datetime) -> str:
-    return "Formiddag (08:00–12:00)" if starts_at.hour < 12 else "Eftermiddag (12:00–16:00)"
+    return "Formiddag (06:00–12:00)" if starts_at.hour < 12 else "Eftermiddag (12:00–20:00)"
 
 
 def public_base_url(request: Request) -> str:

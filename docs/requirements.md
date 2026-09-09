@@ -78,6 +78,8 @@ Dokumentet beskriver krav og funktioner for admin- og VVS-flow, inkl. auto-planl
 - Import bruger `vvs_name` til at finde VVS-bruger.
 - Hvis arbejdsdag allerede findes for datoen, springes rækken over.
 - Hvis arbejdsdag mangler, oprettes den automatisk (08:00–16:00).
+- Arbejdsdage er som standard 08:00-16:00, men kan registreres mellem 06:00 og 20:00.
+- Planlægningen bruger hele 30-minutters slots inden for den registrerede arbejdsdag.
 
 ---
 
