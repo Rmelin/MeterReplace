@@ -6,8 +6,20 @@
 <section class="page-header">
     <div>
         <h1>Indstillinger</h1>
-        <p>Styr standardregler for planlægning og notifikationer.</p>
+        <p>Styr planlægning, beboersupport og notifikationer.</p>
     </div>
+</section>
+
+<section class="card">
+    <h2>Beboersupport</h2>
+    <p class="hint">Vises på fejlsiden, hvis et beboerlink eller en QR-kode ikke virker. Tomme felter skjules.</p>
+    <form method="post" action="/admin/settings" class="form-grid">
+        <input type="hidden" name="section" value="support" />
+        <label>Supportmail<input type="email" name="support_email" maxlength="254" value="{{ support_contact.email }}" /></label>
+        <label>Supporttelefon<input type="tel" name="support_phone" maxlength="50" value="{{ support_contact.phone }}" /></label>
+        <label>Telefontid<input type="text" name="support_phone_hours" maxlength="255" value="{{ support_contact.phone_hours }}" placeholder="Fx hverdage 08:00-15:00" /></label>
+        <button type="submit" class="primary-button">Gem kontaktoplysninger</button>
+    </form>
 </section>
 
 <section class="card">

@@ -225,9 +225,15 @@ class LetterTemplate(Base):
 
 class ResidentLink(Base):
     __tablename__ = "resident_links"
+    __table_args__ = (
+        Index("ix_resident_links_address_appointment_active", "address_id", "appointment_id", "active"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     address_id: Mapped[int] = mapped_column(Integer, ForeignKey("addresses.id"), nullable=False)
+    appointment_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("appointments.id"), nullable=True
+    )
     token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -248,6 +254,13 @@ class ResidentResponse(Base):
             "mailbox_status",
             "created_at",
         ),
+        Index(
+            "ix_resident_responses_link_type_created",
+            "resident_link_id",
+            "response_type",
+            "created_at",
+        ),
+        Index("ux_resident_responses_request_id", "request_id", unique=True),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -255,7 +268,12 @@ class ResidentResponse(Base):
     appointment_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("appointments.id"), nullable=True
     )
+    resident_link_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("resident_links.id"), nullable=True
+    )
     response_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    answer: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     email: Mapped[str | None] = mapped_column(String(200), nullable=True)

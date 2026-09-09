@@ -111,11 +111,16 @@ Beboerlink peger på resident-flowet, men admin følger op fra `/admin/messages`
 
 Typiske resultater:
 
-- beboer bekræfter tidspunkt
-- beboer skriver besked
-- beboer anmoder om ny dato
+- beboer oplyser eller opdaterer placering af målerbrønd
+- beboer bekræfter tidspunkt eller anmoder om en ny dato
+- beboer sender en separat besked uden at ændre de øvrige svar
 
 En anmodning om ny dato kan føre til status `NEEDS_RESCHEDULE`.
+Beboerlinket forbliver tilknyttet den konkrete aftale, så beboeren kan se og
+opdatere sine seneste svar. Hver ændring gemmes som en ny historikpost.
+
+Supportmail, telefon og telefontid konfigureres på `/admin/settings` og vises på
+fejlsiden, hvis et beboerlink ikke kan findes.
 
 ## 8. Følg op på opgaver
 

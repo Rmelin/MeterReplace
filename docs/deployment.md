@@ -281,7 +281,7 @@ Efter deploy bør du kontrollere:
 3. at `/admin/status` og `/admin/addresses` virker
 4. at CSS og JavaScript er opdateret
 5. at uploads og PDF-generering stadig virker
-6. at `python -m alembic current` viser revision `0026`
+6. at `python -m alembic current` viser revision `0027`
 7. at `meterreplace-push.timer` er aktiv
 8. at notifikationer kan aktiveres fra den installerede app på en fysisk iPhone
 9. at en ny beboerbesked opretter en levering og viser en notifikation

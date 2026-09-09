@@ -1404,16 +1404,22 @@ def delete_address(
         flash(request, "Adresse ikke fundet", "error")
         return RedirectResponse("/admin/addresses", status_code=303)
 
+    response_ids = db.query(models.ResidentResponse.id).filter(
+        models.ResidentResponse.address_id == address_id
+    )
+    db.query(models.PushDelivery).filter(
+        models.PushDelivery.resident_response_id.in_(response_ids)
+    ).delete(synchronize_session=False)
     db.query(models.ResidentResponse).filter(
         models.ResidentResponse.address_id == address_id
     ).delete(synchronize_session=False)
     db.query(models.AppointmentPhoto).filter(
         models.AppointmentPhoto.address_id == address_id
     ).delete(synchronize_session=False)
-    db.query(models.Appointment).filter(models.Appointment.address_id == address_id).delete(
+    db.query(models.ResidentLink).filter(models.ResidentLink.address_id == address_id).delete(
         synchronize_session=False
     )
-    db.query(models.ResidentLink).filter(models.ResidentLink.address_id == address_id).delete(
+    db.query(models.Appointment).filter(models.Appointment.address_id == address_id).delete(
         synchronize_session=False
     )
     db.query(models.AddressUnavailablePeriod).filter(

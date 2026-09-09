@@ -10,6 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse, RedirectResponse
 
 from app import models
+from app.app_settings import support_contact
 from app.db import SessionLocal, init_db
 from app.dependencies import consume_flashes, get_optional_user
 from app.routes import admin_addresses, admin_appointments, admin_availability, admin_completed_import, admin_inventory, admin_letters, admin_messages, admin_missing_photos, admin_planning, admin_register_import, admin_settings, admin_status, admin_street_priority, admin_users, auth, push, resident, user_dashboard, vvs_availability, vvs_tasks
@@ -126,8 +127,10 @@ def access_denied(request: Request, exc):
 
 @app.exception_handler(404)
 def not_found(request: Request, exc):
+    is_resident_404 = request.url.path == "/r" or request.url.path.startswith("/r/")
     with SessionLocal() as db:
         user = get_optional_user(request, db)
+        contact = support_contact(db) if is_resident_404 else None
     return request.app.state.templates.TemplateResponse(
         "error.html",
         {
@@ -135,9 +138,20 @@ def not_found(request: Request, exc):
             "current_user": user,
             "flashes": consume_flashes(request),
             "status_code": 404,
-            "message": "Siden findes ikke",
+            "message": (
+                "Beboerlinket kunne ikke findes eller er ikke længere gyldigt."
+                if is_resident_404
+                else "Siden findes ikke"
+            ),
+            "is_resident_404": is_resident_404,
+            "support_contact": contact,
         },
         status_code=404,
+        headers=(
+            {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
+            if is_resident_404
+            else None
+        ),
     )
 
 

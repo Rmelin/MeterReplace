@@ -17,9 +17,6 @@
     {% if resident_response %}
         <p class="hint">Svar: {{ resident_response.label }} · {{ resident_response.date }}</p>
     {% endif %}
-    {% if not link_active %}
-        <p class="hint">Linket er allerede brugt.</p>
-    {% endif %}
 </section>
 {% endif %}
 

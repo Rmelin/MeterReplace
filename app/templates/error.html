@@ -3,6 +3,22 @@
 <section class="card narrow">
     <h1>Fejl {{ status_code }}</h1>
     <p>{{ message }}</p>
-    <a href="/" class="primary-button">Til forsiden</a>
+    {% if is_resident_404 %}
+        <p>Prøv at scanne QR-koden igen, eller kontrollér at hele linket er kopieret.</p>
+        {% if support_contact and (support_contact.email or support_contact.phone) %}
+            <div style="margin: 1.5rem 0;">
+                <h2>Kontakt os</h2>
+                {% if support_contact.email %}
+                    <p>E-mail: <a href="mailto:{{ support_contact.email }}">{{ support_contact.email }}</a></p>
+                {% endif %}
+                {% if support_contact.phone %}
+                    <p>Telefon: {% if support_contact.phone_href %}<a href="tel:{{ support_contact.phone_href }}">{{ support_contact.phone }}</a>{% else %}{{ support_contact.phone }}{% endif %}</p>
+                    {% if support_contact.phone_hours %}<p class="hint">Telefontid: {{ support_contact.phone_hours }}</p>{% endif %}
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        <a href="/" class="primary-button">Til forsiden</a>
+    {% endif %}
 </section>
 {% endblock %}
