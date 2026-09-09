@@ -13,7 +13,13 @@ from app import models
 from app.app_settings import is_within_planning_notice, planning_notice_days
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
-from app.planning_slots import SLOT_OCCUPYING_STATUSES, availability_slots, build_slots
+from app.planning_slots import (
+    PLANNING_DAY_END,
+    PLANNING_DAY_START,
+    SLOT_OCCUPYING_STATUSES,
+    availability_slots,
+    build_slots,
+)
 from app.workday_status import build_workday_status
 
 router = APIRouter(prefix="/admin/planning", tags=["admin"])
@@ -911,11 +917,11 @@ def manual_planning_commit(
 
     slot_start = datetime.combine(plan_date, start_time)
     slot_end = slot_start + timedelta(minutes=30)
-    window_start = time(8, 0)
-    window_end = time(16, 0)
+    window_start = PLANNING_DAY_START
+    window_end = PLANNING_DAY_END
 
     if not (window_start <= start_time < window_end):
-        flash(request, "Tid skal være mellem 08:00 og 16:00", "error")
+        flash(request, "Tid skal være mellem 08:00 og 18:00", "error")
         return RedirectResponse(
             f"/admin/planning/manual?date_query={date_raw}", status_code=303
         )

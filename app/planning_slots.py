@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from app import models
 
+PLANNING_DAY_START = time(8, 0)
+PLANNING_DAY_END = time(18, 0)
+
 SLOT_OCCUPYING_STATUSES = {
     models.AppointmentStatus.SCHEDULED,
     models.AppointmentStatus.INFORMED,
@@ -26,7 +29,10 @@ def availability_slots(
         .all()
     )
     slots: list[tuple[models.User, datetime, datetime]] = []
-    windows = [(time(8, 0), time(12, 0)), (time(12, 0), time(16, 0))]
+    windows = [
+        (PLANNING_DAY_START, time(12, 0)),
+        (time(12, 0), PLANNING_DAY_END),
+    ]
 
     for entry, contractor in availability:
         for window_start, window_end in windows:

@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.planning_slots import PLANNING_DAY_END, PLANNING_DAY_START
 
 router = APIRouter(prefix="/vvs/tasks", tags=["vvs"])
 
@@ -853,11 +854,11 @@ def update_task(
     if calculated_minutes < 5 or calculated_minutes > 480:
         return handle_error("Planlagt varighed skal være mellem 5 og 480 minutter")
 
-    if not (time(8, 0) <= start_time < time(16, 0)):
-        return handle_error("Tid skal være mellem 08:00 og 16:00")
+    if not (PLANNING_DAY_START <= start_time < PLANNING_DAY_END):
+        return handle_error("Tid skal være mellem 08:00 og 18:00")
 
-    if ends_at.time() > time(16, 0):
-        return handle_error("Sluttid skal være senest 16:00")
+    if ends_at.time() > PLANNING_DAY_END:
+        return handle_error("Sluttid skal være senest 18:00")
 
     appointment.old_meter_no = old_meter_no.strip() or None
     appointment.new_meter_no = new_meter_no.strip() or None

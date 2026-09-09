@@ -78,6 +78,7 @@ Dokumentet beskriver krav og funktioner for admin- og VVS-flow, inkl. auto-planl
 - Import bruger `vvs_name` til at finde VVS-bruger.
 - Hvis arbejdsdag allerede findes for datoen, springes rækken over.
 - Hvis arbejdsdag mangler, oprettes den automatisk (08:00–16:00).
+- En manuelt forlænget arbejdsdag giver ekstra hele 30-minutters planslots frem til 18:00.
 
 ---
 
