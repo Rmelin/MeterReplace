@@ -177,3 +177,36 @@ git log --oneline -n 10
 journalctl -u meterreplace -f
 curl -I "https://dit-domaene/static/styles.css"
 ```
+
+## Notifikationer på iPhone virker ikke
+
+Web Push kræver iOS 16.4 eller nyere, HTTPS og at appen åbnes fra hjemmeskærmen
+([WebKits beskrivelse](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)).
+
+1. Åbn MeterReplace i Safari, tryk **Del → Føj til hjemmeskærm**.
+2. Åbn appen fra ikonet, log ind som administrator og gå til **Indstillinger**.
+3. Tryk **Aktivér notifikationer**, og giv tilladelse.
+4. Er tilladelsen blokeret, kontrollér **Indstillinger → Notifikationer → MeterReplace** på iPhone.
+
+Hvis appen viser, at notifikationer er aktive, men ingen modtages:
+
+- Kontrollér Fokus og notifikationsindstillinger på telefonen.
+- Test med en ny beboerbesked. Eksisterende beskeder udløser ikke en ny push.
+- Kontrollér push-timeren og workerens logs på serveren:
+
+  ```bash
+  sudo systemctl status meterreplace-push.timer
+  sudo systemctl list-timers meterreplace-push.timer
+  sudo journalctl -u meterreplace-push --since "1 hour ago" --no-pager
+  ```
+
+- Timeren skal installeres særskilt som beskrevet i [deployment](deployment.md).
+  Et gemt abonnement betyder ikke, at workeren kører eller Apple har modtaget beskeden.
+- Webapp og worker skal bruge samme database og samme VAPID-konfiguration.
+  Kontrollér, at begge servicebrugere kan læse PEM-filen, og at serveren kan nå
+  `*.push.apple.com` via HTTPS. Del aldrig privatnøglen i logs eller fejlrapporter.
+- Efter ændring af VAPID-nøglepar: genstart webappen, åbn appens indstillinger på
+  iPhone og aktivér igen. Bevar normalt nøgleparret mellem deployments.
+
+Ved fortsatte problemer: notér den præcise status i appen, iOS-version og tidspunktet
+for en ny beboerbesked, og sammenhold med workerens `sent`, `retried` og `failed`.
