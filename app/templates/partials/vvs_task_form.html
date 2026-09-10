@@ -73,7 +73,7 @@
             <h2>Upload fotos</h2>
             {% set photo_types = photos | map(attribute='photo_type') | list %}
             {% set photo_complete = ('both' in photo_types) or (photos | length >= 2) %}
-            <div class="photo-count-badge">Fotos: {{ photos | length }}/2{% if photo_complete %} · Komplet{% endif %}</div>
+            <div class="photo-count-badge{% if not photo_complete %} is-incomplete{% endif %}">Fotos: {{ photos | length }}/2 · {% if photo_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
             <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form">
                 <fieldset class="option-field vvs-photo-type-fieldset" required>
                     <legend>Fototype</legend>

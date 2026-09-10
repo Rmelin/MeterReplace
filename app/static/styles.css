@@ -1166,6 +1166,12 @@ a.chip:hover {
     margin: 0.5rem 0 0.75rem;
 }
 
+.photo-count-badge.is-incomplete {
+    border-color: rgba(249, 115, 22, 0.45);
+    background: rgba(249, 115, 22, 0.12);
+    color: #c2410c;
+}
+
 .task-card-has-note {
     border-color: rgba(249, 115, 22, 0.45);
     box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.12), var(--shadow);
@@ -1497,7 +1503,7 @@ a.chip:hover {
 }
 
 .vvs-task-primary-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .vvs-task-action-button {

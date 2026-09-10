@@ -281,7 +281,7 @@
                     {% set photo_types = photo_list | map(attribute='photo_type') | list %}
                     {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
                     <div class="vvs-task-photo-panel">
-                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
+                        <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
                             {% if selected_date %}
                                 <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
@@ -411,7 +411,7 @@
                     {% set photo_types = photo_list | map(attribute='photo_type') | list %}
                     {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
                     <div class="vvs-task-photo-panel">
-                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
+                        <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
                             {% if selected_date %}
                                 <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />

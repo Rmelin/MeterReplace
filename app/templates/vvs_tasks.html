@@ -260,6 +260,10 @@
                 <div class="vvs-task-primary-actions">
                     <a class="primary-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
                     {% if address %}
+                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/complete" class="vvs-task-quick-form">
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <button type="submit" class="primary-button vvs-task-action-button">Skiftet</button>
+                        </form>
                         <form method="post" action="/vvs/tasks/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="ghost-button vvs-task-action-button">Ikke hjemme</button>
@@ -274,7 +278,7 @@
 
                 {% if address %}
                     <div class="vvs-task-photo-panel">
-                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
+                        <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <fieldset class="option-field vvs-photo-type-fieldset" required>
@@ -422,11 +426,14 @@
                 <p class="hint"><strong>Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</strong></p>
                 <div class="vvs-task-primary-actions">
                     <a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
+                    {% if address and not photos_complete %}
+                        <a class="primary-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit">Upload fotos</a>
+                    {% endif %}
                 </div>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
                 {% if address %}
                     <div class="vvs-task-photo-panel is-compact">
-                        <div class="photo-count-badge">Fotos: {{ photo_list | length }}/2{% if photos_complete %} · Komplet{% endif %}</div>
+                        <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         {% if photo_list %}
                             <div class="photo-grid">
                                 {% for photo in photo_list %}

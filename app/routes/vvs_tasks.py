@@ -915,6 +915,46 @@ def close_task(
     return RedirectResponse(redirect_target, status_code=303)
 
 
+@router.post("/{appointment_id}/complete")
+def mark_completed(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id == appointment_id,
+            models.Appointment.contractor_id == user.id,
+        )
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    photos = (
+        db.query(models.AppointmentPhoto)
+        .filter(models.AppointmentPhoto.appointment_id == appointment.id)
+        .all()
+    )
+    appointment.status = models.AppointmentStatus.COMPLETED
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/vvs/tasks"
+    if date_query:
+        redirect_target = f"/vvs/tasks?date_query={date_query}"
+
+    message = "Opgave markeret som skiftet"
+    if not photo_complete(photos):
+        message += " – opgaven mangler stadig fotos"
+    flash(request, message, "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
 @router.post("/{appointment_id}/not-home")
 def mark_not_home(
     request: Request,
