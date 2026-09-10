@@ -235,7 +235,20 @@
 </section>
 
 <section class="card">
-    <h2>To do</h2>
+    <div class="section-header">
+        <div>
+            <h2>To do</h2>
+            {% if remaining_address_count %}
+                <p class="hint">{{ remaining_address_count }} adresse{% if remaining_address_count != 1 %}r{% endif %} mangler en status.</p>
+            {% endif %}
+        </div>
+        {% if remaining_address_count and selected_date %}
+            <form method="post" action="/admin/appointments/complete-remaining" onsubmit="return confirm('Markér alle {{ remaining_address_count }} resterende adresser som skiftet? Opgaver med en anden status ændres ikke.');">
+                <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                <button type="submit" class="primary-button">Markér alle resterende som skiftet</button>
+            </form>
+        {% endif %}
+    </div>
     {% if todo %}
         {% for appointment in todo %}
             {% set address = addresses.get(appointment.id) %}
@@ -249,6 +262,22 @@
                     {% endif %}
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
+                {% if address %}
+                    <div class="vvs-task-primary-actions">
+                        <form method="post" action="/admin/appointments/{{ appointment.id }}/complete" class="vvs-task-quick-form">
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <button type="submit" class="primary-button vvs-task-action-button">Skiftet</button>
+                        </form>
+                        <form method="post" action="/admin/appointments/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <button type="submit" class="ghost-button vvs-task-action-button">Ikke hjemme</button>
+                        </form>
+                        <form method="post" action="/admin/appointments/{{ appointment.id }}/blocked" class="vvs-task-quick-form">
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <button type="submit" class="ghost-button vvs-task-action-button">Fejl ved måler</button>
+                        </form>
+                    </div>
+                {% endif %}
                 {% if appointment.notes %}
                     <div class="task-note-banner">
                         <span class="task-note-label">NOTE</span>

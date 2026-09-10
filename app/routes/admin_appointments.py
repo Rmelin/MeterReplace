@@ -360,6 +360,9 @@ def appointment_overview(
             "afternoon_overview": afternoon_overview,
             "buffer_overview": buffer_overview,
             "todo": todo,
+            "remaining_address_count": sum(
+                1 for appointment in todo if addresses.get(appointment.id) is not None
+            ),
             "needs_reschedule": needs_reschedule,
             "done": done,
             "availability_dates": dates,
@@ -815,4 +818,162 @@ def close_appointment(
         redirect_target = f"/admin/appointments?date_query={date_query}"
 
     flash(request, "Opgave afsluttet", "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/complete-remaining")
+def complete_remaining(
+    request: Request,
+    date_query: str = Form(""),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    try:
+        selected_date = datetime.strptime(date_query, "%Y-%m-%d").date()
+    except ValueError:
+        flash(request, "Vælg en gyldig arbejdsdag", "error")
+        return RedirectResponse("/admin/appointments", status_code=303)
+
+    appointments = (
+        db.query(models.Appointment)
+        .filter(
+            func.date(models.Appointment.starts_at) == selected_date,
+            models.Appointment.address_id.isnot(None),
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                ]
+            ),
+        )
+        .all()
+    )
+    changed_at = datetime.utcnow()
+    for appointment in appointments:
+        appointment.status = models.AppointmentStatus.COMPLETED
+        appointment.changed_date = changed_at
+        appointment.changed_by_user_id = user.id
+    db.commit()
+
+    count = len(appointments)
+    if count:
+        flash(
+            request,
+            f"{count} resterende opgave{'r' if count != 1 else ''} markeret som skiftet",
+            "success",
+        )
+    else:
+        flash(request, "Ingen resterende opgaver at markere som skiftet", "info")
+    return RedirectResponse(
+        f"/admin/appointments?date_query={selected_date.isoformat()}",
+        status_code=303,
+    )
+
+
+@router.post("/{appointment_id}/complete")
+def mark_completed(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    photos = (
+        db.query(models.AppointmentPhoto)
+        .filter(models.AppointmentPhoto.appointment_id == appointment.id)
+        .all()
+    )
+    appointment.status = models.AppointmentStatus.COMPLETED
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/admin/appointments"
+    if date_query:
+        redirect_target = f"/admin/appointments?date_query={date_query}"
+
+    message = "Opgave markeret som skiftet"
+    if not photo_complete(photos):
+        message += " – opgaven mangler stadig fotos"
+    flash(request, message, "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/{appointment_id}/not-home")
+def mark_not_home(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    appointment.status = models.AppointmentStatus.NOT_HOME
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.commit()
+
+    redirect_target = "/admin/appointments"
+    if date_query:
+        redirect_target = f"/admin/appointments?date_query={date_query}"
+
+    flash(request, "Opgave markeret som ikke hjemme", "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/{appointment_id}/blocked")
+def mark_blocked(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    redirect_target = "/admin/appointments"
+    if date_query:
+        redirect_target = f"/admin/appointments?date_query={date_query}"
+
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.address_id is None:
+        flash(request, "Opgave uden adresse kan ikke markeres som fejl ved måler", "error")
+        return RedirectResponse(redirect_target, status_code=303)
+
+    address = db.query(models.Address).filter(models.Address.id == appointment.address_id).first()
+    if not address:
+        flash(request, "Adresse ikke fundet", "error")
+        return RedirectResponse(redirect_target, status_code=303)
+
+    address.blocked_reason = BLOCKED_REASON
+    note_value = appointment.notes or BLOCKED_REASON
+    if appointment.status == models.AppointmentStatus.NOT_HOME:
+        db.add(
+            models.Appointment(
+                address_id=appointment.address_id,
+                contractor_id=appointment.contractor_id,
+                starts_at=appointment.starts_at + timedelta(seconds=1),
+                ends_at=appointment.ends_at + timedelta(seconds=1),
+                status=models.AppointmentStatus.NEEDS_RESCHEDULE,
+                letter_required=appointment.letter_required,
+                notes=note_value,
+                changed_date=datetime.utcnow(),
+                changed_by_user_id=user.id,
+            )
+        )
+    else:
+        appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
+        appointment.notes = note_value
+        appointment.changed_date = datetime.utcnow()
+        appointment.changed_by_user_id = user.id
+    db.commit()
+
+    flash(request, "Adresse markeret som fejl ved måler og sendt til ny plan", "success")
     return RedirectResponse(redirect_target, status_code=303)

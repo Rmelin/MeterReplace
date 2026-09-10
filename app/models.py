@@ -147,7 +147,9 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    address_id: Mapped[int] = mapped_column(Integer, ForeignKey("addresses.id"), nullable=False)
+    address_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("addresses.id"), nullable=True
+    )
     contractor_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
