@@ -139,6 +139,9 @@ Her kan admin blandt andet:
 - afslutte sager
 
 VVS har tilsvarende et separat arbejdsflow i `/vvs/tasks`.
+VVS kan markere en opgave som skiftet uden først at uploade fotos. Manglende
+eller ufuldstændige fotos markeres på opgaven og vises på admins side
+`/admin/missing-photos`.
 
 ## 9. Importer færdige eller afsluttede sager
 

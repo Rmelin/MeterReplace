@@ -13,16 +13,19 @@ STATUS_LABELS = {
 }
 
 
-@router.get("")
-def missing_photos_overview(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: models.User = Depends(require_role(models.UserRole.ADMIN)),
-):
-    photo_address_ids = {
-        row[0]
-        for row in db.query(models.AppointmentPhoto.address_id).distinct().all()
-    }
+def photo_complete(photos: list[models.AppointmentPhoto]) -> bool:
+    photo_types = {photo.photo_type for photo in photos}
+    return "both" in photo_types or {"new", "old"}.issubset(photo_types)
+
+
+def missing_photo_rows(db: Session) -> list[dict[str, object]]:
+    photos = db.query(models.AppointmentPhoto).all()
+    photos_by_appointment: dict[int, list[models.AppointmentPhoto]] = {}
+    photo_address_ids: set[int] = set()
+    for photo in photos:
+        photos_by_appointment.setdefault(photo.appointment_id, []).append(photo)
+        photo_address_ids.add(photo.address_id)
+
     appointments = (
         db.query(models.Appointment, models.Address, models.User)
         .join(models.Address, models.Address.id == models.Appointment.address_id)
@@ -42,7 +45,7 @@ def missing_photos_overview(
         if address.id in seen_addresses:
             continue
         seen_addresses.add(address.id)
-        if address.id in photo_address_ids:
+        if photo_complete(photos_by_appointment.get(appointment.id, [])):
             continue
         rows.append(
             {
@@ -59,9 +62,7 @@ def missing_photos_overview(
         .all()
     )
     for address in register_closed_addresses:
-        if address.id in seen_addresses:
-            continue
-        if address.id in photo_address_ids:
+        if address.id in seen_addresses or address.id in photo_address_ids:
             continue
         rows.append(
             {
@@ -70,6 +71,16 @@ def missing_photos_overview(
                 "contractor": None,
             }
         )
+    return rows
+
+
+@router.get("")
+def missing_photos_overview(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN)),
+):
+    rows = missing_photo_rows(db)
 
     return request.app.state.templates.TemplateResponse(
         "admin_missing_photos.html",
