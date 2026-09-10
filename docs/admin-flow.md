@@ -78,6 +78,7 @@ Vigtige regler:
 - commit laver samtidig en lagerreservation
 - unavailable-perioder respekteres
 - blokerede adresser og buffer-adresser holdes ude af normal planlægning
+- en aftale, der markeres som skiftet før den planlagte dato, frigiver sit oprindelige slot
 
 ## 5. Planlæg manuelt
 

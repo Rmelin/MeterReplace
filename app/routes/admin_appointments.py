@@ -14,7 +14,11 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
-from app.planning_slots import PLANNING_DAY_END, PLANNING_DAY_START
+from app.planning_slots import (
+    PLANNING_DAY_END,
+    PLANNING_DAY_START,
+    SLOT_OCCUPYING_STATUSES,
+)
 from app.workday_status import build_workday_status
 
 router = APIRouter(prefix="/admin/appointments", tags=["admin"])
@@ -45,15 +49,6 @@ STATUS_LABELS = {
     models.AppointmentStatus.NOT_HOME: "Ikke hjemme",
     models.AppointmentStatus.NEEDS_RESCHEDULE: "Behov for ny dato",
 }
-
-SLOT_OCCUPYING_STATUSES = {
-    models.AppointmentStatus.SCHEDULED,
-    models.AppointmentStatus.INFORMED,
-    models.AppointmentStatus.COMPLETED,
-    models.AppointmentStatus.CLOSED,
-    models.AppointmentStatus.NOT_HOME,
-}
-
 
 def appointment_photos(
     db: Session, appointment_ids: list[int]

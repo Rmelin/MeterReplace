@@ -12,7 +12,6 @@ PLANNING_DAY_END = time(20, 0)
 SLOT_OCCUPYING_STATUSES = {
     models.AppointmentStatus.SCHEDULED,
     models.AppointmentStatus.INFORMED,
-    models.AppointmentStatus.COMPLETED,
     models.AppointmentStatus.CLOSED,
     models.AppointmentStatus.NOT_HOME,
 }

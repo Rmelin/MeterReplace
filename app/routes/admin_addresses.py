@@ -21,6 +21,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.planning_slots import SLOT_OCCUPYING_STATUSES
 from app.workday_status import build_workday_status
 
 PHOTO_LABELS = {
@@ -185,15 +186,6 @@ def parse_date(value: str):
 
 def parse_time_value(value: str):
     return datetime.strptime(value, "%H:%M").time()
-
-
-SLOT_OCCUPYING_STATUSES = {
-    models.AppointmentStatus.SCHEDULED,
-    models.AppointmentStatus.INFORMED,
-    models.AppointmentStatus.COMPLETED,
-    models.AppointmentStatus.CLOSED,
-    models.AppointmentStatus.NOT_HOME,
-}
 
 
 def availability_for_user(db: Session, user_id: int, plan_date):

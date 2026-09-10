@@ -86,6 +86,32 @@ class PlanningSlotTests(unittest.TestCase):
         self.assertEqual(len(slots), 16)
         self.assertEqual(slots[-1][2].time(), time(16, 0))
 
+    def test_completed_future_appointment_releases_its_slot(self) -> None:
+        starts_at = datetime.combine(self.plan_date, time(8, 0))
+        appointment = models.Appointment(
+            address_id=self.address.id,
+            contractor_id=self.contractor.id,
+            starts_at=starts_at,
+            ends_at=starts_at + timedelta(minutes=30),
+            status=models.AppointmentStatus.SCHEDULED,
+        )
+        self.db.add(appointment)
+        self.db.commit()
+
+        self.assertNotIn(
+            starts_at,
+            [slot[1] for slot in build_slots(self.db, self.plan_date)],
+        )
+
+        appointment.status = models.AppointmentStatus.COMPLETED
+        appointment.changed_date = datetime(2026, 9, 10, 10, 0)
+        self.db.commit()
+
+        self.assertIn(
+            starts_at,
+            [slot[1] for slot in build_slots(self.db, self.plan_date)],
+        )
+
     def test_planning_uses_full_registered_workday(self) -> None:
         self.availability.start_time = time(6, 30)
         self.availability.end_time = time(20, 0)
