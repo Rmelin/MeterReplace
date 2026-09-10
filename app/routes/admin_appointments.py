@@ -360,6 +360,9 @@ def appointment_overview(
             "afternoon_overview": afternoon_overview,
             "buffer_overview": buffer_overview,
             "todo": todo,
+            "remaining_address_count": sum(
+                1 for appointment in todo if addresses.get(appointment.id) is not None
+            ),
             "needs_reschedule": needs_reschedule,
             "done": done,
             "availability_dates": dates,
@@ -816,6 +819,55 @@ def close_appointment(
 
     flash(request, "Opgave afsluttet", "success")
     return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/complete-remaining")
+def complete_remaining(
+    request: Request,
+    date_query: str = Form(""),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    try:
+        selected_date = datetime.strptime(date_query, "%Y-%m-%d").date()
+    except ValueError:
+        flash(request, "Vælg en gyldig arbejdsdag", "error")
+        return RedirectResponse("/admin/appointments", status_code=303)
+
+    appointments = (
+        db.query(models.Appointment)
+        .filter(
+            func.date(models.Appointment.starts_at) == selected_date,
+            models.Appointment.address_id.isnot(None),
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                ]
+            ),
+        )
+        .all()
+    )
+    changed_at = datetime.utcnow()
+    for appointment in appointments:
+        appointment.status = models.AppointmentStatus.COMPLETED
+        appointment.changed_date = changed_at
+        appointment.changed_by_user_id = user.id
+    db.commit()
+
+    count = len(appointments)
+    if count:
+        flash(
+            request,
+            f"{count} resterende opgave{'r' if count != 1 else ''} markeret som skiftet",
+            "success",
+        )
+    else:
+        flash(request, "Ingen resterende opgaver at markere som skiftet", "info")
+    return RedirectResponse(
+        f"/admin/appointments?date_query={selected_date.isoformat()}",
+        status_code=303,
+    )
 
 
 @router.post("/{appointment_id}/complete")

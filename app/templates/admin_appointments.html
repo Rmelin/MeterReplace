@@ -235,7 +235,20 @@
 </section>
 
 <section class="card">
-    <h2>To do</h2>
+    <div class="section-header">
+        <div>
+            <h2>To do</h2>
+            {% if remaining_address_count %}
+                <p class="hint">{{ remaining_address_count }} adresse{% if remaining_address_count != 1 %}r{% endif %} mangler en status.</p>
+            {% endif %}
+        </div>
+        {% if remaining_address_count and selected_date %}
+            <form method="post" action="/admin/appointments/complete-remaining" onsubmit="return confirm('Markér alle {{ remaining_address_count }} resterende adresser som skiftet? Opgaver med en anden status ændres ikke.');">
+                <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                <button type="submit" class="primary-button">Markér alle resterende som skiftet</button>
+            </form>
+        {% endif %}
+    </div>
     {% if todo %}
         {% for appointment in todo %}
             {% set address = addresses.get(appointment.id) %}

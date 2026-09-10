@@ -135,6 +135,7 @@ Her kan admin blandt andet:
 - redigere opgaver inline
 - oprette manuelle opgaver
 - markere direkte som `Skiftet`, `Ikke hjemme` eller `Fejl ved måler` fra dagslisten
+- markere alle resterende planlagte/informerede opgaver på dagen som `Skiftet` samlet
 - registrere meterdata
 - uploade fotos
 - afslutte sager
