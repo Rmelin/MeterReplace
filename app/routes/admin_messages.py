@@ -44,6 +44,17 @@ STATUS_LABELS = {
     models.ResidentMessageStatus.ARCHIVED: "Arkiv",
 }
 
+APPOINTMENT_STATUS_LABELS = {
+    models.AppointmentStatus.DRAFT: "Kladde",
+    models.AppointmentStatus.NOT_SCHEDULED: "Ikke planlagt",
+    models.AppointmentStatus.SCHEDULED: "Planlagt",
+    models.AppointmentStatus.INFORMED: "Beboer/kunde informeret",
+    models.AppointmentStatus.COMPLETED: "Skiftet",
+    models.AppointmentStatus.CLOSED: "Afsluttet",
+    models.AppointmentStatus.NOT_HOME: "Ikke hjemme",
+    models.AppointmentStatus.NEEDS_RESCHEDULE: "Behov for ny dato",
+}
+
 
 def dashboard_url(folder: str, response_type: str) -> str:
     params = {}
@@ -108,8 +119,43 @@ def message_dashboard(
 
     rows = query.order_by(models.ResidentResponse.created_at.desc()).all()
 
+    # A response normally stores the appointment it relates to.  Older responses
+    # may not, so use the latest appointment for that address as a useful fallback.
+    appointment_ids = {response.appointment_id for response, _address in rows if response.appointment_id}
+    appointments_by_id = {}
+    if appointment_ids:
+        appointments_by_id = {
+            appointment.id: appointment
+            for appointment in db.query(models.Appointment)
+            .filter(models.Appointment.id.in_(appointment_ids))
+            .all()
+        }
+
+    address_ids_without_appointment = {
+        address.id
+        for response, address in rows
+        if response.appointment_id is None
+    }
+    latest_appointments_by_address = {}
+    if address_ids_without_appointment:
+        for appointment in (
+            db.query(models.Appointment)
+            .filter(models.Appointment.address_id.in_(address_ids_without_appointment))
+            .order_by(models.Appointment.address_id, models.Appointment.starts_at.desc())
+            .all()
+        ):
+            latest_appointments_by_address.setdefault(appointment.address_id, appointment)
+
     messages = []
     for response, address in rows:
+        appointment = appointments_by_id.get(response.appointment_id)
+        if appointment is None:
+            appointment = latest_appointments_by_address.get(address.id)
+        appointment_label = "Ikke planlagt"
+        if appointment:
+            appointment_label = APPOINTMENT_STATUS_LABELS[appointment.status]
+            if appointment.status != models.AppointmentStatus.NOT_SCHEDULED:
+                appointment_label += " · " + appointment.starts_at.strftime("%d/%m/%Y %H:%M")
         messages.append(
             {
                 "id": response.id,
@@ -121,6 +167,7 @@ def message_dashboard(
                 "channel": "Brevlink/QR",
                 "status": response.mailbox_status,
                 "status_label": STATUS_LABELS[response.mailbox_status],
+                "appointment_label": appointment_label,
             }
         )
 

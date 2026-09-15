@@ -34,6 +34,8 @@
                         <th>Status</th>
                         <th>Besked</th>
                         <th>Adresse</th>
+                        <th>Aftale</th>
+                        <th>Kontakt</th>
                         <th>Handlinger</th>
                     </tr>
                 </thead>
@@ -46,6 +48,16 @@
                             <td data-label="Status"><span class="message-status-badge message-status-badge-{{ item.status.value|lower }}">{{ item.status_label }}</span></td>
                             <td data-label="Besked">{{ item.message }}</td>
                             <td data-label="Adresse">{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}</td>
+                            <td data-label="Aftale">{{ item.appointment_label }}</td>
+                            <td data-label="Kontakt">
+                                {% if item.address.customer_name or item.address.customer_email or item.address.customer_phone %}
+                                    {{ item.address.customer_name or '-' }}
+                                    {% if item.address.customer_phone %}<br /><a href="tel:{{ item.address.customer_phone }}">{{ item.address.customer_phone }}</a>{% endif %}
+                                    {% if item.address.customer_email %}<br /><a href="mailto:{{ item.address.customer_email }}">{{ item.address.customer_email }}</a>{% endif %}
+                                {% else %}
+                                    <span class="hint">Ingen kontaktoplysninger</span>
+                                {% endif %}
+                            </td>
                             <td data-label="Handlinger">
                                 <a class="ghost-button" href="/admin/addresses/{{ item.address.id }}/edit" style="font-size: 0.85rem; padding: 0.35rem 0.6rem;">Adresse</a>
                                 <form method="post" action="/admin/messages/{{ item.id }}/status" class="message-status-form">
