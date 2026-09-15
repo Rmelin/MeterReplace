@@ -11,6 +11,7 @@ from app import models
 from app.db import Base
 from app.routes.admin_appointments import (
     complete_remaining,
+    keep_scheduled,
     mark_blocked,
     mark_completed,
     mark_not_home,
@@ -115,6 +116,44 @@ class AdminTaskStatusTests(unittest.TestCase):
             models.AppointmentStatus.NEEDS_RESCHEDULE,
         )
         self.assertEqual(self.address.blocked_reason, "Fejl ved måler")
+        self.assertEqual(response.status_code, 303)
+
+    def test_admin_can_keep_resident_reschedule_on_planned_day(self) -> None:
+        self.appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
+        resident_response = models.ResidentResponse(
+            address_id=self.address.id,
+            appointment_id=self.appointment.id,
+            response_type="reschedule_request",
+            answer="same_day",
+            message="Den planlagte dag passer. Kan være hjemme fra kl. 14:00",
+            mailbox_status=models.ResidentMessageStatus.NEW,
+        )
+        self.db.add_all(
+            [
+                resident_response,
+                models.StockMovement(
+                    movement_type=models.InventoryMovementType.RELEASE,
+                    quantity=1,
+                    note="Beboer ønsker nyt tidspunkt",
+                ),
+            ]
+        )
+        self.db.commit()
+
+        response = keep_scheduled(
+            request=self.request("keep-scheduled"),
+            appointment_id=self.appointment.id,
+            date_query="2026-09-24",
+            db=self.db,
+            user=self.admin,
+        )
+
+        self.db.refresh(self.appointment)
+        self.assertEqual(self.appointment.status, models.AppointmentStatus.SCHEDULED)
+        self.assertEqual(
+            self.db.query(models.StockMovement).order_by(models.StockMovement.id.desc()).first().quantity,
+            -1,
+        )
         self.assertEqual(response.status_code, 303)
 
     def test_admin_can_complete_all_remaining_tasks_for_selected_day(self) -> None:

@@ -1130,6 +1130,35 @@ a.chip:hover {
     .time-choice-warning:has(input:checked) { color: #422006; }
 }
 
+.resident-reschedule-banner {
+    margin-top: 0.75rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid;
+    border-radius: 10px;
+}
+
+.resident-reschedule-banner p {
+    margin: 0.35rem 0 0;
+    white-space: pre-wrap;
+}
+
+.resident-reschedule-same-day {
+    color: #854d0e;
+    border-color: #eab308;
+    background: rgba(234, 179, 8, 0.14);
+}
+
+.resident-reschedule-new-day {
+    color: #b91c1c;
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+    .resident-reschedule-same-day { color: #fde047; }
+    .resident-reschedule-new-day { color: #fca5a5; }
+}
+
 /* Tables */
 .table-wrapper {
     background: var(--card);
