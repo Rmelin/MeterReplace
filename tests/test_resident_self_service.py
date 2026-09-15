@@ -10,7 +10,11 @@ from starlette.requests import Request
 from app import models
 from app.db import Base
 from app.routes.admin_letters import get_or_create_link
-from app.routes.resident import resident_form_context, resident_submit
+from app.routes.resident import (
+    resident_form_context,
+    resident_submit,
+    time_preference_message,
+)
 
 
 class ResidentSelfServiceTests(unittest.TestCase):
@@ -121,6 +125,35 @@ class ResidentSelfServiceTests(unittest.TestCase):
         self.assertEqual(self.db.query(models.StockMovement).count(), 1)
         self.assertEqual(self.db.query(models.AddressUnavailablePeriod).count(), 1)
         self.assertEqual(self.db.query(models.ResidentResponse).count(), 2)
+
+    def test_preferred_time_is_saved_with_reschedule_request(self) -> None:
+        response = resident_submit(
+            request=self.request(),
+            token=self.link.token,
+            intent="time",
+            request_id="3" * 32,
+            answer="no",
+            message="Ring venligst først",
+            available_from="07:30",
+            available_to="11:00",
+            phone="",
+            email="",
+            db=self.db,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        saved = self.db.query(models.ResidentResponse).one()
+        self.assertEqual(
+            saved.message,
+            "Kan være hjemme kl. 07:30–11:00. Ring venligst først",
+        )
+        self.assertEqual(saved.mailbox_status, models.ResidentMessageStatus.NEW)
+
+    def test_preferred_time_requires_a_complete_valid_window(self) -> None:
+        with self.assertRaisesRegex(ValueError, "både fra- og til-tidspunkt"):
+            time_preference_message(None, "07:30", "")
+        with self.assertRaisesRegex(ValueError, "efter fra-tidspunktet"):
+            time_preference_message(None, "14:00", "11:00")
 
     def test_free_message_does_not_require_other_answers(self) -> None:
         self.submit("message", "1" * 32, message="Ring gerne til mig")

@@ -112,6 +112,30 @@ def release_stock(db: Session, note: str) -> None:
     )
 
 
+def time_preference_message(
+    message: str | None,
+    available_from: str,
+    available_to: str,
+) -> str | None:
+    """Add a resident's preferred window to the message shown to admin."""
+    available_from = available_from.strip()
+    available_to = available_to.strip()
+    if not available_from and not available_to:
+        return message
+    if not available_from or not available_to:
+        raise ValueError("Angiv både fra- og til-tidspunkt")
+    try:
+        starts_at = datetime.strptime(available_from, "%H:%M")
+        ends_at = datetime.strptime(available_to, "%H:%M")
+    except ValueError as exc:
+        raise ValueError("Tidspunktet er ugyldigt") from exc
+    if starts_at >= ends_at:
+        raise ValueError("Til-tidspunktet skal ligge efter fra-tidspunktet")
+
+    preference = f"Kan være hjemme kl. {available_from}–{available_to}"
+    return f"{preference}. {message}" if message else preference
+
+
 @router.get("/{token}")
 def resident_form(
     request: Request,
@@ -168,6 +192,8 @@ def resident_submit(
     request_id: str = Form(""),
     answer: str = Form(""),
     message: str = Form(""),
+    available_from: str = Form(""),
+    available_to: str = Form(""),
     phone: str | None = Form(""),
     email: str | None = Form(""),
     db: Session = Depends(get_db),
@@ -187,6 +213,8 @@ def resident_submit(
     request_id = request_id.strip().lower()
     answer = answer.strip().lower()
     message_value = message.strip() or None
+    available_from = available_from if isinstance(available_from, str) else ""
+    available_to = available_to if isinstance(available_to, str) else ""
     phone = (phone or "").strip() or None
     email = (email or "").strip() or None
 
@@ -236,6 +264,17 @@ def resident_submit(
         if not appointment:
             flash(request, "Der er ikke længere en aftale på dette link", "error")
             return RedirectResponse(f"/r/{token}", status_code=303)
+        if answer == "no":
+            try:
+                message_value = time_preference_message(
+                    message_value, available_from, available_to
+                )
+            except ValueError as exc:
+                flash(request, str(exc), "error")
+                return RedirectResponse(f"/r/{token}", status_code=303)
+            if len(message_value or "") > 4000:
+                flash(request, "Kommentaren og tidsrummet er for langt", "error")
+                return RedirectResponse(f"/r/{token}", status_code=303)
         previous = latest_link_response(
             db, link.id, ("confirm_time", "reschedule_request")
         )

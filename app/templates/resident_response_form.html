@@ -64,13 +64,21 @@
                     </label>
                     <label class="option-button">
                         <input type="radio" name="answer" value="no" {% if time_response and time_response.answer == 'no' %}checked{% endif %} style="display: none;" />
-                        <span>Jeg har behov for en ny dato</span>
+                        <span>Jeg har behov for et andet tidspunkt</span>
                     </label>
+                </div>
+            </fieldset>
+            <fieldset class="form-fieldset">
+                <legend>Hvornår kan du være hjemme? (valgfrit)</legend>
+                <p class="hint">Udfyld kun, hvis det planlagte tidspunkt ikke passer. Vi kontakter dig for at bekræfte en tid.</p>
+                <div class="form-grid">
+                    <label>Fra<input type="time" name="available_from" /></label>
+                    <label>Til<input type="time" name="available_to" /></label>
                 </div>
             </fieldset>
             <label>
                 Kommentar til tidspunktet (valgfri)
-                <textarea name="message" rows="3" maxlength="4000" class="textarea" placeholder="Skriv eventuelt en kommentar">{{ time_response.message if time_response else '' }}</textarea>
+                <textarea name="message" rows="3" maxlength="4000" class="textarea" placeholder="F.eks. jeg kan kun efter kl. 14">{{ time_response.message if time_response else '' }}</textarea>
             </label>
             <button type="submit" class="primary-button">Gem tidssvar</button>
         </form>
