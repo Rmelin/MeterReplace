@@ -65,6 +65,29 @@ def appointment_photos(
     return grouped
 
 
+def latest_reschedule_responses(
+    db: Session, appointment_ids: list[int]
+) -> dict[int, models.ResidentResponse]:
+    if not appointment_ids:
+        return {}
+    responses = (
+        db.query(models.ResidentResponse)
+        .filter(
+            models.ResidentResponse.appointment_id.in_(appointment_ids),
+            models.ResidentResponse.response_type == "reschedule_request",
+        )
+        .order_by(
+            models.ResidentResponse.created_at.desc(),
+            models.ResidentResponse.id.desc(),
+        )
+        .all()
+    )
+    latest: dict[int, models.ResidentResponse] = {}
+    for response in responses:
+        latest.setdefault(response.appointment_id, response)
+    return latest
+
+
 def photo_complete(photos: list[models.AppointmentPhoto]) -> bool:
     types = {photo.photo_type for photo in photos}
     return "both" in types or ("new" in types and "old" in types)
@@ -302,6 +325,9 @@ def appointment_overview(
         for appt in appointments
         if appt.status == models.AppointmentStatus.NEEDS_RESCHEDULE
     ]
+    reschedule_responses = latest_reschedule_responses(
+        db, [appointment.id for appointment in needs_reschedule]
+    )
     done = [
         appt
         for appt in appointments
@@ -364,6 +390,7 @@ def appointment_overview(
                 1 for appointment in todo if addresses.get(appointment.id) is not None
             ),
             "needs_reschedule": needs_reschedule,
+            "reschedule_responses": reschedule_responses,
             "done": done,
             "availability_dates": dates,
             "selected_date": selected_date,
@@ -900,6 +927,79 @@ def mark_completed(
     if not photo_complete(photos):
         message += " – opgaven mangler stadig fotos"
     flash(request, message, "success")
+    return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/{appointment_id}/keep-scheduled")
+def keep_scheduled(
+    request: Request,
+    appointment_id: int,
+    date_query: str | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    redirect_target = "/admin/appointments"
+    if date_query:
+        redirect_target = f"/admin/appointments?date_query={date_query}"
+
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.id == appointment_id)
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status != models.AppointmentStatus.NEEDS_RESCHEDULE:
+        flash(request, "Opgaven afventer ikke en ny tid", "error")
+        return RedirectResponse(redirect_target, status_code=303)
+
+    resident_response = latest_reschedule_responses(db, [appointment.id]).get(
+        appointment.id
+    )
+    if not resident_response:
+        flash(request, "Opgaven har ikke et tidsønske fra beboeren", "error")
+        return RedirectResponse(redirect_target, status_code=303)
+
+    stock = (
+        db.query(func.coalesce(func.sum(models.StockMovement.quantity), 0)).scalar()
+        or 0
+    )
+    if stock <= 0:
+        flash(request, "Opgaven kan ikke beholdes: der er ingen måler på lager", "error")
+        return RedirectResponse(redirect_target, status_code=303)
+
+    appointment.status = models.AppointmentStatus.SCHEDULED
+    appointment.changed_date = datetime.utcnow()
+    appointment.changed_by_user_id = user.id
+    db.add(
+        models.StockMovement(
+            movement_type=models.InventoryMovementType.RESERVE,
+            quantity=-1,
+            created_by_user_id=user.id,
+            note=f"Opgave beholdt på planlagt dag, aftale {appointment.id}",
+        )
+    )
+
+    if resident_response.answer in {"new_day", "no"}:
+        day = appointment.starts_at.date()
+        starts_at = datetime.combine(day, time(8, 0))
+        ends_at = datetime.combine(day, time(16, 0))
+        period = (
+            db.query(models.AddressUnavailablePeriod)
+            .filter(
+                models.AddressUnavailablePeriod.address_id == appointment.address_id,
+                models.AddressUnavailablePeriod.starts_at == starts_at,
+                models.AddressUnavailablePeriod.ends_at == ends_at,
+                models.AddressUnavailablePeriod.note
+                == (resident_response.message or "Beboer har ikke tid denne dag"),
+            )
+            .first()
+        )
+        if period:
+            db.delete(period)
+
+    db.commit()
+    flash(request, "Opgaven er beholdt på den planlagte dag", "success")
     return RedirectResponse(redirect_target, status_code=303)
 
 

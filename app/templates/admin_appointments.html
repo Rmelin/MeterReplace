@@ -363,6 +363,7 @@
         {% for appointment in needs_reschedule %}
             {% set address = addresses.get(appointment.id) %}
             {% set contractor = contractors.get(appointment.id) %}
+            {% set resident_response = reschedule_responses.get(appointment.id) %}
             <div id="appointment-{{ appointment.id }}" class="card task-card{% if not address %} task-no-address{% endif %}{% if appointment.notes %} task-card-has-note{% endif %}">
                 <div class="task-head">
                     {% if address %}
@@ -373,6 +374,21 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
+                {% if resident_response %}
+                    <div class="resident-reschedule-banner resident-reschedule-{% if resident_response.answer == 'same_day' %}same-day{% else %}new-day{% endif %}">
+                        <strong>
+                            {% if resident_response.answer == 'same_day' %}Dagen passer, men tidspunktet passer ikke
+                            {% else %}Der er behov for en ny dag{% endif %}
+                        </strong>
+                        {% if resident_response.message %}<p>{{ resident_response.message }}</p>{% endif %}
+                    </div>
+                    <form method="post" action="/admin/appointments/{{ appointment.id }}/keep-scheduled" style="margin: 0.75rem 0;">
+                        {% if selected_date %}
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
+                        {% endif %}
+                        <button type="submit" class="primary-button">Behold opgaven på den planlagte dag</button>
+                    </form>
+                {% endif %}
                 {% if appointment.notes %}
                     <div class="task-note-banner">
                         <span class="task-note-label">NOTE</span>
