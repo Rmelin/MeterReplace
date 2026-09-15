@@ -110,8 +110,8 @@ class ResidentSelfServiceTests(unittest.TestCase):
         self.assertEqual(self.db.query(models.ResidentResponse).count(), 2)
 
     def test_reschedule_side_effects_only_run_once(self) -> None:
-        self.submit("time", "1" * 32, "no", "Kan ikke denne dag")
-        self.submit("time", "2" * 32, "no", "Stadig ikke muligt")
+        self.submit("time", "1" * 32, "new_day", "Kan ikke denne dag")
+        self.submit("time", "2" * 32, "new_day", "Stadig ikke muligt")
 
         self.db.refresh(self.appointment)
         self.assertEqual(
@@ -121,6 +121,46 @@ class ResidentSelfServiceTests(unittest.TestCase):
         self.assertEqual(self.db.query(models.StockMovement).count(), 1)
         self.assertEqual(self.db.query(models.AddressUnavailablePeriod).count(), 1)
         self.assertEqual(self.db.query(models.ResidentResponse).count(), 2)
+
+    def test_same_day_preference_is_saved_with_reschedule_request(self) -> None:
+        response = resident_submit(
+            request=self.request(),
+            token=self.link.token,
+            intent="time",
+            request_id="3" * 32,
+            answer="same_day",
+            message="Kan være hjemme fra kl. 14:00",
+            phone="",
+            email="",
+            db=self.db,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        saved = self.db.query(models.ResidentResponse).one()
+        self.assertEqual(
+            saved.message,
+            "Den planlagte dag passer. Kan være hjemme fra kl. 14:00",
+        )
+        self.assertEqual(saved.mailbox_status, models.ResidentMessageStatus.NEW)
+        self.assertEqual(self.db.query(models.AddressUnavailablePeriod).count(), 0)
+
+    def test_contact_details_can_be_updated_independently(self) -> None:
+        response = resident_submit(
+            request=self.request(),
+            token=self.link.token,
+            intent="contact",
+            request_id="4" * 32,
+            name="Anna Andersen",
+            phone="12345678",
+            email="anna@example.dk",
+            db=self.db,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.db.refresh(self.address)
+        self.assertEqual(self.address.customer_name, "Anna Andersen")
+        self.assertEqual(self.address.customer_phone, "12345678")
+        self.assertEqual(self.address.customer_email, "anna@example.dk")
 
     def test_free_message_does_not_require_other_answers(self) -> None:
         self.submit("message", "1" * 32, message="Ring gerne til mig")

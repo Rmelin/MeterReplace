@@ -1074,6 +1074,62 @@ a.chip:hover {
     font-size: 1rem;
 }
 
+.time-choice-success {
+    color: #15803d;
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.12);
+}
+
+.time-choice-warning {
+    color: #a16207;
+    border-color: #eab308;
+    background: rgba(234, 179, 8, 0.14);
+}
+
+.time-choice-danger {
+    color: #dc2626;
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.time-choice-success:hover,
+.time-choice-success:has(input:checked) {
+    color: #fff;
+    border-color: #16a34a;
+    background: #16a34a;
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+}
+
+.time-choice-warning:hover,
+.time-choice-warning:has(input:checked) {
+    color: #422006;
+    border-color: #eab308;
+    background: #facc15;
+    box-shadow: 0 4px 14px rgba(234, 179, 8, 0.3);
+}
+
+.time-choice-danger:hover,
+.time-choice-danger:has(input:checked) {
+    color: #fff;
+    border-color: #dc2626;
+    background: #dc2626;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+    .time-choice-success { color: #86efac; }
+    .time-choice-warning { color: #fde047; }
+    .time-choice-danger { color: #fca5a5; }
+
+    .time-choice-success:hover,
+    .time-choice-success:has(input:checked),
+    .time-choice-danger:hover,
+    .time-choice-danger:has(input:checked) { color: #fff; }
+
+    .time-choice-warning:hover,
+    .time-choice-warning:has(input:checked) { color: #422006; }
+}
+
 /* Tables */
 .table-wrapper {
     background: var(--card);
