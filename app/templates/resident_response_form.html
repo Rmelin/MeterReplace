@@ -92,14 +92,10 @@
             </fieldset>
             <fieldset class="form-fieldset" data-time-preference {% if not time_response or time_response.answer != 'same_day' %}hidden{% endif %}>
                 <legend>Hvornår passer det samme dag?</legend>
-                <p class="hint">Angiv et tidsrum eller beskriv fx “ikke hjemme mellem 10:00 og 12:00” eller “kan være hjemme fra kl. 14:00”. Vi kontakter dig for at bekræfte tiden.</p>
-                <div class="form-grid">
-                    <label>Fra<input type="time" name="available_from" /></label>
-                    <label>Til<input type="time" name="available_to" /></label>
-                </div>
+                <p class="hint">Beskriv fx “ikke hjemme mellem 10:00 og 12:00” eller “kan være hjemme fra kl. 14:00”. Vi kontakter dig for at bekræfte tiden.</p>
                 <label>
                     Beskrivelse
-                    <textarea name="message" rows="3" maxlength="4000" class="textarea" placeholder="Fx ikke hjemme kl. 10:00–12:00 eller kan være hjemme fra kl. 14:00"></textarea>
+                    <textarea name="message" rows="3" maxlength="4000" class="textarea" data-time-description placeholder="Fx ikke hjemme kl. 10:00–12:00 eller kan være hjemme fra kl. 14:00"></textarea>
                 </label>
             </fieldset>
             <button type="submit" class="primary-button">Gem tidssvar</button>
@@ -136,7 +132,10 @@
         const form = document.querySelector('[data-time-form]');
         const selected = form?.querySelector('input[name="answer"]:checked');
         const details = form?.querySelector('[data-time-preference]');
-        if (details) details.hidden = !selected || selected.value !== 'same_day';
+        const description = form?.querySelector('[data-time-description]');
+        const needsDescription = selected?.value === 'same_day';
+        if (details) details.hidden = !needsDescription;
+        if (description) description.required = needsDescription;
     };
     document.querySelectorAll('[data-time-form] input[name="answer"]').forEach((input) => {
         input.addEventListener('change', updateTimePreference);

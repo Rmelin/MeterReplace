@@ -10,11 +10,7 @@ from starlette.requests import Request
 from app import models
 from app.db import Base
 from app.routes.admin_letters import get_or_create_link
-from app.routes.resident import (
-    resident_form_context,
-    resident_submit,
-    time_preference_message,
-)
+from app.routes.resident import resident_form_context, resident_submit
 
 
 class ResidentSelfServiceTests(unittest.TestCase):
@@ -126,16 +122,14 @@ class ResidentSelfServiceTests(unittest.TestCase):
         self.assertEqual(self.db.query(models.AddressUnavailablePeriod).count(), 1)
         self.assertEqual(self.db.query(models.ResidentResponse).count(), 2)
 
-    def test_preferred_time_is_saved_with_reschedule_request(self) -> None:
+    def test_same_day_preference_is_saved_with_reschedule_request(self) -> None:
         response = resident_submit(
             request=self.request(),
             token=self.link.token,
             intent="time",
             request_id="3" * 32,
             answer="same_day",
-            message="Ring venligst først",
-            available_from="07:30",
-            available_to="11:00",
+            message="Kan være hjemme fra kl. 14:00",
             phone="",
             email="",
             db=self.db,
@@ -145,7 +139,7 @@ class ResidentSelfServiceTests(unittest.TestCase):
         saved = self.db.query(models.ResidentResponse).one()
         self.assertEqual(
             saved.message,
-            "Den planlagte dag passer. Kan være hjemme kl. 07:30–11:00. Ring venligst først",
+            "Den planlagte dag passer. Kan være hjemme fra kl. 14:00",
         )
         self.assertEqual(saved.mailbox_status, models.ResidentMessageStatus.NEW)
         self.assertEqual(self.db.query(models.AddressUnavailablePeriod).count(), 0)
@@ -167,12 +161,6 @@ class ResidentSelfServiceTests(unittest.TestCase):
         self.assertEqual(self.address.customer_name, "Anna Andersen")
         self.assertEqual(self.address.customer_phone, "12345678")
         self.assertEqual(self.address.customer_email, "anna@example.dk")
-
-    def test_preferred_time_requires_a_complete_valid_window(self) -> None:
-        with self.assertRaisesRegex(ValueError, "både fra- og til-tidspunkt"):
-            time_preference_message(None, "07:30", "")
-        with self.assertRaisesRegex(ValueError, "efter fra-tidspunktet"):
-            time_preference_message(None, "14:00", "11:00")
 
     def test_free_message_does_not_require_other_answers(self) -> None:
         self.submit("message", "1" * 32, message="Ring gerne til mig")
