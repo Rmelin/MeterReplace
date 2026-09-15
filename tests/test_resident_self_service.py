@@ -114,8 +114,8 @@ class ResidentSelfServiceTests(unittest.TestCase):
         self.assertEqual(self.db.query(models.ResidentResponse).count(), 2)
 
     def test_reschedule_side_effects_only_run_once(self) -> None:
-        self.submit("time", "1" * 32, "no", "Kan ikke denne dag")
-        self.submit("time", "2" * 32, "no", "Stadig ikke muligt")
+        self.submit("time", "1" * 32, "new_day", "Kan ikke denne dag")
+        self.submit("time", "2" * 32, "new_day", "Stadig ikke muligt")
 
         self.db.refresh(self.appointment)
         self.assertEqual(
@@ -132,7 +132,7 @@ class ResidentSelfServiceTests(unittest.TestCase):
             token=self.link.token,
             intent="time",
             request_id="3" * 32,
-            answer="no",
+            answer="same_day",
             message="Ring venligst først",
             available_from="07:30",
             available_to="11:00",
@@ -145,9 +145,28 @@ class ResidentSelfServiceTests(unittest.TestCase):
         saved = self.db.query(models.ResidentResponse).one()
         self.assertEqual(
             saved.message,
-            "Kan være hjemme kl. 07:30–11:00. Ring venligst først",
+            "Den planlagte dag passer. Kan være hjemme kl. 07:30–11:00. Ring venligst først",
         )
         self.assertEqual(saved.mailbox_status, models.ResidentMessageStatus.NEW)
+        self.assertEqual(self.db.query(models.AddressUnavailablePeriod).count(), 0)
+
+    def test_contact_details_can_be_updated_independently(self) -> None:
+        response = resident_submit(
+            request=self.request(),
+            token=self.link.token,
+            intent="contact",
+            request_id="4" * 32,
+            name="Anna Andersen",
+            phone="12345678",
+            email="anna@example.dk",
+            db=self.db,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.db.refresh(self.address)
+        self.assertEqual(self.address.customer_name, "Anna Andersen")
+        self.assertEqual(self.address.customer_phone, "12345678")
+        self.assertEqual(self.address.customer_email, "anna@example.dk")
 
     def test_preferred_time_requires_a_complete_valid_window(self) -> None:
         with self.assertRaisesRegex(ValueError, "både fra- og til-tidspunkt"):

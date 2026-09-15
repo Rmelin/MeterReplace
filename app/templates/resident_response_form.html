@@ -17,6 +17,19 @@
 {% endif %}
 
 <section class="card narrow resident-response">
+    <h2>Kontaktoplysninger</h2>
+    <p class="hint">Kontroller oplysningerne, så vi kan kontakte dig om aftalen.</p>
+    <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
+        <input type="hidden" name="intent" value="contact" />
+        <input type="hidden" name="request_id" value="{{ contact_request_id }}" />
+        <label>Navn<input type="text" name="name" maxlength="200" value="{{ address.customer_name or '' }}" autocomplete="name" /></label>
+        <label>Telefon<input type="tel" name="phone" maxlength="50" value="{{ address.customer_phone or '' }}" autocomplete="tel" /></label>
+        <label>E-mail<input type="email" name="email" maxlength="200" value="{{ address.customer_email or '' }}" autocomplete="email" /></label>
+        <button type="submit" class="primary-button">Gem kontaktoplysninger</button>
+    </form>
+</section>
+
+<section class="card narrow resident-response">
     <h2>Målerbrønd</h2>
     <p class="hint">Oplysningen kan sendes eller opdateres uafhængigt af tidspunktet.</p>
     {% if meter_pit_response %}
@@ -49,10 +62,15 @@
 <section class="card narrow resident-response">
     <h2>Tidspunkt</h2>
     {% if time_response %}
-        <p><strong>Seneste svar:</strong> {% if time_response.answer == 'yes' %}Tidspunktet passer{% else %}Der er behov for en ny dato{% endif %}{% if time_response.message %} - {{ time_response.message }}{% endif %}</p>
+        <p><strong>Seneste svar:</strong>
+            {% if time_response.answer == 'yes' %}Den planlagte dag og tidspunktet passer
+            {% elif time_response.answer == 'same_day' %}Dagen passer, men tidspunktet passer ikke
+            {% else %}Der er behov for en ny planlagt dag{% endif %}
+            {% if time_response.message %} - {{ time_response.message }}{% endif %}
+        </p>
     {% endif %}
     {% if appointment and can_answer_time %}
-        <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
+        <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form data-time-form>
             <input type="hidden" name="intent" value="time" />
             <input type="hidden" name="request_id" value="{{ time_request_id }}" />
             <fieldset class="form-fieldset">
@@ -60,30 +78,34 @@
                 <div class="option-buttons">
                     <label class="option-button">
                         <input type="radio" name="answer" value="yes" required {% if time_response and time_response.answer == 'yes' %}checked{% endif %} style="display: none;" />
-                        <span>Tidspunktet passer</span>
+                        <span>Den planlagte dag og tidspunktet passer</span>
                     </label>
                     <label class="option-button">
-                        <input type="radio" name="answer" value="no" {% if time_response and time_response.answer == 'no' %}checked{% endif %} style="display: none;" />
-                        <span>Jeg har behov for et andet tidspunkt</span>
+                        <input type="radio" name="answer" value="same_day" {% if time_response and time_response.answer == 'same_day' %}checked{% endif %} style="display: none;" />
+                        <span>Den planlagte dag passer, men tidspunktet passer ikke</span>
+                    </label>
+                    <label class="option-button">
+                        <input type="radio" name="answer" value="new_day" {% if time_response and time_response.answer == 'new_day' %}checked{% endif %} style="display: none;" />
+                        <span>Der er behov for en ny planlagt dag</span>
                     </label>
                 </div>
             </fieldset>
-            <fieldset class="form-fieldset">
-                <legend>Hvornår kan du være hjemme? (valgfrit)</legend>
-                <p class="hint">Udfyld kun, hvis det planlagte tidspunkt ikke passer. Vi kontakter dig for at bekræfte en tid.</p>
+            <fieldset class="form-fieldset" data-time-preference {% if not time_response or time_response.answer != 'same_day' %}hidden{% endif %}>
+                <legend>Hvornår passer det samme dag?</legend>
+                <p class="hint">Angiv et tidsrum eller beskriv fx “ikke hjemme mellem 10:00 og 12:00” eller “kan være hjemme fra kl. 14:00”. Vi kontakter dig for at bekræfte tiden.</p>
                 <div class="form-grid">
                     <label>Fra<input type="time" name="available_from" /></label>
                     <label>Til<input type="time" name="available_to" /></label>
                 </div>
+                <label>
+                    Beskrivelse
+                    <textarea name="message" rows="3" maxlength="4000" class="textarea" placeholder="Fx ikke hjemme kl. 10:00–12:00 eller kan være hjemme fra kl. 14:00"></textarea>
+                </label>
             </fieldset>
-            <label>
-                Kommentar til tidspunktet (valgfri)
-                <textarea name="message" rows="3" maxlength="4000" class="textarea" placeholder="F.eks. jeg kan kun efter kl. 14">{{ time_response.message if time_response else '' }}</textarea>
-            </label>
             <button type="submit" class="primary-button">Gem tidssvar</button>
         </form>
         {% if appointment.status.value == 'NEEDS_RESCHEDULE' %}
-            <p class="hint">Dit ønske om en ny dato er registreret. Hvis du ændrer svaret, gennemgår vi det, før aftalen eventuelt ændres igen.</p>
+            <p class="hint">Dit ønske om en anden tid eller dag er registreret. Vi gennemgår svaret og kontakter dig for at bekræfte aftalen.</p>
         {% endif %}
     {% else %}
         <p class="hint">Der er ikke en aktiv aftale, som kan besvares via dette link.</p>
@@ -97,8 +119,6 @@
         <input type="hidden" name="intent" value="message" />
         <input type="hidden" name="request_id" value="{{ message_request_id }}" />
         <label>Besked<textarea name="message" rows="4" maxlength="4000" class="textarea" required placeholder="Skriv din besked"></textarea></label>
-        <label>Telefon<input type="text" name="phone" maxlength="50" value="{{ address.customer_phone or '' }}" /></label>
-        <label>E-mail<input type="email" name="email" maxlength="200" value="{{ address.customer_email or '' }}" /></label>
         <button type="submit" class="primary-button">Send besked</button>
     </form>
     {% if messages %}
@@ -112,6 +132,17 @@
 </section>
 
 <script>
+    const updateTimePreference = () => {
+        const form = document.querySelector('[data-time-form]');
+        const selected = form?.querySelector('input[name="answer"]:checked');
+        const details = form?.querySelector('[data-time-preference]');
+        if (details) details.hidden = !selected || selected.value !== 'same_day';
+    };
+    document.querySelectorAll('[data-time-form] input[name="answer"]').forEach((input) => {
+        input.addEventListener('change', updateTimePreference);
+    });
+    updateTimePreference();
+
     document.addEventListener("submit", (event) => {
         const form = event.target.closest("[data-resident-form]");
         if (!form) return;

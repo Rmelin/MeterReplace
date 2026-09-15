@@ -166,6 +166,7 @@ def resident_form(
             "appointment": appointment,
             "token": token,
             "saved": request.query_params.get("saved"),
+            "contact_request_id": uuid4().hex,
             "meter_pit_request_id": uuid4().hex,
             "time_request_id": uuid4().hex,
             "message_request_id": uuid4().hex,
@@ -194,6 +195,7 @@ def resident_submit(
     message: str = Form(""),
     available_from: str = Form(""),
     available_to: str = Form(""),
+    name: str | None = Form(""),
     phone: str | None = Form(""),
     email: str | None = Form(""),
     db: Session = Depends(get_db),
@@ -211,12 +213,18 @@ def resident_submit(
 
     intent = intent.strip().lower()
     request_id = request_id.strip().lower()
+    answer = answer if isinstance(answer, str) else ""
+    message = message if isinstance(message, str) else ""
     answer = answer.strip().lower()
     message_value = message.strip() or None
     available_from = available_from if isinstance(available_from, str) else ""
     available_to = available_to if isinstance(available_to, str) else ""
-    phone = (phone or "").strip() or None
-    email = (email or "").strip() or None
+    name = name if isinstance(name, str) else ""
+    name = name.strip() or None
+    phone = phone if isinstance(phone, str) else ""
+    email = email if isinstance(email, str) else ""
+    phone = phone.strip() or None
+    email = email.strip() or None
 
     if not valid_request_id(request_id):
         flash(request, "Formularen er udløbet. Prøv igen.", "error")
@@ -228,10 +236,15 @@ def resident_submit(
     )
     if existing:
         return RedirectResponse(f"/r/{token}?saved={intent}", status_code=303)
-    if intent not in {"meter_pit", "time", "message"}:
+    if intent not in {"contact", "meter_pit", "time", "message"}:
         flash(request, "Vælg hvad du vil sende", "error")
         return RedirectResponse(f"/r/{token}", status_code=303)
-    if len(message_value or "") > 4000 or len(phone or "") > 50 or len(email or "") > 200:
+    if (
+        len(message_value or "") > 4000
+        or len(name or "") > 200
+        or len(phone or "") > 50
+        or len(email or "") > 200
+    ):
         flash(request, "Beskeden eller kontaktoplysningerne er for lange", "error")
         return RedirectResponse(f"/r/{token}", status_code=303)
     if email and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
@@ -243,7 +256,14 @@ def resident_submit(
     response_type: str
     mailbox_status: models.ResidentMessageStatus | None = None
 
-    if intent == "meter_pit":
+    if intent == "contact":
+        address.customer_name = name
+        address.customer_phone = phone
+        address.customer_email = email
+        response_type = "contact_update"
+        answer = ""
+        message_value = "Kontaktoplysninger opdateret"
+    elif intent == "meter_pit":
         if answer not in {"yes", "no"}:
             flash(request, "Vælg ja eller nej til målerbrønd", "error")
             return RedirectResponse(f"/r/{token}", status_code=303)
@@ -258,13 +278,13 @@ def resident_submit(
         response_type = "buffer_note"
         mailbox_status = models.ResidentMessageStatus.NEW
     elif intent == "time":
-        if answer not in {"yes", "no"}:
-            flash(request, "Vælg om tidspunktet passer", "error")
+        if answer not in {"yes", "same_day", "new_day"}:
+            flash(request, "Vælg en af de tre muligheder for aftalen", "error")
             return RedirectResponse(f"/r/{token}", status_code=303)
         if not appointment:
             flash(request, "Der er ikke længere en aftale på dette link", "error")
             return RedirectResponse(f"/r/{token}", status_code=303)
-        if answer == "no":
+        if answer == "same_day":
             try:
                 message_value = time_preference_message(
                     message_value, available_from, available_to
@@ -275,12 +295,20 @@ def resident_submit(
             if len(message_value or "") > 4000:
                 flash(request, "Kommentaren og tidsrummet er for langt", "error")
                 return RedirectResponse(f"/r/{token}", status_code=303)
+            if not message_value:
+                flash(
+                    request,
+                    "Angiv hvornår du kan være hjemme eller ikke er hjemme",
+                    "error",
+                )
+                return RedirectResponse(f"/r/{token}", status_code=303)
+            message_value = f"Den planlagte dag passer. {message_value}"
         previous = latest_link_response(
             db, link.id, ("confirm_time", "reschedule_request")
         )
         response_type = "confirm_time" if answer == "yes" else "reschedule_request"
         transitioned = 0
-        if answer == "no":
+        if answer != "yes":
             transitioned = (
                 db.query(models.Appointment)
                 .filter(
@@ -303,18 +331,19 @@ def resident_submit(
             )
         if transitioned == 1:
             release_stock(db, f"Beboer ønsker nyt tidspunkt {address.street} {address.house_no}")
-            day = appointment.starts_at.date()
-            starts_at = datetime.combine(day, time(8, 0))
-            ends_at = datetime.combine(day, time(16, 0))
-            db.add(
-                models.AddressUnavailablePeriod(
-                    address_id=address.id,
-                    starts_at=starts_at,
-                    ends_at=ends_at,
-                    note=(message_value or "Beboer har ikke tid"),
+            if answer == "new_day":
+                day = appointment.starts_at.date()
+                starts_at = datetime.combine(day, time(8, 0))
+                ends_at = datetime.combine(day, time(16, 0))
+                db.add(
+                    models.AddressUnavailablePeriod(
+                        address_id=address.id,
+                        starts_at=starts_at,
+                        ends_at=ends_at,
+                        note=(message_value or "Beboer har ikke tid denne dag"),
+                    )
                 )
-            )
-        if answer == "no" or message_value or (previous and previous.answer != answer):
+        if answer != "yes" or message_value or (previous and previous.answer != answer):
             mailbox_status = models.ResidentMessageStatus.NEW
     else:
         if not message_value:
@@ -324,10 +353,6 @@ def resident_submit(
         answer = ""
         mailbox_status = models.ResidentMessageStatus.NEW
 
-    if phone:
-        address.customer_phone = phone
-    if email:
-        address.customer_email = email
     response = models.ResidentResponse(
         address_id=address.id,
         appointment_id=appointment.id if appointment else None,
