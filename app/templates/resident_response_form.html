@@ -76,15 +76,15 @@
             <fieldset class="form-fieldset">
                 <legend>Passer det planlagte tidspunkt?</legend>
                 <div class="option-buttons">
-                    <label class="option-button">
+                    <label class="option-button time-choice time-choice-success">
                         <input type="radio" name="answer" value="yes" required {% if time_response and time_response.answer == 'yes' %}checked{% endif %} style="display: none;" />
                         <span>Den planlagte dag og tidspunktet passer</span>
                     </label>
-                    <label class="option-button">
+                    <label class="option-button time-choice time-choice-warning">
                         <input type="radio" name="answer" value="same_day" {% if time_response and time_response.answer == 'same_day' %}checked{% endif %} style="display: none;" />
                         <span>Den planlagte dag passer, men tidspunktet passer ikke</span>
                     </label>
-                    <label class="option-button">
+                    <label class="option-button time-choice time-choice-danger">
                         <input type="radio" name="answer" value="new_day" {% if time_response and time_response.answer == 'new_day' %}checked{% endif %} style="display: none;" />
                         <span>Der er behov for en ny planlagt dag</span>
                     </label>
