@@ -20,6 +20,7 @@ from weasyprint import HTML
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/letters", tags=["admin"])
 
@@ -297,14 +298,14 @@ def update_template(
         template.body_markdown = body
         template.logo_path = logo_path
         template.include_resident_link = include_resident_link
-        template.updated_at = datetime.utcnow()
+        template.updated_at = utc_now()
     else:
         db.add(
             models.LetterTemplate(
                 body_markdown=body,
                 logo_path=logo_path,
                 include_resident_link=include_resident_link,
-                updated_at=datetime.utcnow(),
+                updated_at=utc_now(),
             )
         )
 
@@ -401,7 +402,7 @@ def letter_pdf(
 
     if appointment.status != models.AppointmentStatus.INFORMED:
         appointment.status = models.AppointmentStatus.INFORMED
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
         db.commit()
 
@@ -467,7 +468,7 @@ def batch_pdf(
     for appointment in appointments_to_update:
         if appointment.status != models.AppointmentStatus.INFORMED:
             appointment.status = models.AppointmentStatus.INFORMED
-            appointment.changed_date = datetime.utcnow()
+            appointment.changed_date = utc_now()
             appointment.changed_by_user_id = user.id
             updated = True
     if updated:
@@ -533,7 +534,7 @@ def latest_planning_batch_pdf(
     for appointment, _ in rows:
         if appointment.status != models.AppointmentStatus.INFORMED:
             appointment.status = models.AppointmentStatus.INFORMED
-            appointment.changed_date = datetime.utcnow()
+            appointment.changed_date = utc_now()
             appointment.changed_by_user_id = user.id
             updated = True
     if updated:

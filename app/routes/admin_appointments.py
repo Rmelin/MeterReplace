@@ -20,6 +20,7 @@ from app.planning_slots import (
     SLOT_OCCUPYING_STATUSES,
 )
 from app.workday_status import build_workday_status
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/appointments", tags=["admin"])
 
@@ -505,7 +506,7 @@ def create_manual_task(
             ends_at=slot_end,
             status=models.AppointmentStatus.SCHEDULED,
             notes=note_value,
-            changed_date=datetime.utcnow(),
+            changed_date=utc_now(),
             changed_by_user_id=user.id,
         )
     )
@@ -593,7 +594,7 @@ def upload_photo(
     updated_photos = existing_photos + [photo]
     if photo_complete(updated_photos):
         appointment.status = models.AppointmentStatus.COMPLETED
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
         db.commit()
         flash(request, "Foto uploadet og status sat til skiftet", "success")
@@ -617,7 +618,7 @@ def update_appointment_note(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.notes = note.strip() or None
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -812,7 +813,7 @@ def update_appointment(
     appointment.old_meter_no = old_meter_no.strip() or None
     appointment.new_meter_no = new_meter_no.strip() or None
     appointment.notes = notes.strip() or None
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -836,7 +837,7 @@ def close_appointment(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.CLOSED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -875,7 +876,7 @@ def complete_remaining(
         )
         .all()
     )
-    changed_at = datetime.utcnow()
+    changed_at = utc_now()
     for appointment in appointments:
         appointment.status = models.AppointmentStatus.COMPLETED
         appointment.changed_date = changed_at
@@ -915,7 +916,7 @@ def mark_completed(
         .all()
     )
     appointment.status = models.AppointmentStatus.COMPLETED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -969,7 +970,7 @@ def keep_scheduled(
         return RedirectResponse(redirect_target, status_code=303)
 
     appointment.status = models.AppointmentStatus.SCHEDULED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.add(
         models.StockMovement(
@@ -1016,7 +1017,7 @@ def mark_not_home(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.NOT_HOME
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -1064,14 +1065,14 @@ def mark_blocked(
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
                 letter_required=appointment.letter_required,
                 notes=note_value,
-                changed_date=datetime.utcnow(),
+                changed_date=utc_now(),
                 changed_by_user_id=user.id,
             )
         )
     else:
         appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
         appointment.notes = note_value
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
     db.commit()
 

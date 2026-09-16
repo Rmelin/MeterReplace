@@ -1,4 +1,4 @@
-from datetime import datetime
+
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from starlette.responses import RedirectResponse
 from app import auth, models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/users", tags=["admin"])
 
@@ -142,7 +143,7 @@ def update_user(
         db.query(models.PushSubscription).filter(
             models.PushSubscription.user_id == target_user.id,
             models.PushSubscription.disabled_at.is_(None),
-        ).update({"disabled_at": datetime.utcnow()}, synchronize_session=False)
+        ).update({"disabled_at": utc_now()}, synchronize_session=False)
 
     db.commit()
     flash(request, "Bruger opdateret", "success")
