@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
+from app.timeutils import utc_now
 
 
 class UserRole(str, enum.Enum):
@@ -35,7 +36,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class Address(Base):
@@ -57,9 +58,9 @@ class Address(Base):
     register_closed: Mapped[bool] = mapped_column(Boolean, default=False)
     latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
 
@@ -73,7 +74,7 @@ class AddressUnavailablePeriod(Base):
     starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class InventoryMovementType(str, enum.Enum):
@@ -88,7 +89,7 @@ class MeterBatch(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    purchased_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    purchased_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
     meter_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -105,7 +106,7 @@ class StockMovement(Base):
         Enum(InventoryMovementType), nullable=False
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     batch_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("meter_batches.id"), nullable=True
     )
@@ -124,9 +125,9 @@ class VvsAvailability(Base):
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
 
@@ -168,9 +169,9 @@ class Appointment(Base):
     )
 
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
 
@@ -180,9 +181,9 @@ class StreetPriority(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     street: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
 
@@ -193,7 +194,7 @@ class AppSetting(Base):
     key: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     value: Mapped[str] = mapped_column(String(255), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
 
@@ -212,7 +213,7 @@ class AppointmentPhoto(Base):
     uploaded_by_user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class LetterTemplate(Base):
@@ -222,7 +223,7 @@ class LetterTemplate(Base):
     body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
     logo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     include_resident_link: Mapped[bool] = mapped_column(Boolean, default=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class ResidentLink(Base):
@@ -238,7 +239,7 @@ class ResidentLink(Base):
     )
     token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class ResidentMessageStatus(str, enum.Enum):
@@ -289,7 +290,7 @@ class ResidentResponse(Base):
     mailbox_status_updated_by_user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class PushSubscription(Base):
@@ -304,9 +305,9 @@ class PushSubscription(Base):
     p256dh: Mapped[str] = mapped_column(String(255), nullable=False)
     auth: Mapped[str] = mapped_column(String(255), nullable=False)
     expiration_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     failure_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -338,8 +339,8 @@ class PushDelivery(Base):
         Integer, ForeignKey("push_subscriptions.id"), nullable=False
     )
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    next_attempt_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     failed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

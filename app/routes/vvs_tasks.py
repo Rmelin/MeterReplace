@@ -19,6 +19,7 @@ from app.planning_slots import (
     PLANNING_DAY_START,
     SLOT_OCCUPYING_STATUSES,
 )
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/vvs/tasks", tags=["vvs"])
 
@@ -685,7 +686,7 @@ def upload_photo(
     updated_photos = existing_photos + [photo]
     if photo_complete(updated_photos):
         appointment.status = models.AppointmentStatus.COMPLETED
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
         db.commit()
         flash(request, "Foto uploadet og status sat til skiftet", "success")
@@ -872,7 +873,7 @@ def update_task(
     appointment.status = status_map[status]
     appointment.starts_at = starts_at
     appointment.ends_at = ends_at
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -903,7 +904,7 @@ def close_task(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.CLOSED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -940,7 +941,7 @@ def mark_completed(
         .all()
     )
     appointment.status = models.AppointmentStatus.COMPLETED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -975,7 +976,7 @@ def mark_not_home(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.NOT_HOME
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -1030,14 +1031,14 @@ def mark_blocked(
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
                 letter_required=appointment.letter_required,
                 notes=note_value,
-                changed_date=datetime.utcnow(),
+                changed_date=utc_now(),
                 changed_by_user_id=user.id,
             )
         )
     else:
         appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
         appointment.notes = note_value
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
 
     db.commit()
@@ -1099,7 +1100,7 @@ def undo_blocked(
     )
     if previous_not_home and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
         previous_not_home.status = models.AppointmentStatus.SCHEDULED
-        previous_not_home.changed_date = datetime.utcnow()
+        previous_not_home.changed_date = utc_now()
         previous_not_home.changed_by_user_id = user.id
         if previous_not_home.notes == BLOCKED_REASON:
             previous_not_home.notes = None
@@ -1107,7 +1108,7 @@ def undo_blocked(
         restored = True
     else:
         appointment.status = models.AppointmentStatus.SCHEDULED
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
         if appointment.notes == BLOCKED_REASON:
             appointment.notes = None

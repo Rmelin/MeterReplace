@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
+from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse, RedirectResponse
 
@@ -14,6 +15,7 @@ from app.app_settings import support_contact
 from app.db import SessionLocal, init_db
 from app.dependencies import consume_flashes, get_optional_user
 from app.routes import admin_addresses, admin_appointments, admin_availability, admin_completed_import, admin_inventory, admin_letters, admin_messages, admin_missing_photos, admin_planning, admin_register_import, admin_settings, admin_status, admin_street_priority, admin_users, auth, push, resident, user_dashboard, vvs_availability, vvs_tasks
+from app.timeutils import utc_now
 
 SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {
     "1",
@@ -21,7 +23,17 @@ SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {
     "yes",
 }
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    templates = Jinja2Templates(directory="app/templates")
+    templates.env.globals["year"] = utc_now().year
+    app.state.templates = templates
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     SessionMiddleware,
@@ -32,19 +44,6 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/upload", StaticFiles(directory="data/uploads"), name="uploads")
-
-app.state.templates = None
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-    from fastapi.templating import Jinja2Templates
-
-    templates = Jinja2Templates(directory="app/templates")
-    templates.env.globals["year"] = datetime.utcnow().year
-    app.state.templates = templates
-
 
 app.include_router(auth.router)
 app.include_router(admin_addresses.router)

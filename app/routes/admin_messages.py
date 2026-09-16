@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -11,6 +11,7 @@ from starlette.responses import RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/messages", tags=["admin"])
 
@@ -218,7 +219,7 @@ def update_message_status(
         raise HTTPException(status_code=404, detail="Besked ikke fundet")
 
     response.mailbox_status = status
-    response.mailbox_status_updated_at = datetime.utcnow()
+    response.mailbox_status_updated_at = utc_now()
     response.mailbox_status_updated_by_user_id = user.id
     db.commit()
     flash(request, f"Beskeden er flyttet til {STATUS_LABELS[status]}", "success")

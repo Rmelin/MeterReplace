@@ -21,6 +21,7 @@ from app.planning_slots import (
     build_slots,
 )
 from app.workday_status import build_workday_status
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/planning", tags=["admin"])
 
@@ -747,7 +748,7 @@ def commit_plan(
             ends_at=slot.ends_at,
             status=models.AppointmentStatus.SCHEDULED,
             letter_required=slot.letter_required,
-            changed_date=datetime.utcnow(),
+            changed_date=utc_now(),
             changed_by_user_id=user.id,
         )
         db.add(appointment)
@@ -953,7 +954,7 @@ def manual_planning_commit(
             status=models.AppointmentStatus.SCHEDULED,
             letter_required=not address.buffer_flag,
             notes=note_value,
-            changed_date=datetime.utcnow(),
+            changed_date=utc_now(),
             changed_by_user_id=user.id,
         )
     )
