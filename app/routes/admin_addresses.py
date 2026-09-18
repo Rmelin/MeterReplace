@@ -24,6 +24,7 @@ from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import SLOT_OCCUPYING_STATUSES
 from app.workday_status import build_workday_status
+from app.timeutils import utc_now
 
 PHOTO_LABELS = {
     "both": "Begge målere",
@@ -325,7 +326,7 @@ def list_addresses(
     photo_map: dict[int, int] = {}
     resident_response_map: dict[int, dict[str, str]] = {}
     letter_available_ids: set[int] = set()
-    current_year = datetime.utcnow().year
+    current_year = utc_now().year
     if address_ids:
         appointments = (
             db.query(models.Appointment)
@@ -596,7 +597,7 @@ def edit_address_form(
             .order_by(models.Appointment.starts_at.desc())
             .first()
         )
-    current_year = datetime.utcnow().year
+    current_year = utc_now().year
     status_label, status_key = status_label_and_key(
         latest_appointment, current_year, address.register_closed
     )
@@ -896,7 +897,7 @@ def address_map_data(
             addresses = [address for address in addresses if address.id in date_ids]
     address_ids = [address.id for address in addresses]
     status_map = latest_status_map(db, address_ids)
-    current_year = datetime.utcnow().year
+    current_year = utc_now().year
     appointment_map: dict[int, models.Appointment] = {}
     notscheduled_candidates: dict[int, models.Appointment] = {}
     contractor_map: dict[int, str] = {}
@@ -1279,7 +1280,7 @@ def upload_address_photo(
             ends_at=ends_at,
             status=models.AppointmentStatus.SCHEDULED,
             letter_required=not address.buffer_flag,
-            changed_date=datetime.utcnow(),
+            changed_date=utc_now(),
             changed_by_user_id=user.id,
         )
         db.add(appointment)
@@ -1288,7 +1289,7 @@ def upload_address_photo(
         appointment.contractor_id = contractor.id
         appointment.starts_at = starts_at
         appointment.ends_at = ends_at
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
 
     if force:
@@ -1354,7 +1355,7 @@ def upload_address_photo(
                     )
                 )
             appointment.status = models.AppointmentStatus.COMPLETED
-            appointment.changed_date = datetime.utcnow()
+            appointment.changed_date = utc_now()
             appointment.changed_by_user_id = user.id
             db.flush()
             success_message = "Foto uploadet og status sat til skiftet"
@@ -1507,14 +1508,14 @@ def mark_needs_reschedule(
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
                 letter_required=appointment.letter_required,
                 notes=note_value,
-                changed_date=datetime.utcnow(),
+                changed_date=utc_now(),
                 changed_by_user_id=user.id,
             )
         )
     else:
         appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
         appointment.notes = note_value
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
     db.commit()
 

@@ -15,6 +15,7 @@ from starlette.responses import RedirectResponse, Response
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/import/completed", tags=["admin"])
 
@@ -116,7 +117,7 @@ def parse_photo_list(value: str) -> list[str]:
 
 def ensure_closed(appointment: models.Appointment, user: models.User) -> None:
     appointment.status = models.AppointmentStatus.CLOSED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
 
 
@@ -364,14 +365,14 @@ def import_completed(
                 starts_at=changed_date,
                 ends_at=changed_date + timedelta(minutes=30),
                 status=STATUS_MAP[status_value],
-                changed_date=datetime.utcnow(),
+                changed_date=utc_now(),
                 changed_by_user_id=user.id,
             )
             db.add(appointment)
             db.flush()
 
         appointment.status = STATUS_MAP[status_value]
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
 
         for filename in parse_photo_list(row.get("photo_both") or ""):

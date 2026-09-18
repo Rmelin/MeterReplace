@@ -14,6 +14,7 @@ from pywebpush import WebPushException, webpush
 from sqlalchemy.orm import Session
 
 from app import models
+from app.timeutils import utc_now
 
 MAX_ATTEMPTS = 5
 RETRY_DELAYS = (1, 5, 30, 120)
@@ -64,7 +65,7 @@ def enqueue_message_pushes(
         )
         .all()
     ]
-    now = datetime.utcnow()
+    now = utc_now()
     for subscription_id in subscription_ids:
         db.add(
             models.PushDelivery(
@@ -151,7 +152,7 @@ def process_pending_deliveries(
     limit: int = 50,
     sender: Callable[[models.PushSubscription, int], None] = send_push,
 ) -> dict[str, int]:
-    now = datetime.utcnow()
+    now = utc_now()
     delivery_ids = [
         row[0]
         for row in db.query(models.PushDelivery.id)
@@ -173,7 +174,7 @@ def process_pending_deliveries(
 
     result = {"sent": 0, "retried": 0, "failed": 0}
     for delivery_id in delivery_ids:
-        claim_time = datetime.utcnow()
+        claim_time = utc_now()
         claimed = (
             db.query(models.PushDelivery)
             .filter(
@@ -199,7 +200,7 @@ def process_pending_deliveries(
         if not delivery or delivery.sent_at or delivery.failed_at:
             continue
         subscription = db.get(models.PushSubscription, delivery.subscription_id)
-        attempt_time = datetime.utcnow()
+        attempt_time = utc_now()
         delivery.attempts += 1
         delivery.locked_until = None
 

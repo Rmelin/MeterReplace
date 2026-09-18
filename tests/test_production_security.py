@@ -182,12 +182,10 @@ class ProductionSecurityTests(unittest.TestCase):
                 yield db
 
         self.app.dependency_overrides[get_db] = test_db
-        # Existing startup callback puts templates on main.app, not the isolated wrapper.
         self.client = TestClient(
             self.app, base_url="https://testserver", follow_redirects=False
         )
         self.client.__enter__()
-        self.app.state.templates = main.app.state.templates
         self.addCleanup(self.client.__exit__, None, None, None)
 
     @staticmethod
