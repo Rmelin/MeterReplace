@@ -32,12 +32,6 @@ PHOTO_LABELS = {
     "old": "Gammel måler",
 }
 
-PHOTO_FILENAME = {
-    "both": "begge",
-    "new": "ny",
-    "old": "gammel",
-}
-
 UPLOAD_DIR = Path("data") / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 

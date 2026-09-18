@@ -68,11 +68,14 @@ def save_image(file: UploadFile, folder: Path, root: Path) -> str:
         folder.mkdir(parents=True, exist_ok=True)
         extension = ".png" if transparent else ".jpg"
         path = folder / f"{uuid4().hex}{extension}"
+        created = False
         try:
             with path.open("xb") as target:
+                created = True
                 image.save(target, format="PNG" if transparent else "JPEG", quality=90)
         except Exception:
-            path.unlink(missing_ok=True)
+            if created:
+                path.unlink(missing_ok=True)
             raise
         finally:
             image.close()

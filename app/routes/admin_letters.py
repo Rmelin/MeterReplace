@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 import os
-import re
-import unicodedata
 from uuid import uuid4
 import base64
 import io
@@ -34,13 +32,6 @@ DEFAULT_BODY = (
     "VVS har adgang i det angivne tidsrum.\n\n"
     "## Med venlig hilsen\nDit vandværk"
 )
-
-
-def slugify(value: str) -> str:
-    text = value.strip().lower()
-    text = text.replace("æ", "ae").replace("ø", "oe").replace("å", "aa")
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-    return re.sub(r"[^a-z0-9]", "", text) or "logo"
 
 
 def save_logo(file: UploadFile) -> str:

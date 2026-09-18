@@ -33,12 +33,6 @@ PHOTO_LABELS = {
     "old": "Gammel måler",
 }
 
-PHOTO_FILENAME = {
-    "both": "begge",
-    "new": "ny",
-    "old": "gammel",
-}
-
 BLOCKED_REASON = "Fejl ved måler"
 
 STATUS_LABELS = {
