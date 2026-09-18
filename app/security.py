@@ -224,7 +224,7 @@ class SecurityMiddleware:
         if limits:
             try:
                 retry = await run_in_threadpool(self.limiter.check, limits)
-            except sqlite3.Error:
+            except (sqlite3.Error, OSError):
                 return await reject(503, "Prøv igen senere", {"Retry-After": "60"})
             if retry:
                 return await reject(
