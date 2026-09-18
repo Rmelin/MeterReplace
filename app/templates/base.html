@@ -2,6 +2,7 @@
 <html lang="da">
 <head>
     <meta charset="UTF-8" />
+    <meta name="csrf-token" content="{{ request.scope.get('session', {}).get('csrf_token', '') if request is defined else '' }}" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ title or 'MeterReplace' }}</title>
     <link rel="icon" href="/static/favicon.ico" sizes="any" />
@@ -65,6 +66,7 @@
                     <a href="/admin/availability">Arbejdsdage</a>
                 {% endif %}
                 <form action="/logout" method="post" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                     <button type="submit" class="ghost-button">Log ud</button>
                 </form>
             {% else %}
@@ -73,6 +75,7 @@
         </nav>
         {% if current_user %}
         <form action="/logout" method="post" class="inline-form mobile-only">
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <button type="submit" class="ghost-button" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Log ud</button>
         </form>
         {% endif %}

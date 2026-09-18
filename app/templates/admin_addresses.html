@@ -31,6 +31,7 @@
         <div class="card is-hidden" data-panel="new-address">
             <h2>Ny adresse</h2>
             <form method="post" action="/admin/addresses" class="form-grid">
+                <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                 <label>Vej<input type="text" name="street" required /></label>
                 <label>Husnr<input type="text" name="house_no" required /></label>
                 <label>Postnr<input type="text" name="zip" required /></label>
@@ -54,6 +55,7 @@
         <div class="card is-hidden" data-panel="csv-import">
             <h2>CSV-import</h2>
             <form method="post" action="/admin/addresses/import" enctype="multipart/form-data" class="form-grid">
+                <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                 <label>Fil<input type="file" name="file" accept=".csv" required /></label>
                 <label class="checkbox-field">
                     <input type="checkbox" name="geocode" value="1" />
@@ -148,6 +150,7 @@
                             <a class="primary-button" href="/admin/addresses/{{ address.id }}/edit" style="font-size: 0.85rem; padding: 0.5rem 0.75rem;">Detaljer / Rediger</a>
                             {% if status_status_map.get(address.id) and status_status_map.get(address.id) != AppointmentStatus.NEEDS_RESCHEDULE %}
                                 <form method="post" action="/admin/addresses/{{ address.id }}/needs-reschedule" class="inline-status-form" style="display: grid; gap: 0.4rem;">
+                                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                                     <input type="hidden" name="redirect" value="{{ redirect_url }}" />
                                     <input type="text" name="note" placeholder="Note til ny dato" required style="font-size: 0.85rem; padding: 0.45rem;" />
                                     <button type="submit" class="ghost-button" style="font-size: 0.85rem; padding: 0.45rem;">Behov for ny dato</button>
@@ -219,6 +222,7 @@
                                     <a class="primary-button" href="/admin/addresses/{{ address.id }}/edit" style="font-size: 0.85rem; padding: 0.4rem;">Detaljer / Rediger</a>
                                     {% if status_status_map.get(address.id) and status_status_map.get(address.id) != AppointmentStatus.NEEDS_RESCHEDULE %}
                                         <form method="post" action="/admin/addresses/{{ address.id }}/needs-reschedule" class="inline-status-form" style="display: grid; gap: 0.25rem;">
+                                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                                             <input type="hidden" name="redirect" value="{{ redirect_url }}" />
                                             <input type="text" name="note" placeholder="Note til ny dato" required style="font-size: 0.85rem; padding: 0.4rem;" />
                                             <button type="submit" class="ghost-button" style="font-size: 0.85rem; padding: 0.4rem;">Behov for ny dato</button>

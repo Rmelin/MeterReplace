@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -15,23 +14,29 @@ from app.db import SessionLocal, init_db
 from app.dependencies import consume_flashes, get_optional_user
 from app.routes import admin_addresses, admin_appointments, admin_availability, admin_completed_import, admin_inventory, admin_letters, admin_messages, admin_missing_photos, admin_planning, admin_register_import, admin_settings, admin_status, admin_street_priority, admin_users, auth, push, resident, user_dashboard, vvs_availability, vvs_tasks
 
-SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {
-    "1",
-    "true",
-    "yes",
-}
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from app.security import RateLimiter, SecurityMiddleware, security_settings
+from app.routes import uploads
 
+settings = security_settings()
 app = FastAPI()
-
+app.add_middleware(
+    SecurityMiddleware,
+    limiter=RateLimiter(Path("data/security/rate-limits.db"), settings.secret_key),
+    production=settings.production,
+)
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("SECRET_KEY", "dev-secret"),
+    secret_key=settings.secret_key,
     session_cookie="vand_session",
-    https_only=SESSION_COOKIE_SECURE,
+    https_only=settings.secure_cookie,
+    same_site="lax",
 )
+if settings.allowed_host:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[settings.allowed_host])
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-app.mount("/upload", StaticFiles(directory="data/uploads"), name="uploads")
+app.include_router(uploads.router)
 
 app.state.templates = None
 
@@ -113,7 +118,7 @@ def access_denied(request: Request, exc):
     with SessionLocal() as db:
         user = get_optional_user(request, db)
     return request.app.state.templates.TemplateResponse(
-        "error.html",
+        request, "error.html",
         {
             "request": request,
             "current_user": user,
@@ -132,7 +137,7 @@ def not_found(request: Request, exc):
         user = get_optional_user(request, db)
         contact = support_contact(db) if is_resident_404 else None
     return request.app.state.templates.TemplateResponse(
-        "error.html",
+        request, "error.html",
         {
             "request": request,
             "current_user": user,
@@ -160,7 +165,7 @@ def server_error(request: Request, exc):
     with SessionLocal() as db:
         user = get_optional_user(request, db)
     return request.app.state.templates.TemplateResponse(
-        "error.html",
+        request, "error.html",
         {
             "request": request,
             "current_user": user,

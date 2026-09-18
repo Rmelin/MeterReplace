@@ -23,6 +23,7 @@
             </div>
         {% endif %}
         <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid" data-inline-edit-form data-duration-form>
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <input type="hidden" name="inline" value="1" />
             <label>
                 Status
@@ -75,6 +76,7 @@
             {% set photo_complete = ('both' in photo_types) or (photos | length >= 2) %}
             <div class="photo-count-badge{% if not photo_complete %} is-incomplete{% endif %}">Fotos: {{ photos | length }}/2 · {% if photo_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
             <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form">
+                <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                 <fieldset class="option-field vvs-photo-type-fieldset" required>
                     <legend>Fototype</legend>
                     <div class="option-buttons">
@@ -108,6 +110,7 @@
         </div>
     {% endif %}
     <form method="post" action="/vvs/tasks/{{ appointment.id }}/edit" class="form-grid" data-duration-form>
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>
             Status
             <select name="status" required>

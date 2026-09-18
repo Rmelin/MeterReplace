@@ -33,11 +33,21 @@ def get_db():
 
 def init_db() -> None:
     from app import models
-    from app.auth import hash_password
+    from app.auth import hash_password, verify_password
+    from app.security import security_settings
+
+    production = security_settings().production
 
     if not inspect(engine).has_table("users"):
         raise RuntimeError("Databasen mangler. Kør 'python -m alembic upgrade head'.")
     with SessionLocal() as db:
+        if production:
+            admins = db.query(models.User).filter(models.User.role == models.UserRole.ADMIN).all()
+            if not admins:
+                raise RuntimeError("Opret først en administrator med python -m app.bootstrap_admin")
+            if any(verify_password("admin123", admin.password_hash) for admin in admins):
+                raise RuntimeError("Skift standard-adminadgangskoden før produktionsstart")
+            return
         if not db.query(models.User).first():
             admin = models.User(
                 username="admin",

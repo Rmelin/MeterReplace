@@ -176,7 +176,7 @@ def message_dashboard(
         )
 
     return request.app.state.templates.TemplateResponse(
-        "admin_messages.html",
+        request, "admin_messages.html",
         {
             "request": request,
             "current_user": user,

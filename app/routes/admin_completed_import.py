@@ -150,7 +150,7 @@ def import_form(
     user: models.User = Depends(require_role(models.UserRole.ADMIN)),
 ):
     return request.app.state.templates.TemplateResponse(
-        "admin_completed_import.html",
+        request, "admin_completed_import.html",
         {
             "request": request,
             "current_user": user,

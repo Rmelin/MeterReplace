@@ -11,6 +11,7 @@
     <div class="card">
         <h2>Ny bruger</h2>
         <form method="post" action="/admin/users" class="form-grid">
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <label>Brugernavn<input type="text" name="username" required /></label>
             <label>Adgangskode<input type="password" name="password" required /></label>
             <label>

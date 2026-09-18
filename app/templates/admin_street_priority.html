@@ -16,6 +16,7 @@
         <p class="hint">Ingen veje tilgængelige endnu.</p>
     {% else %}
         <form method="post" action="/admin/street-priority" class="form-grid">
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <label>
                 Vej
                 <select name="street" required>
@@ -34,6 +35,7 @@
 <section class="card">
     <h2>Importer CSV</h2>
     <form method="post" action="/admin/street-priority/import" enctype="multipart/form-data" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>Fil<input type="file" name="file" accept=".csv" required /></label>
         <button type="submit" class="primary-button">Importer</button>
     </form>
@@ -58,6 +60,7 @@
                             <td>{{ entry.street }}</td>
                             <td>
                                 <form method="post" action="/admin/street-priority" class="form-grid" style="grid-template-columns: 1fr auto; gap: 0.5rem;">
+                                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                                     <input type="hidden" name="street" value="{{ entry.street }}" />
                                     <input type="number" name="priority" min="0" value="{{ entry.priority }}" />
                                     <button type="submit" class="primary-button">Opdater</button>
@@ -65,6 +68,7 @@
                             </td>
                             <td>
                                 <form method="post" action="/admin/street-priority/{{ entry.id }}/delete" class="inline-form">
+                                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                                     <button type="submit" class="ghost-button">Slet</button>
                                 </form>
                             </td>

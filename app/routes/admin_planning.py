@@ -623,7 +623,7 @@ def planning_form(
     ]
 
     return request.app.state.templates.TemplateResponse(
-        "admin_planning.html",
+        request, "admin_planning.html",
         {
             "request": request,
             "current_user": user,
@@ -820,7 +820,7 @@ def manual_planning_form(
         scheduled_map = manual_schedule_map(appointments)
 
     return request.app.state.templates.TemplateResponse(
-        "admin_manual_planning.html",
+        request, "admin_manual_planning.html",
         {
             "request": request,
             "current_user": user,

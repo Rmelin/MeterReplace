@@ -3,6 +3,7 @@
 <section class="card narrow">
     <h1>Rediger bruger</h1>
     <form method="post" action="/admin/users/{{ target_user.id }}/edit" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>Brugernavn<input type="text" name="username" value="{{ target_user.username }}" required /></label>
         <label>
             Rolle
