@@ -11,6 +11,7 @@
 <section class="card">
     <h2>Ny arbejdsdag</h2>
     <form method="post" action="/admin/availability" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>
             VVS
             <select name="user_id" required>

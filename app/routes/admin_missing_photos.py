@@ -83,7 +83,7 @@ def missing_photos_overview(
     rows = missing_photo_rows(db)
 
     return request.app.state.templates.TemplateResponse(
-        "admin_missing_photos.html",
+        request, "admin_missing_photos.html",
         {
             "request": request,
             "current_user": user,

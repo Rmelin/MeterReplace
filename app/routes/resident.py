@@ -134,7 +134,7 @@ def resident_form(
     responses = resident_form_context(db, link)
 
     return request.app.state.templates.TemplateResponse(
-        "resident_response_form.html",
+        request, "resident_response_form.html",
         {
             "request": request,
             "current_user": None,

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
@@ -30,12 +31,6 @@ PHOTO_LABELS = {
     "both": "Begge målere",
     "new": "Ny måler",
     "old": "Gammel måler",
-}
-
-PHOTO_FILENAME = {
-    "both": "begge",
-    "new": "ny",
-    "old": "gammel",
 }
 
 BLOCKED_REASON = "Fejl ved måler"
@@ -79,10 +74,6 @@ def photo_complete(photos: list[models.AppointmentPhoto]) -> bool:
     return "both" in types or ("new" in types and "old" in types)
 
 
-def ensure_image(file: UploadFile) -> bool:
-    return file.content_type is not None and file.content_type.startswith("image/")
-
-
 def slugify_address(address: models.Address) -> str:
     value = f"{address.street}{address.house_no}".strip().lower()
     value = value.replace("æ", "ae").replace("ø", "oe").replace("å", "aa")
@@ -91,25 +82,7 @@ def slugify_address(address: models.Address) -> str:
 
 
 def save_photo(address: models.Address, photo_type: str, file: UploadFile) -> str:
-    extension = Path(file.filename or "").suffix.lower() or ".jpg"
-    filename_slug = PHOTO_FILENAME.get(photo_type, "foto")
-    slug = slugify_address(address)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    counter = 1
-
-    folder = UPLOAD_DIR / slug
-    folder.mkdir(parents=True, exist_ok=True)
-
-    while True:
-        filename = f"{slug}-{filename_slug}-{timestamp}-{counter}{extension}"
-        path = folder / filename
-        if not path.exists():
-            break
-        counter += 1
-
-    with path.open("wb") as buffer:
-        buffer.write(file.file.read())
-    return str(path.relative_to(UPLOAD_DIR))
+    return save_image(file, UPLOAD_DIR / slugify_address(address), UPLOAD_DIR)
 
 
 def availability_dates(db: Session, user_id: int) -> list[date]:
@@ -445,7 +418,7 @@ def vvs_tasks(
     ]
 
     return request.app.state.templates.TemplateResponse(
-        "vvs_tasks.html",
+        request, "vvs_tasks.html",
         {
             "request": request,
             "current_user": user,
@@ -488,7 +461,7 @@ def vvs_tasks_map(
         return selection
     available_dates, show_all_dates, selected_date = selection
     return request.app.state.templates.TemplateResponse(
-        "vvs_tasks_map.html",
+        request, "vvs_tasks_map.html",
         {
             "request": request,
             "current_user": user,
@@ -664,7 +637,7 @@ def upload_photo(
             return RedirectResponse(redirect_url, status_code=303)
 
     if not ensure_image(file):
-        flash(request, "Kun billedfiler er tilladt", "error")
+        flash(request, "Vælg et gyldigt JPEG-, PNG- eller WebP-billede (højst 10 MiB)", "error")
         return RedirectResponse(redirect_url, status_code=303)
 
     address = db.query(models.Address).filter(models.Address.id == appointment.address_id).first()
@@ -673,25 +646,28 @@ def upload_photo(
         return RedirectResponse(redirect_url, status_code=303)
 
     file_path = save_photo(address, photo_type, file)
-    photo = models.AppointmentPhoto(
-        appointment_id=appointment.id,
-        address_id=appointment.address_id,
-        file_path=file_path,
-        photo_type=photo_type,
-        uploaded_by_user_id=user.id,
-    )
-    db.add(photo)
-    db.commit()
+    with upload_transaction(db, UPLOAD_DIR / file_path):
+        photo = models.AppointmentPhoto(
+            appointment_id=appointment.id,
+            address_id=appointment.address_id,
+            file_path=file_path,
+            photo_type=photo_type,
+            uploaded_by_user_id=user.id,
+        )
+        db.add(photo)
+        db.flush()
 
-    updated_photos = existing_photos + [photo]
-    if photo_complete(updated_photos):
-        appointment.status = models.AppointmentStatus.COMPLETED
-        appointment.changed_date = utc_now()
-        appointment.changed_by_user_id = user.id
-        db.commit()
-        flash(request, "Foto uploadet og status sat til skiftet", "success")
-    else:
-        flash(request, "Foto uploadet", "success")
+        updated_photos = existing_photos + [photo]
+        if photo_complete(updated_photos):
+            appointment.status = models.AppointmentStatus.COMPLETED
+            appointment.changed_date = utc_now()
+            appointment.changed_by_user_id = user.id
+            db.flush()
+            success_message = "Foto uploadet og status sat til skiftet"
+        else:
+            success_message = "Foto uploadet"
+
+    flash(request, success_message, "success")
 
     return RedirectResponse(redirect_url, status_code=303)
 
@@ -750,7 +726,7 @@ def edit_task(
         base_context["flashes"] = consume_flashes(request)
 
     return request.app.state.templates.TemplateResponse(
-        template_name,
+        request, template_name,
         base_context,
     )
 
@@ -787,7 +763,7 @@ def update_task(
         if not context:
             raise HTTPException(status_code=404, detail="Opgave ikke fundet")
         return request.app.state.templates.TemplateResponse(
-            "partials/vvs_task_form.html",
+            request, "partials/vvs_task_form.html",
             {
                 "request": request,
                 "current_user": user,

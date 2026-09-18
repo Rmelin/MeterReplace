@@ -26,8 +26,9 @@ def authenticate_user(db: Session, username: str, password: str) -> models.User 
 
 
 def login_user(session: dict, user: models.User) -> None:
+    session.clear()
     session["user_id"] = user.id
 
 
 def logout_user(session: dict) -> None:
-    session.pop("user_id", None)
+    session.clear()

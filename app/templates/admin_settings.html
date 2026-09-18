@@ -14,6 +14,7 @@
     <h2>Beboersupport</h2>
     <p class="hint">Vises på fejlsiden, hvis et beboerlink eller en QR-kode ikke virker. Tomme felter skjules.</p>
     <form method="post" action="/admin/settings" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <input type="hidden" name="section" value="support" />
         <label>Supportmail<input type="email" name="support_email" maxlength="254" value="{{ support_contact.email }}" /></label>
         <label>Supporttelefon<input type="tel" name="support_phone" maxlength="50" value="{{ support_contact.phone }}" /></label>
@@ -25,6 +26,7 @@
 <section class="card">
     <h2>Planlægning</h2>
     <form method="post" action="/admin/settings" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>
             Varslingsperiode i dage
             <input type="number" name="planning_notice_days_value" min="0" value="{{ planning_notice_days }}" required />

@@ -230,7 +230,7 @@ def status_dashboard(
     workday_status = build_workday_status(db)
 
     return request.app.state.templates.TemplateResponse(
-        "admin_status.html",
+        request, "admin_status.html",
         {
             "request": request,
             "current_user": user,

@@ -70,6 +70,7 @@
                             <td data-label="Handlinger">
                                 <a class="ghost-button" href="/admin/addresses/{{ item.address.id }}/edit" style="font-size: 0.85rem; padding: 0.35rem 0.6rem;">Adresse</a>
                                 <form method="post" action="/admin/messages/{{ item.id }}/status" class="message-status-form">
+                                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                                     <input type="hidden" name="folder" value="{{ selected_folder }}" />
                                     <input type="hidden" name="response_type" value="{{ selected_type }}" />
                                     {% for status, label in statuses.items() %}

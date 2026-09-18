@@ -6,6 +6,7 @@ from starlette.responses import RedirectResponse
 
 from app import auth, models
 from app.db import get_db
+from app.security import password_error
 from app.dependencies import consume_flashes, flash, require_role
 from app.timeutils import utc_now
 
@@ -32,7 +33,7 @@ def list_users(
 ):
     users = db.query(models.User).order_by(models.User.username).all()
     return request.app.state.templates.TemplateResponse(
-        "admin_users.html",
+        request, "admin_users.html",
         {
             "request": request,
             "current_user": user,
@@ -56,6 +57,10 @@ def create_user(
     role_value = parse_role(role)
     if not username or not password:
         flash(request, "Brugernavn og adgangskode er påkrævet", "error")
+        return RedirectResponse("/admin/users", status_code=303)
+
+    if error := password_error(password):
+        flash(request, error, "error")
         return RedirectResponse("/admin/users", status_code=303)
 
     if not role_value:
@@ -90,7 +95,7 @@ def edit_user_form(
     if not target_user:
         raise HTTPException(status_code=404, detail="Bruger ikke fundet")
     return request.app.state.templates.TemplateResponse(
-        "admin_user_edit.html",
+        request, "admin_user_edit.html",
         {
             "request": request,
             "current_user": user,
@@ -132,6 +137,10 @@ def update_user(
     )
     if existing:
         flash(request, "Brugernavn findes allerede", "error")
+        return RedirectResponse(f"/admin/users/{user_id}/edit", status_code=303)
+
+    if password and (error := password_error(password)):
+        flash(request, error, "error")
         return RedirectResponse(f"/admin/users/{user_id}/edit", status_code=303)
 
     was_admin = target_user.role == models.UserRole.ADMIN

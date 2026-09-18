@@ -10,6 +10,7 @@
 <section class="card">
     <h2>Standardtekst</h2>
     <form method="post" action="/admin/letters/template" enctype="multipart/form-data" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>
             Tekst (Markdown)
             <textarea name="body_markdown" rows="10" class="textarea" required>{{ template.body_markdown }}</textarea>
