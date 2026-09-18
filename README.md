@@ -43,6 +43,7 @@ Hvis databasen er tom ved første opstart, oprettes en standard admin-bruger aut
 - [Statusmodel](docs/status-model.md)
 - [Admin-flow](docs/admin-flow.md)
 - [Fejlsøgning](docs/troubleshooting.md)
+- [Plan for bedre kodekvalitet](docs/kodekvalitet.md)
 - [Bidrag](CONTRIBUTING.md)
 
 ## Teknologi
