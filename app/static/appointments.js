@@ -1,6 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
   const triggers = document.querySelectorAll('[data-inline-edit-trigger]')
 
+  document.querySelectorAll('[data-manual-task-form]').forEach((form) => {
+    const windowSelect = form.querySelector('[data-task-window]')
+    const exactFields = form.querySelectorAll('[data-task-exact]')
+    const syncWindow = () => {
+      const exact = windowSelect.value === 'exact'
+      exactFields.forEach((label) => {
+        label.hidden = !exact
+        label.querySelector('input').required = exact
+      })
+    }
+    windowSelect.addEventListener('change', syncWindow)
+    syncWindow()
+  })
+
   const toMinutes = (value) => {
     if (!value) return null
     const parts = value.split(':')

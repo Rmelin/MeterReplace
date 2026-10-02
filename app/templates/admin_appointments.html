@@ -91,12 +91,22 @@
 <section class="card">
     <div class="section-header">
         <div>
-            <h2>Dagens adresser</h2>
-            <p class="hint">Enkel oversigt for {{ selected_date.strftime('%d/%m/%Y') }}. Klik på en adresse for at hoppe til detaljerne længere nede.</p>
+            <h2>Dagens adresser og opgaver</h2>
+            <p class="hint">Oversigt for {{ selected_date.strftime('%d/%m/%Y') }}. Klik for at hoppe til detaljerne længere nede.</p>
         </div>
     </div>
-    {% if morning_overview or afternoon_overview or buffer_overview %}
+    {% if morning_overview or afternoon_overview or buffer_overview or manual_overview %}
         <div class="appointment-outline-grid">
+            {% if manual_overview %}
+                <section class="appointment-outline-section">
+                    <h3>VVS-opgaver</h3>
+                    <ul class="appointment-outline-list">
+                        {% for item in manual_overview %}
+                            <li><a class="appointment-outline-link" href="#appointment-{{ item.appointment_id }}">{{ item.title }}{% if item.address %} · {{ item.address }}{% endif %}</a> <span class="hint">{% if item.time_window == 'all_day' %}Hele dagen{% elif item.time_window == 'morning' %}Formiddag{% elif item.time_window == 'afternoon' %}Eftermiddag{% else %}Kl. {{ item.start_time }}{% endif %}</span>{% if item.is_done %} ✓{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
             {% if morning_overview %}
                 <section class="appointment-outline-section">
                     <h3>Formiddag</h3>
@@ -207,7 +217,7 @@
     <h2>Opret VVS-opgave</h2>
     {% if selected_date and vvs_users %}
         {% set single_vvs = vvs_users|length == 1 %}
-        <form method="post" action="/admin/appointments/manual-task" class="form-grid" data-duration-form>
+        <form method="post" action="/admin/appointments/manual-task" class="form-grid" data-manual-task-form>
             <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <input type="hidden" name="date_raw" value="{{ selected_date.isoformat() }}" />
             <label>
@@ -219,8 +229,24 @@
                     {% endfor %}
                 </select>
             </label>
-            <label>Starttid<input type="time" name="start_raw" step="1800" required data-duration-start /></label>
-            <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="30" required data-duration-minutes /></label>
+            <label>Adresse (valgfri)
+                <select name="address_id">
+                    <option value="0">Ingen bestemt adresse</option>
+                    {% for address in task_addresses %}
+                        <option value="{{ address.id }}">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Tidspunkt
+                <select name="time_window" data-task-window>
+                    <option value="all_day">Hele dagen</option>
+                    <option value="morning">Formiddag</option>
+                    <option value="afternoon">Eftermiddag</option>
+                    <option value="exact">Klokkeslæt</option>
+                </select>
+            </label>
+            <label data-task-exact hidden>Starttid<input type="time" name="start_raw" step="60" /></label>
+            <label data-task-exact hidden>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="30" /></label>
             <label>
                 Opgave
                 <textarea name="notes" rows="3" placeholder="Luk for vand på X vej" required></textarea>
@@ -263,8 +289,15 @@
                         <span class="task-flag">Opgave uden adresse</span>
                     {% endif %}
                 </div>
-                <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
-                {% if address %}
+                <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m') }} · {% if appointment.is_manual_task and appointment.time_window == 'all_day' %}Hele dagen{% elif appointment.is_manual_task and appointment.time_window == 'morning' %}Formiddag{% elif appointment.is_manual_task and appointment.time_window == 'afternoon' %}Eftermiddag{% else %}{{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}{% endif %}</p>
+                {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave</span>{% endif %}
+                {% if appointment.is_manual_task %}
+                    <form method="post" action="/admin/appointments/{{ appointment.id }}/close" class="vvs-task-quick-form">
+                        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+                        <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                        <button type="submit" class="primary-button vvs-task-action-button">Udført</button>
+                    </form>
+                {% elif address %}
                     <div class="vvs-task-primary-actions">
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/complete" class="vvs-task-quick-form">
                             <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
@@ -305,13 +338,13 @@
                 {% endif %}
                 <div class="action-row" style="margin-top: 0.75rem;">
                     <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
-                    {% if address and appointment.letter_required %}
+                    {% if address and appointment.letter_required and not appointment.is_manual_task %}
                         <a class="ghost-button" href="/admin/letters/address/{{ address.id }}?appointment_id={{ appointment.id }}">Se brev</a>
                         <a class="ghost-button" href="/admin/letters/address/{{ address.id }}/pdf?appointment_id={{ appointment.id }}">Hent PDF</a>
                     {% endif %}
                 </div>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
-                {% if address %}
+                {% if address and not appointment.is_manual_task %}
                     {% set photo_list = photos.get(appointment.id, []) %}
                     {% set photo_types = photo_list | map(attribute='photo_type') | list %}
                     {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}
@@ -380,7 +413,7 @@
                     {% endif %}
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
-                <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
+                <p class="hint">Status: {% if appointment.is_manual_task and appointment.status.value == 'CLOSED' %}Udført{% else %}{{ status_labels.get(appointment.status, appointment.status.value) }}{% endif %}</p>
                 {% if resident_response %}
                     <div class="resident-reschedule-banner resident-reschedule-{% if resident_response.answer == 'same_day' %}same-day{% else %}new-day{% endif %}">
                         <strong>
@@ -438,7 +471,8 @@
                     {% endif %}
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
-                <p class="hint">Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</p>
+                <p class="hint">Status: {% if appointment.is_manual_task and appointment.status.value == 'CLOSED' %}Udført{% else %}{{ status_labels.get(appointment.status, appointment.status.value) }}{% endif %}</p>
+                {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave · {% if appointment.time_window == 'all_day' %}Hele dagen{% elif appointment.time_window == 'morning' %}Formiddag{% elif appointment.time_window == 'afternoon' %}Eftermiddag{% else %}Kl. {{ appointment.starts_at.strftime('%H:%M') }}{% endif %}</span>{% endif %}
                 {% if appointment.notes %}
                     <div class="task-note-banner">
                         <span class="task-note-label">NOTE</span>
@@ -461,7 +495,7 @@
                 {% endif %}
                 <a class="link" href="/admin/appointments/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Rediger</a>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
-                {% if address %}
+                {% if address and not appointment.is_manual_task %}
                     {% set photo_list = photos.get(appointment.id, []) %}
                     {% set photo_types = photo_list | map(attribute='photo_type') | list %}
                     {% set photos_complete = ('both' in photo_types) or (photo_list | length >= 2) %}

@@ -7,7 +7,7 @@ import re
 import unicodedata
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
@@ -138,6 +138,7 @@ def is_meter_issue_row(
 ) -> bool:
     return bool(
         address
+        and not appointment.is_manual_task
         and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE
         and address.blocked_reason == BLOCKED_REASON
     )
@@ -182,6 +183,7 @@ def has_conflict(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -201,6 +203,7 @@ def has_conflict_for_user(
         .filter(
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -235,7 +238,7 @@ def appointment_overview(
     if selected_date:
         rows = (
             db.query(models.Appointment, models.Address, models.User)
-            .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+            .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
             .join(models.User, models.User.id == models.Appointment.contractor_id)
             .join(
                 models.VvsAvailability,
@@ -267,7 +270,18 @@ def appointment_overview(
     morning_overview = []
     afternoon_overview = []
     buffer_overview = []
+    manual_overview = []
     for appointment, address, _contractor in rows:
+        if appointment.is_manual_task:
+            manual_overview.append({
+                "appointment_id": appointment.id,
+                "title": appointment.notes or "VVS-opgave",
+                "address": f"{address.street} {address.house_no}" if address else None,
+                "time_window": appointment.time_window,
+                "start_time": appointment.starts_at.strftime("%H:%M"),
+                "is_done": is_done_for_day(appointment.status),
+            })
+            continue
         if not address:
             continue
         if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
@@ -359,9 +373,10 @@ def appointment_overview(
             "morning_overview": morning_overview,
             "afternoon_overview": afternoon_overview,
             "buffer_overview": buffer_overview,
+            "manual_overview": manual_overview,
             "todo": todo,
             "remaining_address_count": sum(
-                1 for appointment in todo if addresses.get(appointment.id) is not None
+                1 for appointment in todo if addresses.get(appointment.id) is not None and not appointment.is_manual_task
             ),
             "needs_reschedule": needs_reschedule,
             "reschedule_responses": reschedule_responses,
@@ -369,6 +384,7 @@ def appointment_overview(
             "availability_dates": dates,
             "selected_date": selected_date,
             "vvs_users": vvs_users,
+            "task_addresses": db.query(models.Address).order_by(models.Address.street, models.Address.house_no).all(),
             "photo_labels": PHOTO_LABELS,
             "status_labels": STATUS_LABELS,
             "today_day_status": today_day_status,
@@ -386,6 +402,8 @@ def create_manual_task(
     contractor_id: int = Form(0),
     start_raw: str = Form(""),
     duration_minutes: int = Form(30),
+    time_window: str = Form("exact"),
+    address_id: int = Form(0),
     notes: str = Form(""),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
@@ -396,7 +414,6 @@ def create_manual_task(
 
     try:
         plan_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
-        start_time = parse_time(start_raw)
     except ValueError:
         flash(request, "Dato eller tid er ugyldig", "error")
         return RedirectResponse(
@@ -430,54 +447,58 @@ def create_manual_task(
             f"/admin/appointments?date_query={date_raw}", status_code=303
         )
 
-    if duration_minutes < 5 or duration_minutes > 480:
-        flash(request, "Planlagt varighed skal være mellem 5 og 480 minutter", "error")
+    if address_id:
+        address = db.query(models.Address).filter(models.Address.id == address_id).first()
+        if not address:
+            flash(request, "Vælg en gyldig adresse", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+
+    if time_window not in {"all_day", "morning", "afternoon", "exact"}:
+        flash(request, "Vælg et gyldigt tidspunkt", "error")
         return RedirectResponse(
             f"/admin/appointments?date_query={date_raw}", status_code=303
         )
-
-    slot_start = datetime.combine(plan_date, start_time)
-    slot_end = slot_start + timedelta(minutes=duration_minutes)
-    window_start = PLANNING_DAY_START
-    window_end = PLANNING_DAY_END
-
-    if not (window_start <= start_time < window_end):
-        flash(request, "Tid skal være mellem 06:00 og 20:00", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if slot_end.time() > window_end:
-        flash(request, "Sluttid skal være senest 20:00", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if not (availability.start_time <= start_time < availability.end_time):
-        flash(request, "Tid ligger udenfor arbejdsdag", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if slot_end.time() > availability.end_time:
-        flash(request, "Slot slutter udenfor arbejdsdag", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if has_conflict_for_user(db, contractor_id, slot_start, slot_end):
-        flash(request, "VVS er allerede planlagt på dette tidspunkt", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
+    if time_window == "exact":
+        try:
+            start_time = parse_time(start_raw)
+        except ValueError:
+            flash(request, "Angiv et gyldigt klokkeslæt", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        if duration_minutes < 5 or duration_minutes > 480:
+            flash(request, "Planlagt varighed skal være mellem 5 og 480 minutter", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        slot_start = datetime.combine(plan_date, start_time)
+        slot_end = slot_start + timedelta(minutes=duration_minutes)
+        if not (max(availability.start_time, PLANNING_DAY_START) <= start_time < min(availability.end_time, PLANNING_DAY_END)) or slot_end.date() != plan_date or slot_end.time() > min(availability.end_time, PLANNING_DAY_END):
+            flash(request, "Tid ligger udenfor arbejdsdagen", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        if has_conflict_for_user(db, contractor_id, slot_start, slot_end):
+            flash(request, "VVS er allerede planlagt på dette tidspunkt", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+    else:
+        window_start = max(availability.start_time, PLANNING_DAY_START)
+        window_end = min(availability.end_time, PLANNING_DAY_END)
+        if time_window == "morning":
+            window_end = min(window_end, time(12, 0))
+        elif time_window == "afternoon":
+            window_start = max(window_start, time(12, 0))
+        if window_start >= window_end:
+            flash(request, "VVS arbejder ikke i den valgte del af dagen", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        slot_start = datetime.combine(plan_date, window_start)
+        slot_end = datetime.combine(plan_date, window_end)
 
     db.add(
         models.Appointment(
             address_id=None,
+            task_address_id=address_id or None,
             contractor_id=contractor.id,
             starts_at=slot_start,
             ends_at=slot_end,
             status=models.AppointmentStatus.SCHEDULED,
+            is_manual_task=True,
+            time_window=time_window,
+            letter_required=False,
             notes=note_value,
             changed_date=utc_now(),
             changed_by_user_id=user.id,
@@ -611,7 +632,7 @@ def appointment_edit_context(
 ) -> dict[str, object] | None:
     row = (
         db.query(models.Appointment, models.Address, models.User)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .join(models.User, models.User.id == models.Appointment.contractor_id)
         .filter(models.Appointment.id == appointment_id)
         .first()
@@ -728,6 +749,8 @@ def update_appointment(
     }
     if status not in status_map:
         return handle_error("Vælg en gyldig status")
+    if appointment.is_manual_task and status not in {"scheduled", "closed", "notscheduled"}:
+        return handle_error("Vælg en gyldig status for VVS-opgaven")
 
     contractor = db.query(models.User).filter(models.User.id == contractor_id).first()
     if not contractor or contractor.role != models.UserRole.VVS:
@@ -762,8 +785,9 @@ def update_appointment(
     if duration_minutes > 0 and calculated_minutes != duration_minutes:
         return handle_error("Sluttid matcher ikke planlagt varighed")
 
-    if calculated_minutes < 5 or calculated_minutes > 480:
-        return handle_error("Planlagt varighed skal være mellem 5 og 480 minutter")
+    max_minutes = 840 if appointment.is_manual_task and appointment.time_window != "exact" else 480
+    if calculated_minutes < 5 or calculated_minutes > max_minutes:
+        return handle_error(f"Planlagt varighed skal være mellem 5 og {max_minutes} minutter")
 
     if not (PLANNING_DAY_START <= start_time < PLANNING_DAY_END):
         return handle_error("Tid skal være mellem 06:00 og 20:00")
@@ -779,7 +803,7 @@ def update_appointment(
             return handle_error("Tid ligger udenfor arbejdsdag")
         if ends_at.time() > availability.end_time:
             return handle_error("Slot slutter udenfor arbejdsdag")
-        if has_conflict(db, appointment.id, contractor.id, starts_at, ends_at):
+        if (not appointment.is_manual_task or appointment.time_window == "exact") and has_conflict(db, appointment.id, contractor.id, starts_at, ends_at):
             return handle_error("VVS er allerede planlagt på dette tidspunkt")
 
     appointment.status = status_map[status]
@@ -843,6 +867,7 @@ def complete_remaining(
         .filter(
             func.date(models.Appointment.starts_at) == selected_date,
             models.Appointment.address_id.isnot(None),
+            models.Appointment.is_manual_task.is_(False),
             models.Appointment.status.in_(
                 [
                     models.AppointmentStatus.SCHEDULED,
@@ -885,6 +910,9 @@ def mark_completed(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+
+    if appointment.is_manual_task:
+        raise HTTPException(status_code=400, detail="VVS-opgaver kan ikke markeres som målerskift")
 
     photos = (
         db.query(models.AppointmentPhoto)

@@ -29,21 +29,21 @@
                 <select name="status" required>
                     <option value="notscheduled" {% if appointment.status.value|lower == 'notscheduled' %}selected{% endif %}>Ikke planlagt</option>
                     <option value="scheduled" {% if appointment.status.value|lower == 'scheduled' %}selected{% endif %}>Planlagt</option>
-                    <option value="informed" {% if appointment.status.value|lower == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
-                    <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>
-                    <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>Afsluttet</option>
-                    <option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
-                    <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
+                    {% if not appointment.is_manual_task %}<option value="informed" {% if appointment.status.value|lower == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
+                    <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>{% endif %}
+                    <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>{% if appointment.is_manual_task %}Udført{% else %}Afsluttet{% endif %}</option>
+                    {% if not appointment.is_manual_task %}<option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
+                    <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>{% endif %}
                 </select>
             </label>
             <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
             <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
-            <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
+            <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="{{ 840 if appointment.is_manual_task and appointment.time_window != 'exact' else 480 }}" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
             <label>
                 Opgave
                 <textarea name="notes" rows="3">{{ appointment.notes or '' }}</textarea>
             </label>
-            {% if address %}
+            {% if address and not appointment.is_manual_task %}
                 <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
                 <label>Ny målernr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
             {% endif %}
@@ -80,21 +80,21 @@
             <select name="status" required>
                 <option value="notscheduled" {% if appointment.status.value|lower == 'notscheduled' %}selected{% endif %}>Ikke planlagt</option>
                 <option value="scheduled" {% if appointment.status.value|lower == 'scheduled' %}selected{% endif %}>Planlagt</option>
-                <option value="informed" {% if appointment.status.value|lower == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
-                <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>
-                <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>Afsluttet</option>
-                <option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
-                <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>
+                {% if not appointment.is_manual_task %}<option value="informed" {% if appointment.status.value|lower == 'informed' %}selected{% endif %}>Beboer/kunde informeret</option>
+                <option value="completed" {% if appointment.status.value|lower == 'completed' %}selected{% endif %}>Skiftet</option>{% endif %}
+                <option value="closed" {% if appointment.status.value|lower == 'closed' %}selected{% endif %}>{% if appointment.is_manual_task %}Udført{% else %}Afsluttet{% endif %}</option>
+                {% if not appointment.is_manual_task %}<option value="not_home" {% if appointment.status.value|lower == 'not_home' %}selected{% endif %}>Ikke hjemme</option>
+                <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>{% endif %}
             </select>
         </label>
         <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
         <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
-        <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="480" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
+        <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="{{ 840 if appointment.is_manual_task and appointment.time_window != 'exact' else 480 }}" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
         <label>
             Opgave
             <textarea name="notes" rows="3">{{ appointment.notes or '' }}</textarea>
         </label>
-        {% if address %}
+        {% if address and not appointment.is_manual_task %}
             <label>Gammel målernr<input type="text" name="old_meter_no" value="{{ appointment.old_meter_no or '' }}" /></label>
             <label>Ny målernr<input type="text" name="new_meter_no" value="{{ appointment.new_meter_no or '' }}" /></label>
         {% endif %}
