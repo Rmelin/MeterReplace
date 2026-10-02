@@ -11,8 +11,10 @@ from alembic.operations import Operations
 
 from app import models
 from app.db import Base
+from app.day_agenda import day_agenda
 from app.planning_slots import build_slots
 from app.routes.admin_appointments import create_manual_task
+from app.routes.admin_planning import PlannedSlot
 from app.routes.vvs_tasks import build_day_checklist
 
 
@@ -70,6 +72,27 @@ class ManualVvsTaskTests(unittest.TestCase):
         self.assertEqual(response.status_code, 303)
         self.assertEqual(self.db.query(models.Appointment).count(), 0)
         self.assertEqual(request.session["_flashes"][0]["category"], "error")
+
+    def test_day_agenda_combines_saved_meter_visits_tasks_and_drafts(self):
+        self.create("all_day")
+        meter_visit = models.Appointment(
+            address_id=self.address.id, contractor_id=self.vvs.id,
+            starts_at=datetime(2026, 10, 8, 9), ends_at=datetime(2026, 10, 8, 9, 30),
+            status=models.AppointmentStatus.INFORMED,
+        )
+        self.db.add(meter_visit)
+        self.db.commit()
+        draft = PlannedSlot(
+            address=self.address, contractor=self.vvs,
+            starts_at=datetime(2026, 10, 8, 10), ends_at=datetime(2026, 10, 8, 10, 30),
+        )
+        agenda = day_agenda(self.db, self.day, [draft])
+        self.assertEqual([item["kind"] for item in agenda], ["VVS-opgave", "Målerskift", "Målerskift"])
+        self.assertEqual([item["status"] for item in agenda], ["Planlagt", "Beboer/kunde informeret", "Udkast"])
+        self.assertEqual(agenda[0]["time_label"], "Hele dagen")
+        self.assertEqual(agenda[0]["description"], "Kontroller vandtryk")
+        self.assertEqual(agenda[0]["address"].id, self.address.id)
+        self.assertTrue(agenda[-1]["is_draft"])
 
     def test_upgrade_repairs_legacy_required_address_and_allows_task_creation(self):
         admin_id, vvs_id, address_id = self.admin.id, self.vvs.id, self.address.id

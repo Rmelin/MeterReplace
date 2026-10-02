@@ -12,6 +12,7 @@ from starlette.responses import RedirectResponse
 from app import models
 from app.app_settings import is_within_planning_notice, planning_notice_days
 from app.db import get_db
+from app.day_agenda import day_agenda
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
@@ -635,6 +636,8 @@ def planning_form(
             "current_user": user,
             "flashes": consume_flashes(request),
             "planned": planned,
+            "agenda": day_agenda(db, plan_date, planned) if plan_date else [],
+            "agenda_date": plan_date,
             "unplanned": unplanned,
             "stock": stock,
             "slot_count": slot_count,

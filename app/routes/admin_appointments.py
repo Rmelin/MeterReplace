@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app import models
 from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
+from app.day_agenda import day_agenda
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
@@ -267,42 +268,6 @@ def appointment_overview(
     contractors = {row[0].id: row[2] for row in rows}
     photos = appointment_photos(db, [appointment.id for appointment in appointments])
     vvs_users = available_vvs_for_date(db, selected_date) if selected_date else []
-    morning_overview = []
-    afternoon_overview = []
-    buffer_overview = []
-    manual_overview = []
-    for appointment, address, _contractor in rows:
-        if appointment.is_manual_task:
-            manual_overview.append({
-                "appointment_id": appointment.id,
-                "title": appointment.notes or "VVS-opgave",
-                "address": f"{address.street} {address.house_no}" if address else None,
-                "time_window": appointment.time_window,
-                "start_time": appointment.starts_at.strftime("%H:%M"),
-                "is_done": is_done_for_day(appointment.status),
-            })
-            continue
-        if not address:
-            continue
-        if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
-            appointment, address
-        ):
-            continue
-        entry = {
-            "appointment_id": appointment.id,
-            "street": address.street,
-            "house_no": address.house_no,
-            "buffer_note": address.buffer_note,
-            "is_done": is_done_for_day(appointment.status),
-            "is_meter_issue": is_meter_issue_row(appointment, address),
-            "has_note": bool((appointment.notes or "").strip()),
-        }
-        if address.buffer_flag:
-            buffer_overview.append(entry)
-        elif appointment.starts_at.time() < time(12, 0):
-            morning_overview.append(entry)
-        else:
-            afternoon_overview.append(entry)
     todo = [
         appt
         for appt in appointments
@@ -367,13 +332,11 @@ def appointment_overview(
             "current_user": user,
             "flashes": consume_flashes(request),
             "appointments": appointments,
+            "agenda": day_agenda(db, selected_date) if selected_date else [],
+            "agenda_date": selected_date,
             "addresses": addresses,
             "contractors": contractors,
             "photos": photos,
-            "morning_overview": morning_overview,
-            "afternoon_overview": afternoon_overview,
-            "buffer_overview": buffer_overview,
-            "manual_overview": manual_overview,
             "todo": todo,
             "remaining_address_count": sum(
                 1 for appointment in todo if addresses.get(appointment.id) is not None and not appointment.is_manual_task

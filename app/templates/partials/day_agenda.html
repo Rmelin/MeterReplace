@@ -1,0 +1,28 @@
+<section class="card" id="day-agenda">
+    <div class="section-header">
+        <div>
+            <h2>Dagens opgaver og målerskift</h2>
+            <p class="hint">{{ agenda_date.strftime('%d/%m/%Y') }} · {{ agenda|length }} i alt{% if agenda|selectattr('is_draft')|list %}. Udkast bliver gemt, når du godkender planen.{% endif %}</p>
+        </div>
+    </div>
+    {% if agenda %}
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Tid</th><th>Type</th><th>Opgave / adresse</th><th>VVS</th><th>Status</th></tr></thead>
+                <tbody>
+                    {% for item in agenda %}
+                        <tr>
+                            <td>{{ item.time_label }}</td>
+                            <td><span class="chip">{{ item.kind }}</span></td>
+                            <td><a href="{{ item.href }}">{% if item.description %}{{ item.description }}{% if item.address %}<br />{% endif %}{% endif %}{% if item.address %}{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}{% elif not item.description %}Ingen bestemt adresse{% endif %}</a></td>
+                            <td>{{ item.contractor }}</td>
+                            <td>{{ item.status }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="hint">Ingen opgaver eller målerskift på dagen.</p>
+    {% endif %}
+</section>
