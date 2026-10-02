@@ -39,6 +39,8 @@
 
 [hidden] { display: none !important; }
 
+#day-agenda { scroll-margin-top: 100px; }
+
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: #0f1115;
