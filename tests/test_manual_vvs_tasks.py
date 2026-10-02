@@ -1,9 +1,13 @@
 from datetime import date, datetime, time
 import unittest
+from pathlib import Path
+import runpy
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Integer, inspect
 from sqlalchemy.orm import Session
 from starlette.requests import Request
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 
 from app import models
 from app.db import Base
@@ -66,6 +70,26 @@ class ManualVvsTaskTests(unittest.TestCase):
         self.assertEqual(response.status_code, 303)
         self.assertEqual(self.db.query(models.Appointment).count(), 0)
         self.assertEqual(request.session["_flashes"][0]["category"], "error")
+
+    def test_upgrade_repairs_legacy_required_address_and_allows_task_creation(self):
+        admin_id, vvs_id, address_id = self.admin.id, self.vvs.id, self.address.id
+        self.db.close()
+        with self.engine.begin() as connection:
+            with Operations.context(MigrationContext.configure(connection)):
+                with Operations(MigrationContext.configure(connection)).batch_alter_table("appointments") as batch:
+                    batch.alter_column("address_id", existing_type=Integer(), nullable=False)
+                migration = runpy.run_path(str(Path(__file__).resolve().parents[1] / "alembic/versions/0029_repair_optional_appointment_address.py"))
+                migration["upgrade"]()
+            address_column = next(column for column in inspect(connection).get_columns("appointments") if column["name"] == "address_id")
+            self.assertTrue(address_column["nullable"])
+        self.admin = self.db.get(models.User, admin_id)
+        self.vvs = self.db.get(models.User, vvs_id)
+        self.address = self.db.get(models.Address, address_id)
+        response, _ = self.create("afternoon")
+        self.assertEqual(response.status_code, 303)
+        task = self.db.query(models.Appointment).one()
+        self.assertIsNone(task.address_id)
+        self.assertEqual(task.task_address_id, self.address.id)
 
 
 if __name__ == "__main__":
