@@ -151,6 +151,7 @@ class Appointment(Base):
     address_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("addresses.id"), nullable=True
     )
+    task_address_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("addresses.id"), nullable=True)
     contractor_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -160,6 +161,8 @@ class Appointment(Base):
         nullable=False,
     )
     letter_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_manual_task: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    time_window: Mapped[str] = mapped_column(String(20), default="exact", nullable=False)
     notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
     old_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     new_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)

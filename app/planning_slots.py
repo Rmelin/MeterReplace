@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
+from sqlalchemy import or_
 
 from sqlalchemy.orm import Session
 
@@ -58,6 +59,7 @@ def occupied_slots_by_contractor(
         db.query(models.Appointment)
         .filter(
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at <= day_end,
             models.Appointment.ends_at >= day_start,
         )

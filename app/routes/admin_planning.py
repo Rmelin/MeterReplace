@@ -5,13 +5,14 @@ from datetime import date, datetime, time, timedelta
 import re
 
 from fastapi import APIRouter, Depends, Form, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from app import models
 from app.app_settings import is_within_planning_notice, planning_notice_days
 from app.db import get_db
+from app.day_agenda import day_agenda
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
@@ -186,6 +187,8 @@ def fetch_addresses(
     notice_days: int | None = None,
 ) -> tuple[list[models.Address], set[int], set[int]]:
     scheduled = select(models.Appointment.address_id).where(
+        models.Appointment.address_id.isnot(None),
+        models.Appointment.is_manual_task.is_(False),
         models.Appointment.status.in_(
             [
                 models.AppointmentStatus.SCHEDULED,
@@ -242,6 +245,8 @@ def fetch_skipped_addresses(
     notice_days: int | None = None,
 ) -> tuple[list[models.Address], list[models.Address], list[models.Address]]:
     scheduled = select(models.Appointment.address_id).where(
+        models.Appointment.address_id.isnot(None),
+        models.Appointment.is_manual_task.is_(False),
         models.Appointment.status.in_(
             [
                 models.AppointmentStatus.SCHEDULED,
@@ -347,6 +352,7 @@ def has_conflict(db: Session, contractor_id: int, starts_at: datetime, ends_at: 
         .filter(
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -630,6 +636,8 @@ def planning_form(
             "current_user": user,
             "flashes": consume_flashes(request),
             "planned": planned,
+            "agenda": day_agenda(db, plan_date, planned) if plan_date else [],
+            "agenda_date": plan_date,
             "unplanned": unplanned,
             "stock": stock,
             "slot_count": slot_count,

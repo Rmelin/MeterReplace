@@ -128,6 +128,7 @@ def is_meter_issue_row(
 ) -> bool:
     return bool(
         address
+        and not appointment.is_manual_task
         and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE
         and address.blocked_reason == BLOCKED_REASON
     )
@@ -148,7 +149,7 @@ def visible_task_rows(
 
     visible_rows = []
     for appointment, address in rows:
-        if address and address.id in latest_meter_issue_by_address:
+        if address and not appointment.is_manual_task and address.id in latest_meter_issue_by_address:
             latest_appointment, _latest_address = latest_meter_issue_by_address[address.id]
             if appointment.id == latest_appointment.id:
                 visible_rows.append((appointment, address))
@@ -183,6 +184,7 @@ def has_conflict(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -237,7 +239,7 @@ def task_rows_for_date(
         return []
     rows = (
         db.query(models.Appointment, models.Address)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .join(
             models.VvsAvailability,
             models.VvsAvailability.user_id == models.Appointment.contractor_id,
@@ -270,6 +272,8 @@ def build_task_overview(
     afternoon_overview = []
     buffer_overview = []
     for appointment, address in rows:
+        if appointment.is_manual_task:
+            continue
         if not address:
             continue
         if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
@@ -314,6 +318,7 @@ def build_day_checklist(
         is_done = is_done_for_day(appointment.status) and not is_meter_issue
         missing_photos = (
             has_address
+            and not appointment.is_manual_task
             and appointment.status != models.AppointmentStatus.NOT_HOME
             and not is_meter_issue
             and not photo_complete(photo_list)
@@ -322,7 +327,7 @@ def build_day_checklist(
             done_count += 1
         if missing_photos:
             missing_photo_count += 1
-        if has_note:
+        if has_note and not appointment.is_manual_task:
             note_count += 1
         if is_meter_issue:
             meter_issue_count += 1
@@ -330,17 +335,22 @@ def build_day_checklist(
         badges = []
         if missing_photos:
             badges.append("Mangler fotos")
-        if has_note:
+        if has_note and not appointment.is_manual_task:
             badges.append("Note")
+        if appointment.is_manual_task:
+            badges.append("VVS-opgave")
         if is_meter_issue:
             badges.append("Fejl ved måler")
-        if address and address.buffer_flag:
+        if address and address.buffer_flag and not appointment.is_manual_task:
             badges.append("Brønd")
 
         items.append(
             {
                 "appointment_id": appointment.id,
                 "address_label": (
+                    f"{appointment.notes} · {address.street} {address.house_no}"
+                    if address and appointment.is_manual_task else
+                    (appointment.notes or "VVS-opgave") if appointment.is_manual_task else
                     f"{address.street} {address.house_no}, {address.zip} {address.city}"
                     if address else "Opgave uden adresse"
                 ),
@@ -391,7 +401,10 @@ def vvs_tasks(
     photos = appointment_photos(db, [appointment.id for appointment in appointments])
     morning_overview, afternoon_overview, buffer_overview = build_task_overview(rows)
     period_labels = {
-        appointment.id: period_label_for(appointment.starts_at) for appointment in appointments
+        appointment.id: (
+            {"all_day": "Hele dagen", "morning": "Formiddag", "afternoon": "Eftermiddag"}.get(appointment.time_window, f"Kl. {appointment.starts_at:%H:%M}")
+            if appointment.is_manual_task else period_label_for(appointment.starts_at)
+        ) for appointment in appointments
     }
     checklist_summary, checklist_items = build_day_checklist(
         appointments, addresses, photos, period_labels
@@ -491,7 +504,7 @@ def vvs_tasks_map_data(
 
     query = (
         db.query(models.Appointment, models.Address)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .filter(
             models.Appointment.contractor_id == user.id,
             models.Appointment.status.in_(
@@ -677,7 +690,7 @@ def task_edit_context(
 ) -> dict[str, object] | None:
     row = (
         db.query(models.Appointment, models.Address)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .filter(
             models.Appointment.id == appointment_id,
             models.Appointment.contractor_id == user_id,
@@ -910,6 +923,8 @@ def mark_completed(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.is_manual_task:
+        raise HTTPException(status_code=400, detail="Brug Udført til VVS-opgaver")
 
     photos = (
         db.query(models.AppointmentPhoto)
