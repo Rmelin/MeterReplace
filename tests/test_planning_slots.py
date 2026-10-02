@@ -11,7 +11,7 @@ from app import models
 from app.db import Base
 from app.planning_slots import availability_slots, build_slots
 from app.routes.admin_availability import validate_time_window as admin_time_window_valid
-from app.routes.admin_planning import manual_planning_commit
+from app.routes.admin_planning import compute_plan, fetch_skipped_addresses, has_conflict, manual_planning_commit
 from app.routes.vvs_availability import validate_time_window as vvs_time_window_valid
 
 
@@ -51,6 +51,32 @@ class PlanningSlotTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.db.close()
         self.engine.dispose()
+
+    def test_manual_task_does_not_remove_addresses_from_planning(self) -> None:
+        self.plan_date = date.today() + timedelta(days=60)
+        self.availability.date = self.plan_date
+        self.db.add_all([
+            models.Appointment(
+                address_id=None,
+                task_address_id=self.address.id,
+                is_manual_task=True,
+                time_window="afternoon",
+                contractor_id=self.contractor.id,
+                starts_at=datetime.combine(self.plan_date, time(12)),
+                ends_at=datetime.combine(self.plan_date, time(16)),
+                status=models.AppointmentStatus.SCHEDULED,
+                letter_required=False,
+            ),
+            models.StockMovement(movement_type=models.InventoryMovementType.PURCHASE, quantity=10),
+        ])
+        self.db.commit()
+        planned, _, _, _, _ = compute_plan(self.db, self.plan_date)
+        self.assertEqual([slot.address.id for slot in planned], [self.address.id])
+        self.assertFalse(has_conflict(self.db, self.contractor.id, datetime.combine(self.plan_date, time(13)), datetime.combine(self.plan_date, time(13, 30))))
+        self.address.blocked_reason = "Fejl ved måler"
+        self.db.commit()
+        blocked, _, _ = fetch_skipped_addresses(self.db, self.plan_date)
+        self.assertEqual([address.id for address in blocked], [self.address.id])
 
     def test_extended_workday_adds_complete_half_hour_slot(self) -> None:
         slots = availability_slots(self.db, self.plan_date)
