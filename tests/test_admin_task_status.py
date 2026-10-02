@@ -2,19 +2,24 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 import unittest
+from types import SimpleNamespace
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.requests import Request
+from starlette.templating import Jinja2Templates
 
 from app import models
 from app.db import Base
+from app.day_agenda import day_agenda
+from app.routes.admin_addresses import status_label_and_key
 from app.routes.admin_appointments import (
     complete_remaining,
     keep_scheduled,
     mark_blocked,
     mark_completed,
     mark_not_home,
+    appointment_overview,
 )
 
 
@@ -66,6 +71,59 @@ class AdminTaskStatusTests(unittest.TestCase):
                 "session": {},
             }
         )
+
+    def test_actual_change_date_preserves_plan_and_appears_on_both_days(self) -> None:
+        self.appointment.starts_at = datetime(2026, 10, 8, 8)
+        self.appointment.ends_at = datetime(2026, 10, 8, 8, 30)
+        self.db.commit()
+        response = mark_completed(
+            request=self.request("complete"), appointment_id=self.appointment.id,
+            actual_changed_on="2026-10-01", date_query="2026-10-08",
+            db=self.db, user=self.admin,
+        )
+        self.db.refresh(self.appointment)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(self.appointment.starts_at.date(), date(2026, 10, 8))
+        self.assertEqual(self.appointment.actual_changed_on, date(2026, 10, 1))
+        self.assertEqual(status_label_and_key(self.appointment, 2026, False), ("Skiftet 01/10", "completed"))
+        for day in (date(2026, 10, 1), date(2026, 10, 8)):
+            agenda = day_agenda(self.db, day)
+            self.assertEqual(len(agenda), 1)
+            self.assertEqual(agenda[0]["changed_on"], date(2026, 10, 1))
+            self.assertEqual(agenda[0]["planned_on"], date(2026, 10, 8))
+        request = self.request("overview")
+        request.scope["app"] = SimpleNamespace(state=SimpleNamespace(templates=Jinja2Templates(directory="app/templates")))
+        rendered = appointment_overview(request, date_query="2026-10-01", db=self.db, user=self.admin)
+        html = rendered.body.decode()
+        self.assertIn("Skiftet 01/10/2026", html)
+        self.assertIn("Planlagt 08/10/2026", html)
+        self.assertIn("Ret skiftedato", html)
+
+    def test_invalid_actual_date_does_not_complete_visit(self) -> None:
+        for raw_date in ("invalid", "2099-01-01"):
+            request = self.request("complete")
+            response = mark_completed(
+                request=request, appointment_id=self.appointment.id,
+                actual_changed_on=raw_date, date_query="2026-09-24",
+                db=self.db, user=self.admin,
+            )
+            self.assertEqual(response.status_code, 303)
+            self.assertEqual(self.appointment.status, models.AppointmentStatus.SCHEDULED)
+            self.assertIsNone(self.appointment.actual_changed_on)
+            self.assertEqual(request.session["_flashes"][0]["category"], "error")
+
+    def test_correction_and_note_changes_keep_actual_date(self) -> None:
+        for changed_on in ("2026-09-23", "2026-09-22"):
+            mark_completed(
+                request=self.request("complete"), appointment_id=self.appointment.id,
+                actual_changed_on=changed_on, date_query="2026-09-24",
+                db=self.db, user=self.admin,
+            )
+        self.appointment.notes = "Ny note"
+        self.appointment.changed_date = datetime(2026, 10, 2)
+        self.db.commit()
+        self.assertEqual(self.appointment.meter_changed_on, date(2026, 9, 22))
+        self.assertEqual(self.appointment.starts_at.date(), date(2026, 9, 24))
 
     def test_admin_can_complete_task_without_photos(self) -> None:
         request = self.request("complete")

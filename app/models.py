@@ -167,6 +167,7 @@ class Appointment(Base):
     old_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     new_meter_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     changed_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    actual_changed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     changed_by_user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
@@ -176,6 +177,11 @@ class Appointment(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=utc_now, onupdate=utc_now
     )
+
+    @property
+    def meter_changed_on(self) -> date:
+        # Older records only contain the planned date. Do not infer from audit timestamps.
+        return self.actual_changed_on or self.starts_at.date()
 
 
 class StreetPriority(Base):

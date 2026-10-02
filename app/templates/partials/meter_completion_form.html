@@ -1,0 +1,10 @@
+<form method="post" action="/admin/appointments/{{ appointment.id }}/complete" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+    <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+    {% set changed_on = appointment.meter_changed_on %}
+    <label>Faktisk skiftedato
+        <input type="date" name="actual_changed_on" value="{{ (changed_on if changed_on <= today else today).isoformat() }}" max="{{ today.isoformat() }}" required />
+    </label>
+    <p class="hint">Planlagt {{ appointment.starts_at.strftime('%d/%m/%Y') }}. Vælg den dag, måleren faktisk blev skiftet.</p>
+    <button type="submit" class="primary-button">{{ 'Gem skiftedato' if appointment.status.value == 'COMPLETED' else 'Skiftet' }}</button>
+</form>
