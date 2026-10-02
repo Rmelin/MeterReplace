@@ -5,7 +5,7 @@ from datetime import date, datetime, time, timedelta
 import re
 
 from fastapi import APIRouter, Depends, Form, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
@@ -186,6 +186,8 @@ def fetch_addresses(
     notice_days: int | None = None,
 ) -> tuple[list[models.Address], set[int], set[int]]:
     scheduled = select(models.Appointment.address_id).where(
+        models.Appointment.address_id.isnot(None),
+        models.Appointment.is_manual_task.is_(False),
         models.Appointment.status.in_(
             [
                 models.AppointmentStatus.SCHEDULED,
@@ -242,6 +244,8 @@ def fetch_skipped_addresses(
     notice_days: int | None = None,
 ) -> tuple[list[models.Address], list[models.Address], list[models.Address]]:
     scheduled = select(models.Appointment.address_id).where(
+        models.Appointment.address_id.isnot(None),
+        models.Appointment.is_manual_task.is_(False),
         models.Appointment.status.in_(
             [
                 models.AppointmentStatus.SCHEDULED,
@@ -347,6 +351,7 @@ def has_conflict(db: Session, contractor_id: int, starts_at: datetime, ends_at: 
         .filter(
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
