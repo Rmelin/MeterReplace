@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 import os
-import re
-import unicodedata
 from uuid import uuid4
 import base64
 import io
@@ -18,6 +16,7 @@ from starlette.responses import RedirectResponse, Response
 from weasyprint import HTML
 
 from app import models
+from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
 from app.timeutils import utc_now
@@ -35,31 +34,8 @@ DEFAULT_BODY = (
 )
 
 
-def slugify(value: str) -> str:
-    text = value.strip().lower()
-    text = text.replace("æ", "ae").replace("ø", "oe").replace("å", "aa")
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-    return re.sub(r"[^a-z0-9]", "", text) or "logo"
-
-
 def save_logo(file: UploadFile) -> str:
-    extension = Path(file.filename or "").suffix.lower() or ".png"
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    slug = slugify(Path(file.filename or "logo").stem)
-    counter = 1
-    while True:
-        filename = f"{slug}-{timestamp}-{counter}{extension}"
-        path = UPLOAD_DIR / filename
-        if not path.exists():
-            break
-        counter += 1
-    with path.open("wb") as buffer:
-        buffer.write(file.file.read())
-    return str(path.relative_to(Path("data") / "uploads"))
-
-
-def ensure_image(file: UploadFile) -> bool:
-    return file.content_type is not None and file.content_type.startswith("image/")
+    return save_image(file, UPLOAD_DIR, UPLOAD_DIR.parent)
 
 
 def latest_template(db: Session) -> models.LetterTemplate | None:
@@ -259,7 +235,7 @@ def template_form(
         )
     logo_url, _ = logo_paths(template)
     return request.app.state.templates.TemplateResponse(
-        "admin_letter_template.html",
+        request, "admin_letter_template.html",
         {
             "request": request,
             "current_user": user,
@@ -290,7 +266,7 @@ def update_template(
 
     if logo and logo.filename:
         if not ensure_image(logo):
-            flash(request, "Logo skal være et billede", "error")
+            flash(request, "Logo skal være et gyldigt JPEG-, PNG- eller WebP-billede (højst 10 MiB)", "error")
             return RedirectResponse("/admin/letters/template", status_code=303)
         logo_path = save_logo(logo)
 
@@ -309,7 +285,11 @@ def update_template(
             )
         )
 
-    db.commit()
+    if logo and logo.filename:
+        with upload_transaction(db, UPLOAD_DIR.parent / logo_path):
+            db.flush()
+    else:
+        db.commit()
     flash(request, "Skabelon opdateret", "success")
     return RedirectResponse("/admin/letters/template", status_code=303)
 
@@ -355,7 +335,7 @@ def letter_preview(
         }
 
     return request.app.state.templates.TemplateResponse(
-        "admin_letter_preview.html",
+        request, "admin_letter_preview.html",
         {
             "request": request,
             "current_user": user,
@@ -371,6 +351,7 @@ def letter_preview(
 
 
 @router.get("/address/{address_id}/pdf")
+@router.post("/address/{address_id}/pdf")
 def letter_pdf(
     request: Request,
     address_id: int,
@@ -380,6 +361,11 @@ def letter_pdf(
         require_role(models.UserRole.ADMIN, models.UserRole.USER)
     ),
 ):
+    if request.method == "GET":
+        return request.app.state.templates.TemplateResponse(
+            request, "confirm_letter_download.html",
+            {"request": request, "current_user": user, "flashes": consume_flashes(request)},
+        )
     address = db.query(models.Address).filter(models.Address.id == address_id).first()
     if not address:
         raise HTTPException(status_code=404, detail="Adresse ikke fundet")
@@ -415,12 +401,18 @@ def letter_pdf(
 
 
 @router.get("/batch/pdf")
+@router.post("/batch/pdf")
 def batch_pdf(
     request: Request,
     date: str,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN)),
 ):
+    if request.method == "GET":
+        return request.app.state.templates.TemplateResponse(
+            request, "confirm_letter_download.html",
+            {"request": request, "current_user": user, "flashes": consume_flashes(request)},
+        )
     planned = planned_dates(db)
     if date not in planned:
         flash(request, "Vælg en planlagt dato", "error")
@@ -483,12 +475,18 @@ def batch_pdf(
 
 
 @router.get("/planning/latest/pdf")
+@router.post("/planning/latest/pdf")
 def latest_planning_batch_pdf(
     request: Request,
     date: str,
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN)),
 ):
+    if request.method == "GET":
+        return request.app.state.templates.TemplateResponse(
+            request, "confirm_letter_download.html",
+            {"request": request, "current_user": user, "flashes": consume_flashes(request)},
+        )
     latest_commit = latest_planning_commit_data(request)
     if not latest_commit or not latest_commit["appointment_ids"]:
         flash(request, "Ingen nye planlagte adresser fundet", "error")

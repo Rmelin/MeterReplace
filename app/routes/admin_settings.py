@@ -41,7 +41,7 @@ def settings_form(
 ):
     contact = support_contact(db)
     return request.app.state.templates.TemplateResponse(
-        "admin_settings.html",
+        request, "admin_settings.html",
         {
             "request": request,
             "current_user": user,

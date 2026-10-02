@@ -12,13 +12,14 @@ Denne side beskriver et simpelt produktionssetup for MeterReplace.
 - Python installeret
 - `git`
 - systemd
-- en reverse proxy eller direkte adgang til port `8000`
+- en reverse proxy med HTTPS; port `8000` må ikke være offentligt tilgængelig
 
 ## Miljøvariabler
 
 Opret en `.env`-fil med de relevante værdier:
 
 ```env
+APP_ENV=production
 SECRET_KEY=skift-denne-til-en-lang-tilfaeldig-vaerdi
 PUBLIC_BASE_URL=https://dit-domaene
 SESSION_COOKIE_SECURE=true
@@ -29,14 +30,16 @@ VAPID_SUBJECT=mailto:drift@example.dk
 
 | Variabel | Påkrævet | Beskrivelse |
 |---|---|---|
-| `SECRET_KEY` | Ja | Bruges af sessions middleware |
-| `PUBLIC_BASE_URL` | Anbefalet | Bruges i links og PDF-breve |
+| `APP_ENV` | Ja i produktion | Skal være `production`; usikker konfiguration afvises |
+| `SECRET_KEY` | Ja | Tilfældig sessionsnøgle på mindst 32 tegn; generér den som beskrevet i sikkerhedsguiden |
+| `PUBLIC_BASE_URL` | Ja i produktion | HTTPS-domæne uden sti; bruges også til Host-validering |
 | `SESSION_COOKIE_SECURE` | Ja i produktion | Sæt til `true`, når appen kører over HTTPS |
 | `VAPID_PRIVATE_KEY` | Ved Web Push | Sti til den private VAPID PEM-fil |
 | `VAPID_PUBLIC_KEY` | Ved Web Push | Offentlig VAPID-nøgle til browseren |
 | `VAPID_SUBJECT` | Ved Web Push | Kontaktadresse, fx `mailto:drift@example.dk` |
 
-Hvis `PUBLIC_BASE_URL` ikke er sat, bruges requestens base URL som fallback.
+Kun i udvikling bruges requestens base URL som fallback. `.env` indlæses af
+systemd via `EnvironmentFile`, ikke automatisk af Python.
 
 ## VAPID-nøgler til Web Push
 
@@ -145,6 +148,7 @@ Generér først VAPID-nøgleparret som beskrevet ovenfor. Opret derefter
 `/opt/meterreplace/.env`:
 
 ```env
+APP_ENV=production
 SECRET_KEY=skift-denne-til-en-lang-tilfaeldig-vaerdi
 PUBLIC_BASE_URL=https://dit-domaene
 SESSION_COOKIE_SECURE=true
@@ -152,6 +156,18 @@ VAPID_PRIVATE_KEY=/opt/meterreplace/secrets/vapid-private.pem
 VAPID_PUBLIC_KEY=indsæt-den-offentlige-nøgle
 VAPID_SUBJECT=mailto:drift@example.dk
 ```
+
+På en ny installation: opret administratoren efter migrationerne og før opstart:
+
+```bash
+sudo -u meterreplace /opt/meterreplace/.venv/bin/python -m app.bootstrap_admin
+sudo chmod 600 /opt/meterreplace/.env
+sudo chown meterreplace:meterreplace /opt/meterreplace/.env
+```
+
+Kommandoen beder om brugernavn og en skjult adgangskode på mindst 16 tegn.
+Eksisterende installationer skal skifte en eventuel `admin123`-adgangskode før
+`APP_ENV=production` aktiveres. Se [Sikkerhed](security.md).
 
 ### 4. Opret systemd service
 
@@ -167,7 +183,8 @@ User=meterreplace
 Group=meterreplace
 WorkingDirectory=/opt/meterreplace
 EnvironmentFile=/opt/meterreplace/.env
-ExecStart=/opt/meterreplace/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+UMask=0077
+ExecStart=/opt/meterreplace/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1 --no-access-log
 Restart=always
 RestartSec=3
 
@@ -239,12 +256,22 @@ Typisk køres appen bag Nginx, Caddy eller Cloudflare.
 Vigtigt i drift:
 
 - appen serverer selv `/static`
-- appen serverer selv `/upload`
+- appen håndhæver adgangskontrol på `/upload`; proxyen må ikke servere uploadmappen direkte
+- dynamiske sider og `/upload` må ikke caches
+- begræns requeststørrelsen til 12 MiB; enkelte billeder må højst fylde 10 MiB
+- undlad adgangslogs med beboertokens i `/r/`-stier
+- overskriv forwarded-headere ved proxyen; appen stoler kun på proxyens faktiske IP
 - aggressiv cache på CSS og JS kan give gammelt UI efter deployment
 - HTTPS skal håndhæves, gerne med HSTS
 - port `8000` bør kun være tilgængelig fra reverse proxyen eller det interne net
 
-Hvis du bruger CDN eller reverse proxy cache, bør du have en strategi for cache-busting eller cache purge ved release.
+Systemd-eksemplet forudsætter en proxy på samme server. Ved en anden proxyadresse
+skal bind-adresse, firewall og `--forwarded-allow-ips` tilpasses konkret, aldrig
+med en generel tillid til alle IP-adresser. Health checks skal bruge Host fra
+`PUBLIC_BASE_URL`. Håndhæv HTTPS ved proxyen, og log ikke fulde beboer-URL'er.
+
+Hvis du bruger CDN-cache til statiske filer, skal du have en strategi for
+cache-busting eller cache purge ved release.
 
 ## Data og persistens
 
@@ -253,6 +280,7 @@ Standardplaceringer i den nuværende kode:
 - database: `data/data/app.db`
 - uploads: `data/uploads/`
 - logs til register-import: `data/logs/`
+- delte rate-limit-tællere: `data/security/rate-limits.db` (lokal disk, fælles for workers)
 
 Sikring i produktion:
 
@@ -270,6 +298,12 @@ sudo -u meterreplace /opt/meterreplace/.venv/bin/python -m alembic upgrade head
 sudo systemctl restart meterreplace
 ```
 
+Før denne sikkerhedsopdatering skal miljøvariabler, adminadgangskode og proxyregler
+være gennemgået. Gamle åbne formularer skal genindlæses for at få CSRF-token.
+PDF-download kræver nu bekræftelse, og ikke-understøttede fotoformater skal
+konverteres til JPEG, PNG eller WebP. Test de faktiske brevskabeloner efter
+opdateringen af PDF-biblioteket.
+
 Kør altid Alembic via appens `.venv` i produktion. Brug ikke `python3 -m alembic ...`, da den kan bruge systemets globale pakker i stedet for projektets dependencies. Se også [Fejlsøgning: Alembic og database er ude af sync](troubleshooting.md#alembic-og-database-er-ude-af-sync).
 
 ## Verifikation efter deploy
@@ -285,6 +319,9 @@ Efter deploy bør du kontrollere:
 7. at `meterreplace-push.timer` er aktiv
 8. at notifikationer kan aktiveres fra den installerede app på en fysisk iPhone
 9. at en ny beboerbesked opretter en levering og viser en notifikation
+10. at cookies har Secure/HttpOnly/SameSite=Lax, og ukendte Host-headere afvises
+11. at anonyme brugere ikke kan hente fotos, og VVS kun kan hente egne opgavefotos
+12. at backup kan gendannes på en isoleret installation, før gamle backups slettes
 
 ## Kendte driftsfælder
 

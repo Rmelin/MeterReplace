@@ -30,6 +30,7 @@
 <section class="card">
     <h2>Ny arbejdsdag</h2>
     <form method="post" action="/vvs" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>Dato<input type="date" name="date_raw" required /></label>
         <label>Start<input type="time" name="start_raw" value="08:00" required /></label>
         <label>Slut<input type="time" name="end_raw" value="16:00" required /></label>

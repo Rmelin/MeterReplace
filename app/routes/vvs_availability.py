@@ -97,7 +97,7 @@ def vvs_availability(
         entries
     )
     return request.app.state.templates.TemplateResponse(
-        "vvs_availability.html",
+        request, "vvs_availability.html",
         {
             "request": request,
             "current_user": user,
@@ -167,7 +167,7 @@ def edit_availability_form(
     has_conflict = has_scheduled_appointments(db, user.id, entry.date)
 
     return request.app.state.templates.TemplateResponse(
-        "vvs_availability_edit.html",
+        request, "vvs_availability_edit.html",
         {
             "request": request,
             "current_user": user,

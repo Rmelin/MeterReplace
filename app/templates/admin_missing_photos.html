@@ -35,6 +35,7 @@
                                 <td>{{ appointment.starts_at.strftime('%d/%m/%Y') }}</td>
                                 <td>
                                     <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid">
+                                        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                                         <input type="hidden" name="redirect" value="/admin/missing-photos" />
                                         <div>
                                             <label style="margin-bottom: 0.5rem; display: block; font-weight: 700;">Fototype</label>

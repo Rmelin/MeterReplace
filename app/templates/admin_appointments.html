@@ -208,6 +208,7 @@
     {% if selected_date and vvs_users %}
         {% set single_vvs = vvs_users|length == 1 %}
         <form method="post" action="/admin/appointments/manual-task" class="form-grid" data-duration-form>
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <input type="hidden" name="date_raw" value="{{ selected_date.isoformat() }}" />
             <label>
                 VVS
@@ -244,6 +245,7 @@
         </div>
         {% if remaining_address_count and selected_date %}
             <form method="post" action="/admin/appointments/complete-remaining" onsubmit="return confirm('Markér alle {{ remaining_address_count }} resterende adresser som skiftet? Opgaver med en anden status ændres ikke.');">
+                <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                 <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                 <button type="submit" class="primary-button">Markér alle resterende som skiftet</button>
             </form>
@@ -265,14 +267,17 @@
                 {% if address %}
                     <div class="vvs-task-primary-actions">
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/complete" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="primary-button vvs-task-action-button">Skiftet</button>
                         </form>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="ghost-button vvs-task-action-button">Ikke hjemme</button>
                         </form>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/blocked" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="ghost-button vvs-task-action-button">Fejl ved måler</button>
                         </form>
@@ -285,6 +290,7 @@
                     </div>
                 {% endif %}
                 <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                     {% if selected_date %}
                         <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                     {% endif %}
@@ -312,6 +318,7 @@
                     <div class="vvs-task-photo-panel">
                         <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             {% if selected_date %}
                                 <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                             {% endif %}
@@ -383,6 +390,7 @@
                         {% if resident_response.message %}<p>{{ resident_response.message }}</p>{% endif %}
                     </div>
                     <form method="post" action="/admin/appointments/{{ appointment.id }}/keep-scheduled" style="margin: 0.75rem 0;">
+                        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                         {% if selected_date %}
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                         {% endif %}
@@ -396,6 +404,7 @@
                     </div>
                 {% endif %}
                 <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                     {% if selected_date %}
                         <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                     {% endif %}
@@ -437,6 +446,7 @@
                     </div>
                 {% endif %}
                 <form method="post" action="/admin/appointments/{{ appointment.id }}/note" class="form-grid" style="margin-top: 0.75rem;">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                     {% if selected_date %}
                         <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                     {% endif %}
@@ -458,6 +468,7 @@
                     <div class="vvs-task-photo-panel">
                         <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             {% if selected_date %}
                                 <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
                             {% endif %}

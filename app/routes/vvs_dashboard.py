@@ -17,7 +17,7 @@ def vvs_dashboard(
     user: models.User = Depends(require_role(models.UserRole.VVS)),
 ):
     return request.app.state.templates.TemplateResponse(
-        "vvs_dashboard.html",
+        request, "vvs_dashboard.html",
         {
             "request": request,
             "current_user": user,

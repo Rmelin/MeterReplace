@@ -43,7 +43,7 @@ def inventory_dashboard(
     }
 
     return request.app.state.templates.TemplateResponse(
-        "admin_inventory.html",
+        request, "admin_inventory.html",
         {
             "request": request,
             "current_user": user,

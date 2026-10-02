@@ -24,7 +24,9 @@ Tjek først om databasen er ny eller eksisterende.
 
 Vigtigt:
 
-- standardbrugeren `admin / admin123` oprettes kun hvis databasen er tom
+- standardbrugeren `admin / admin123` oprettes kun i lokal udvikling, hvis databasen er tom
+- i produktion oprettes første administrator med `python -m app.bootstrap_admin`
+- produktionsstart afvises ved manglende sikkerhedskonfiguration eller standard-adminadgangskode; se [Sikkerhed](security.md)
 - hvis der allerede findes brugere, bliver den ikke genoprettet
 
 ## Produktion ser anderledes ud end lokalt

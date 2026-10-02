@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -29,7 +32,7 @@ jobs:
             libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 libffi8
 
       - name: Installer Python-afhængigheder
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Kør migrationer mod tom database
         run: python -m alembic upgrade head

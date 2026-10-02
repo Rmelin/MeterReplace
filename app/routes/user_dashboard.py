@@ -59,7 +59,7 @@ def user_dashboard(
         )
 
     return request.app.state.templates.TemplateResponse(
-        "user_dashboard.html",
+        request, "user_dashboard.html",
         {
             "request": request,
             "current_user": user,

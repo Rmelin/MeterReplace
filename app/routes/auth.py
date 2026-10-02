@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("/login")
 def login_form(request: Request):
     return request.app.state.templates.TemplateResponse(
-        "login.html",
+        request, "login.html",
         {
             "request": request,
             "flashes": consume_flashes(request),
