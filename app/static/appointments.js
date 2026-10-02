@@ -1,4 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-completion-date-toggle]').forEach((button) => {
+    const panel = document.getElementById(button.dataset.completionDateToggle)
+    if (!panel) return
+    button.addEventListener('click', () => {
+      panel.hidden = !panel.hidden
+      button.setAttribute('aria-expanded', String(!panel.hidden))
+      if (!panel.hidden) panel.querySelector('input[type="date"]').focus()
+    })
+  })
   const triggers = document.querySelectorAll('[data-inline-edit-trigger]')
 
   document.querySelectorAll('[data-manual-task-form]').forEach((form) => {

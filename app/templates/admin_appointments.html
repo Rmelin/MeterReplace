@@ -198,10 +198,13 @@
                     </form>
                 {% elif address %}
                     <div class="vvs-task-primary-actions">
-                        <details class="card">
-                            <summary>Skiftet · vælg skiftedato</summary>
-                            {% include "partials/meter_completion_form.html" %}
-                        </details>
+                        <form method="post" action="/admin/appointments/{{ appointment.id }}/complete" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <input type="hidden" name="actual_changed_on" value="{{ appointment.starts_at.date().isoformat() }}" />
+                            <button type="submit" class="primary-button vvs-task-action-button" {% if appointment.starts_at.date() > today %}disabled title="Den planlagte dag ligger i fremtiden. Vælg faktisk skiftedato i stedet."{% endif %}>Skiftet – på planlagt dag</button>
+                        </form>
+                        <button type="button" class="ghost-button vvs-task-action-button" data-completion-date-toggle="completion-date-{{ appointment.id }}" aria-controls="completion-date-{{ appointment.id }}" aria-expanded="false">Vælg skiftedato</button>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
                             <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
@@ -212,6 +215,9 @@
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="ghost-button vvs-task-action-button">Fejl ved måler</button>
                         </form>
+                    </div>
+                    <div id="completion-date-{{ appointment.id }}" hidden>
+                        {% include "partials/meter_completion_form.html" %}
                     </div>
                 {% endif %}
                 {% if appointment.notes %}
@@ -450,5 +456,5 @@
     {% endif %}
 </section>
 
-<script src="/static/appointments.js" defer></script>
+<script src="/static/appointments.js?v=actual-change-date-2" defer></script>
 {% endblock %}
