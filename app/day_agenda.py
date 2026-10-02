@@ -16,6 +16,14 @@ STATUS_LABELS = {
 }
 
 
+def agenda_group(window: str, starts_at: datetime, is_meter_pit: bool) -> str:
+    if window == "all_day" or is_meter_pit:
+        return "all_day"
+    if window in {"morning", "afternoon"}:
+        return window
+    return "morning" if starts_at.time() < time(12) else "afternoon"
+
+
 def day_agenda(db: Session, day: date, drafts=()) -> list[dict]:
     start = datetime.combine(day, time.min)
     rows = (
@@ -39,6 +47,11 @@ def day_agenda(db: Session, day: date, drafts=()) -> list[dict]:
             "time_label": period or f"{appointment.starts_at:%H:%M}–{appointment.ends_at:%H:%M}",
             "kind": "VVS-opgave" if appointment.is_manual_task else "Målerskift",
             "description": appointment.notes if appointment.is_manual_task else None,
+            "note": appointment.notes,
+            "buffer_note": address.buffer_note if address and address.buffer_flag and not appointment.is_manual_task else None,
+            "group": agenda_group(window, appointment.starts_at, bool(address and address.buffer_flag and not appointment.is_manual_task)),
+            "is_done": appointment.status in {models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED, models.AppointmentStatus.NOT_HOME},
+            "is_meter_issue": bool(not appointment.is_manual_task and address and address.blocked_reason == "Fejl ved måler" and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE),
             "address": address,
             "contractor": contractor.username,
             "status": "Udført" if appointment.is_manual_task and appointment.status == models.AppointmentStatus.CLOSED else STATUS_LABELS[appointment.status],
@@ -52,6 +65,11 @@ def day_agenda(db: Session, day: date, drafts=()) -> list[dict]:
             "time_label": f"{draft.starts_at:%H:%M}–{draft.ends_at:%H:%M}",
             "kind": "Målerskift",
             "description": None,
+            "note": None,
+            "buffer_note": draft.address.buffer_note if draft.is_buffer else None,
+            "group": agenda_group("exact", draft.starts_at, draft.is_buffer),
+            "is_done": False,
+            "is_meter_issue": False,
             "address": draft.address,
             "contractor": draft.contractor.username,
             "status": "Udkast",

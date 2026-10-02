@@ -79,6 +79,7 @@ class ManualVvsTaskTests(unittest.TestCase):
             address_id=self.address.id, contractor_id=self.vvs.id,
             starts_at=datetime(2026, 10, 8, 9), ends_at=datetime(2026, 10, 8, 9, 30),
             status=models.AppointmentStatus.INFORMED,
+            notes="Ring først til beboeren",
         )
         self.db.add(meter_visit)
         self.db.commit()
@@ -93,6 +94,16 @@ class ManualVvsTaskTests(unittest.TestCase):
         self.assertEqual(agenda[0]["description"], "Kontroller vandtryk")
         self.assertEqual(agenda[0]["address"].id, self.address.id)
         self.assertTrue(agenda[-1]["is_draft"])
+        self.assertEqual(agenda[0]["group"], "all_day")
+        self.assertEqual(agenda[1]["group"], "morning")
+        self.assertEqual(agenda[1]["note"], "Ring først til beboeren")
+        self.address.buffer_flag = True
+        self.address.buffer_note = "Til højre for indkørslen"
+        self.db.commit()
+        agenda = day_agenda(self.db, self.day)
+        self.assertEqual(agenda[1]["group"], "all_day")
+        self.assertEqual(agenda[1]["buffer_note"], "Til højre for indkørslen")
+        self.assertIsNone(agenda[0]["buffer_note"])
 
     def test_upgrade_repairs_legacy_required_address_and_allows_task_creation(self):
         admin_id, vvs_id, address_id = self.admin.id, self.vvs.id, self.address.id

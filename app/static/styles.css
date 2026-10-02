@@ -1300,6 +1300,10 @@ a.chip:hover {
     color: var(--accent);
 }
 
+.agenda-outline-item { margin-bottom: 0.2rem; }
+.agenda-outline-meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
+.agenda-outline-note { color: var(--muted); font-size: 0.95rem; line-height: 1.5; margin-top: 0.3rem; white-space: pre-line; overflow-wrap: anywhere; }
+
 .appointment-outline-done {
     display: inline-flex;
     align-items: center;
