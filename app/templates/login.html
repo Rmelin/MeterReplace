@@ -3,6 +3,7 @@
 <section class="card narrow">
     <h1>Log ind</h1>
     <form method="post" action="/login" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>
             Brugernavn
             <input type="text" name="username" required />

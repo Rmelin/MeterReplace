@@ -112,7 +112,7 @@
 <section class="card">
     <div class="section-header">
         <div>
-            <h2>Dagens adresser</h2>
+            <h2>Dagens adresser og opgaver</h2>
             <p class="hint">Klik på en adresse for at hoppe direkte til opgaven længere nede på siden.</p>
         </div>
     </div>
@@ -216,7 +216,7 @@
                     {% if address %}
                         <div class="task-title-row">
                             <h3>{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</h3>
-                            {% if address.buffer_flag %}
+                            {% if address.buffer_flag and not appointment.is_manual_task %}
                                 <span class="task-chip" {% if address.buffer_note %}title="Placering af målerbrønd: {{ address.buffer_note }}"{% endif %}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M8 12h8"></path><path d="M12 8v8"></path></svg>
                                     Brønd
@@ -247,6 +247,7 @@
                         <span class="task-flag">Opgave uden adresse</span>
                     {% endif %}
                 </div>
+                {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave</span>{% endif %}
                 {% if appointment.notes %}
                     <div class="task-note-banner">
                         <span class="task-note-label">NOTE</span>
@@ -258,17 +259,26 @@
                     <p class="hint"><strong>Brønd: {{ address.buffer_note }}</strong></p>
                 {% endif %}
                 <div class="vvs-task-primary-actions">
-                    <a class="primary-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
-                    {% if address %}
+                    {% if not appointment.is_manual_task %}<a class="primary-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>{% endif %}
+                    {% if appointment.is_manual_task %}
+                        <form method="post" action="/vvs/tasks/{{ appointment.id }}/close" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                            <button type="submit" class="primary-button vvs-task-action-button">Udført</button>
+                        </form>
+                    {% elif address %}
                         <form method="post" action="/vvs/tasks/{{ appointment.id }}/complete" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="primary-button vvs-task-action-button">Skiftet</button>
                         </form>
                         <form method="post" action="/vvs/tasks/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="ghost-button vvs-task-action-button">Ikke hjemme</button>
                         </form>
                         <form method="post" action="/vvs/tasks/{{ appointment.id }}/blocked" class="vvs-task-quick-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <button type="submit" class="ghost-button vvs-task-action-button">Fejl ved måler</button>
                         </form>
@@ -276,10 +286,11 @@
                 </div>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
 
-                {% if address %}
+                {% if address and not appointment.is_manual_task %}
                     <div class="vvs-task-photo-panel">
                         <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         <form method="post" action="/vvs/tasks/{{ appointment.id }}/photos" enctype="multipart/form-data" class="form-grid photo-upload-form vvs-task-photo-form">
+                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                             <fieldset class="option-field vvs-photo-type-fieldset" required>
                                 <legend>Fototype</legend>
@@ -373,6 +384,7 @@
             <div class="vvs-task-primary-actions">
                 <a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
                 <form method="post" action="/vvs/tasks/{{ appointment.id }}/blocked/undo" class="vvs-task-quick-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                     <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
                     <button type="submit" class="ghost-button vvs-task-action-button">Fortryd</button>
                 </form>
@@ -423,15 +435,16 @@
                     </div>
                 {% endif %}
                 <p class="hint">{{ period_labels.get(appointment.id) }}</p>
-                <p class="hint"><strong>Status: {{ status_labels.get(appointment.status, appointment.status.value) }}</strong></p>
+                <p class="hint"><strong>Status: {% if appointment.is_manual_task and appointment.status.value == 'CLOSED' %}Udført{% else %}{{ status_labels.get(appointment.status, appointment.status.value) }}{% endif %}</strong></p>
+                {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave</span>{% endif %}
                 <div class="vvs-task-primary-actions">
-                    <a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
-                    {% if address and not photos_complete %}
+                    {% if not appointment.is_manual_task %}<a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>{% endif %}
+                    {% if address and not appointment.is_manual_task and not photos_complete %}
                         <a class="primary-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit">Upload fotos</a>
                     {% endif %}
                 </div>
                 <div class="inline-edit is-hidden" data-inline-edit="{{ appointment.id }}"></div>
-                {% if address %}
+                {% if address and not appointment.is_manual_task %}
                     <div class="vvs-task-photo-panel is-compact">
                         <div class="photo-count-badge{% if not photos_complete %} is-incomplete{% endif %}">Fotos: {{ photo_list | length }}/2 · {% if photos_complete %}Komplet{% else %}Mangler fotos{% endif %}</div>
                         {% if photo_list %}

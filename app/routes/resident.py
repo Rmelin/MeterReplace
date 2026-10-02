@@ -13,6 +13,7 @@ from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash
 from app.push_notifications import enqueue_message_pushes
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/r", tags=["resident"])
 
@@ -133,7 +134,7 @@ def resident_form(
     responses = resident_form_context(db, link)
 
     return request.app.state.templates.TemplateResponse(
-        "resident_response_form.html",
+        request, "resident_response_form.html",
         {
             "request": request,
             "current_user": None,
@@ -224,7 +225,7 @@ def resident_submit(
         return RedirectResponse(f"/r/{token}", status_code=303)
 
     appointment = appointment_for_link(db, link)
-    submitted_at = datetime.utcnow()
+    submitted_at = utc_now()
     response_type: str
     mailbox_status: models.ResidentMessageStatus | None = None
 
@@ -285,7 +286,7 @@ def resident_submit(
                 .update(
                     {
                         "status": models.AppointmentStatus.NEEDS_RESCHEDULE,
-                        "changed_date": datetime.utcnow(),
+                        "changed_date": utc_now(),
                         "changed_by_user_id": None,
                     },
                     synchronize_session=False,

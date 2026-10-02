@@ -11,6 +11,7 @@ from app import models
 from app.db import get_db
 from app.dependencies import require_role
 from app.push_notifications import push_is_configured, vapid_public_key
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/api/push", tags=["push"])
 
@@ -75,7 +76,7 @@ def subscribe(
         .filter(models.PushSubscription.endpoint == endpoint)
         .first()
     )
-    now = datetime.utcnow()
+    now = utc_now()
     if subscription:
         subscription.user_id = user.id
         subscription.p256dh = payload.keys.p256dh
@@ -117,7 +118,7 @@ def unsubscribe(
         .first()
     )
     if subscription and subscription.disabled_at is None:
-        now = datetime.utcnow()
+        now = utc_now()
         subscription.disabled_at = now
         db.query(models.PushDelivery).filter(
             models.PushDelivery.subscription_id == subscription.id,

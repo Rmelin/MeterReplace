@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveSubscription = async (subscription) => {
       const response = await fetch('/api/push/subscriptions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
         body: JSON.stringify(subscription.toJSON())
       })
       if (!response.ok) {
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const removeSubscription = async (subscription) => {
       const response = await fetch('/api/push/subscriptions', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
         body: JSON.stringify({ endpoint: subscription.endpoint })
       })
       if (!response.ok) throw new Error('unsubscribe_failed')

@@ -20,6 +20,7 @@
     <h2>Kontaktoplysninger</h2>
     <p class="hint">Kontroller oplysningerne, så vi kan kontakte dig om aftalen.</p>
     <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <input type="hidden" name="intent" value="contact" />
         <input type="hidden" name="request_id" value="{{ contact_request_id }}" />
         <label>Navn<input type="text" name="name" maxlength="200" value="{{ address.customer_name or '' }}" autocomplete="name" /></label>
@@ -36,6 +37,7 @@
         <p><strong>Seneste svar:</strong> {% if meter_pit_response.answer == 'yes' %}Ja{% else %}Nej{% endif %}{% if meter_pit_response.message %} - {{ meter_pit_response.message }}{% endif %}</p>
     {% endif %}
     <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <input type="hidden" name="intent" value="meter_pit" />
         <input type="hidden" name="request_id" value="{{ meter_pit_request_id }}" />
         <fieldset class="form-fieldset">
@@ -71,6 +73,7 @@
     {% endif %}
     {% if appointment and can_answer_time %}
         <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form data-time-form>
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <input type="hidden" name="intent" value="time" />
             <input type="hidden" name="request_id" value="{{ time_request_id }}" />
             <fieldset class="form-fieldset">
@@ -112,6 +115,7 @@
     <h2>Anden besked</h2>
     <p class="hint">Send en besked uden at ændre svar om målerbrønd eller tidspunkt.</p>
     <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <input type="hidden" name="intent" value="message" />
         <input type="hidden" name="request_id" value="{{ message_request_id }}" />
         <label>Besked<textarea name="message" rows="4" maxlength="4000" class="textarea" required placeholder="Skriv din besked"></textarea></label>

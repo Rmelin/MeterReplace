@@ -353,6 +353,7 @@ const renderMissingList = () => {
         try {
           const response = await fetch(`/admin/addresses/${row.id}/geocode`, {
             method: 'POST',
+            headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
           })
           const result = await response.json()
           if (!response.ok || !result.success) {
@@ -441,7 +442,7 @@ const loadMapData = async () => {
 const saveCoordinates = async (addressId, latitude, longitude) => {
   const response = await fetch(`/admin/addresses/${addressId}/coordinates`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
     body: JSON.stringify({ latitude, longitude }),
   })
   if (!response.ok) {

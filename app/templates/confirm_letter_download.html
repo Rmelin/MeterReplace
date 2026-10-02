@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h1>Hent breve</h1>
+    <p>Når brevene dannes, markeres de tilhørende aftaler som beboer/kunde informeret.</p>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+        <button type="submit" class="primary-button">Dan og hent PDF</button>
+    </form>
+</section>
+{% endblock %}

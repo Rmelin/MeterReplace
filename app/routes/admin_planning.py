@@ -5,13 +5,14 @@ from datetime import date, datetime, time, timedelta
 import re
 
 from fastapi import APIRouter, Depends, Form, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
 from app import models
 from app.app_settings import is_within_planning_notice, planning_notice_days
 from app.db import get_db
+from app.day_agenda import day_agenda
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
@@ -21,6 +22,7 @@ from app.planning_slots import (
     build_slots,
 )
 from app.workday_status import build_workday_status
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/planning", tags=["admin"])
 
@@ -185,6 +187,8 @@ def fetch_addresses(
     notice_days: int | None = None,
 ) -> tuple[list[models.Address], set[int], set[int]]:
     scheduled = select(models.Appointment.address_id).where(
+        models.Appointment.address_id.isnot(None),
+        models.Appointment.is_manual_task.is_(False),
         models.Appointment.status.in_(
             [
                 models.AppointmentStatus.SCHEDULED,
@@ -241,6 +245,8 @@ def fetch_skipped_addresses(
     notice_days: int | None = None,
 ) -> tuple[list[models.Address], list[models.Address], list[models.Address]]:
     scheduled = select(models.Appointment.address_id).where(
+        models.Appointment.address_id.isnot(None),
+        models.Appointment.is_manual_task.is_(False),
         models.Appointment.status.in_(
             [
                 models.AppointmentStatus.SCHEDULED,
@@ -346,6 +352,7 @@ def has_conflict(db: Session, contractor_id: int, starts_at: datetime, ends_at: 
         .filter(
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -623,12 +630,14 @@ def planning_form(
     ]
 
     return request.app.state.templates.TemplateResponse(
-        "admin_planning.html",
+        request, "admin_planning.html",
         {
             "request": request,
             "current_user": user,
             "flashes": consume_flashes(request),
             "planned": planned,
+            "agenda": day_agenda(db, plan_date, planned) if plan_date else [],
+            "agenda_date": plan_date,
             "unplanned": unplanned,
             "stock": stock,
             "slot_count": slot_count,
@@ -747,7 +756,7 @@ def commit_plan(
             ends_at=slot.ends_at,
             status=models.AppointmentStatus.SCHEDULED,
             letter_required=slot.letter_required,
-            changed_date=datetime.utcnow(),
+            changed_date=utc_now(),
             changed_by_user_id=user.id,
         )
         db.add(appointment)
@@ -820,7 +829,7 @@ def manual_planning_form(
         scheduled_map = manual_schedule_map(appointments)
 
     return request.app.state.templates.TemplateResponse(
-        "admin_manual_planning.html",
+        request, "admin_manual_planning.html",
         {
             "request": request,
             "current_user": user,
@@ -953,7 +962,7 @@ def manual_planning_commit(
             status=models.AppointmentStatus.SCHEDULED,
             letter_required=not address.buffer_flag,
             notes=note_value,
-            changed_date=datetime.utcnow(),
+            changed_date=utc_now(),
             changed_by_user_id=user.id,
         )
     )

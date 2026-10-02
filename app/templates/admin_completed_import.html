@@ -11,6 +11,7 @@
     <h2>Upload CSV + ZIP</h2>
     <a class="ghost-button" href="/admin/import/completed/export">Download CSV + ZIP</a>
     <form method="post" action="/admin/import/completed" enctype="multipart/form-data" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>CSV<input type="file" name="csv_file" accept=".csv" required /></label>
         <label>ZIP med billeder (valgfrit)<input type="file" name="zip_file" accept=".zip" /></label>
         <button type="submit" class="primary-button">Importer</button>

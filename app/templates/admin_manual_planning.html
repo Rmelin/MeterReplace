@@ -38,6 +38,7 @@
         <p class="hint">Ingen adresser klar til planlægning.</p>
     {% else %}
         <form method="post" action="/admin/planning/manual" class="form-grid">
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <input type="hidden" name="date_raw" value="{{ plan_date.isoformat() }}" />
             <label class="search-field">
                 Søg adresse

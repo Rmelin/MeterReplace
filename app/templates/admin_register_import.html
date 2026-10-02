@@ -14,6 +14,7 @@
 <section class="card">
     <h2>CSV import</h2>
     <form method="post" action="/admin/import/register" enctype="multipart/form-data" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>Fil<input type="file" name="file" accept=".csv" required /></label>
         <button type="submit" class="primary-button">Importer</button>
     </form>

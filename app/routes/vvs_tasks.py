@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
@@ -19,6 +20,7 @@ from app.planning_slots import (
     PLANNING_DAY_START,
     SLOT_OCCUPYING_STATUSES,
 )
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/vvs/tasks", tags=["vvs"])
 
@@ -29,12 +31,6 @@ PHOTO_LABELS = {
     "both": "Begge målere",
     "new": "Ny måler",
     "old": "Gammel måler",
-}
-
-PHOTO_FILENAME = {
-    "both": "begge",
-    "new": "ny",
-    "old": "gammel",
 }
 
 BLOCKED_REASON = "Fejl ved måler"
@@ -78,10 +74,6 @@ def photo_complete(photos: list[models.AppointmentPhoto]) -> bool:
     return "both" in types or ("new" in types and "old" in types)
 
 
-def ensure_image(file: UploadFile) -> bool:
-    return file.content_type is not None and file.content_type.startswith("image/")
-
-
 def slugify_address(address: models.Address) -> str:
     value = f"{address.street}{address.house_no}".strip().lower()
     value = value.replace("æ", "ae").replace("ø", "oe").replace("å", "aa")
@@ -90,25 +82,7 @@ def slugify_address(address: models.Address) -> str:
 
 
 def save_photo(address: models.Address, photo_type: str, file: UploadFile) -> str:
-    extension = Path(file.filename or "").suffix.lower() or ".jpg"
-    filename_slug = PHOTO_FILENAME.get(photo_type, "foto")
-    slug = slugify_address(address)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    counter = 1
-
-    folder = UPLOAD_DIR / slug
-    folder.mkdir(parents=True, exist_ok=True)
-
-    while True:
-        filename = f"{slug}-{filename_slug}-{timestamp}-{counter}{extension}"
-        path = folder / filename
-        if not path.exists():
-            break
-        counter += 1
-
-    with path.open("wb") as buffer:
-        buffer.write(file.file.read())
-    return str(path.relative_to(UPLOAD_DIR))
+    return save_image(file, UPLOAD_DIR / slugify_address(address), UPLOAD_DIR)
 
 
 def availability_dates(db: Session, user_id: int) -> list[date]:
@@ -154,6 +128,7 @@ def is_meter_issue_row(
 ) -> bool:
     return bool(
         address
+        and not appointment.is_manual_task
         and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE
         and address.blocked_reason == BLOCKED_REASON
     )
@@ -174,7 +149,7 @@ def visible_task_rows(
 
     visible_rows = []
     for appointment, address in rows:
-        if address and address.id in latest_meter_issue_by_address:
+        if address and not appointment.is_manual_task and address.id in latest_meter_issue_by_address:
             latest_appointment, _latest_address = latest_meter_issue_by_address[address.id]
             if appointment.id == latest_appointment.id:
                 visible_rows.append((appointment, address))
@@ -209,6 +184,7 @@ def has_conflict(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -263,7 +239,7 @@ def task_rows_for_date(
         return []
     rows = (
         db.query(models.Appointment, models.Address)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .join(
             models.VvsAvailability,
             models.VvsAvailability.user_id == models.Appointment.contractor_id,
@@ -296,6 +272,8 @@ def build_task_overview(
     afternoon_overview = []
     buffer_overview = []
     for appointment, address in rows:
+        if appointment.is_manual_task:
+            continue
         if not address:
             continue
         if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
@@ -340,6 +318,7 @@ def build_day_checklist(
         is_done = is_done_for_day(appointment.status) and not is_meter_issue
         missing_photos = (
             has_address
+            and not appointment.is_manual_task
             and appointment.status != models.AppointmentStatus.NOT_HOME
             and not is_meter_issue
             and not photo_complete(photo_list)
@@ -348,7 +327,7 @@ def build_day_checklist(
             done_count += 1
         if missing_photos:
             missing_photo_count += 1
-        if has_note:
+        if has_note and not appointment.is_manual_task:
             note_count += 1
         if is_meter_issue:
             meter_issue_count += 1
@@ -356,17 +335,22 @@ def build_day_checklist(
         badges = []
         if missing_photos:
             badges.append("Mangler fotos")
-        if has_note:
+        if has_note and not appointment.is_manual_task:
             badges.append("Note")
+        if appointment.is_manual_task:
+            badges.append("VVS-opgave")
         if is_meter_issue:
             badges.append("Fejl ved måler")
-        if address and address.buffer_flag:
+        if address and address.buffer_flag and not appointment.is_manual_task:
             badges.append("Brønd")
 
         items.append(
             {
                 "appointment_id": appointment.id,
                 "address_label": (
+                    f"{appointment.notes} · {address.street} {address.house_no}"
+                    if address and appointment.is_manual_task else
+                    (appointment.notes or "VVS-opgave") if appointment.is_manual_task else
                     f"{address.street} {address.house_no}, {address.zip} {address.city}"
                     if address else "Opgave uden adresse"
                 ),
@@ -417,7 +401,10 @@ def vvs_tasks(
     photos = appointment_photos(db, [appointment.id for appointment in appointments])
     morning_overview, afternoon_overview, buffer_overview = build_task_overview(rows)
     period_labels = {
-        appointment.id: period_label_for(appointment.starts_at) for appointment in appointments
+        appointment.id: (
+            {"all_day": "Hele dagen", "morning": "Formiddag", "afternoon": "Eftermiddag"}.get(appointment.time_window, f"Kl. {appointment.starts_at:%H:%M}")
+            if appointment.is_manual_task else period_label_for(appointment.starts_at)
+        ) for appointment in appointments
     }
     checklist_summary, checklist_items = build_day_checklist(
         appointments, addresses, photos, period_labels
@@ -444,7 +431,7 @@ def vvs_tasks(
     ]
 
     return request.app.state.templates.TemplateResponse(
-        "vvs_tasks.html",
+        request, "vvs_tasks.html",
         {
             "request": request,
             "current_user": user,
@@ -487,7 +474,7 @@ def vvs_tasks_map(
         return selection
     available_dates, show_all_dates, selected_date = selection
     return request.app.state.templates.TemplateResponse(
-        "vvs_tasks_map.html",
+        request, "vvs_tasks_map.html",
         {
             "request": request,
             "current_user": user,
@@ -517,7 +504,7 @@ def vvs_tasks_map_data(
 
     query = (
         db.query(models.Appointment, models.Address)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .filter(
             models.Appointment.contractor_id == user.id,
             models.Appointment.status.in_(
@@ -663,7 +650,7 @@ def upload_photo(
             return RedirectResponse(redirect_url, status_code=303)
 
     if not ensure_image(file):
-        flash(request, "Kun billedfiler er tilladt", "error")
+        flash(request, "Vælg et gyldigt JPEG-, PNG- eller WebP-billede (højst 10 MiB)", "error")
         return RedirectResponse(redirect_url, status_code=303)
 
     address = db.query(models.Address).filter(models.Address.id == appointment.address_id).first()
@@ -672,25 +659,28 @@ def upload_photo(
         return RedirectResponse(redirect_url, status_code=303)
 
     file_path = save_photo(address, photo_type, file)
-    photo = models.AppointmentPhoto(
-        appointment_id=appointment.id,
-        address_id=appointment.address_id,
-        file_path=file_path,
-        photo_type=photo_type,
-        uploaded_by_user_id=user.id,
-    )
-    db.add(photo)
-    db.commit()
+    with upload_transaction(db, UPLOAD_DIR / file_path):
+        photo = models.AppointmentPhoto(
+            appointment_id=appointment.id,
+            address_id=appointment.address_id,
+            file_path=file_path,
+            photo_type=photo_type,
+            uploaded_by_user_id=user.id,
+        )
+        db.add(photo)
+        db.flush()
 
-    updated_photos = existing_photos + [photo]
-    if photo_complete(updated_photos):
-        appointment.status = models.AppointmentStatus.COMPLETED
-        appointment.changed_date = datetime.utcnow()
-        appointment.changed_by_user_id = user.id
-        db.commit()
-        flash(request, "Foto uploadet og status sat til skiftet", "success")
-    else:
-        flash(request, "Foto uploadet", "success")
+        updated_photos = existing_photos + [photo]
+        if photo_complete(updated_photos):
+            appointment.status = models.AppointmentStatus.COMPLETED
+            appointment.changed_date = utc_now()
+            appointment.changed_by_user_id = user.id
+            db.flush()
+            success_message = "Foto uploadet og status sat til skiftet"
+        else:
+            success_message = "Foto uploadet"
+
+    flash(request, success_message, "success")
 
     return RedirectResponse(redirect_url, status_code=303)
 
@@ -700,7 +690,7 @@ def task_edit_context(
 ) -> dict[str, object] | None:
     row = (
         db.query(models.Appointment, models.Address)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .filter(
             models.Appointment.id == appointment_id,
             models.Appointment.contractor_id == user_id,
@@ -749,7 +739,7 @@ def edit_task(
         base_context["flashes"] = consume_flashes(request)
 
     return request.app.state.templates.TemplateResponse(
-        template_name,
+        request, template_name,
         base_context,
     )
 
@@ -786,7 +776,7 @@ def update_task(
         if not context:
             raise HTTPException(status_code=404, detail="Opgave ikke fundet")
         return request.app.state.templates.TemplateResponse(
-            "partials/vvs_task_form.html",
+            request, "partials/vvs_task_form.html",
             {
                 "request": request,
                 "current_user": user,
@@ -872,7 +862,7 @@ def update_task(
     appointment.status = status_map[status]
     appointment.starts_at = starts_at
     appointment.ends_at = ends_at
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -903,7 +893,7 @@ def close_task(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.CLOSED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -933,6 +923,8 @@ def mark_completed(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.is_manual_task:
+        raise HTTPException(status_code=400, detail="Brug Udført til VVS-opgaver")
 
     photos = (
         db.query(models.AppointmentPhoto)
@@ -940,7 +932,7 @@ def mark_completed(
         .all()
     )
     appointment.status = models.AppointmentStatus.COMPLETED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -975,7 +967,7 @@ def mark_not_home(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.NOT_HOME
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -1030,14 +1022,14 @@ def mark_blocked(
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
                 letter_required=appointment.letter_required,
                 notes=note_value,
-                changed_date=datetime.utcnow(),
+                changed_date=utc_now(),
                 changed_by_user_id=user.id,
             )
         )
     else:
         appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
         appointment.notes = note_value
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
 
     db.commit()
@@ -1099,7 +1091,7 @@ def undo_blocked(
     )
     if previous_not_home and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE:
         previous_not_home.status = models.AppointmentStatus.SCHEDULED
-        previous_not_home.changed_date = datetime.utcnow()
+        previous_not_home.changed_date = utc_now()
         previous_not_home.changed_by_user_id = user.id
         if previous_not_home.notes == BLOCKED_REASON:
             previous_not_home.notes = None
@@ -1107,7 +1099,7 @@ def undo_blocked(
         restored = True
     else:
         appointment.status = models.AppointmentStatus.SCHEDULED
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
         if appointment.notes == BLOCKED_REASON:
             appointment.notes = None

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime, timedelta
+from datetime import timedelta
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -24,6 +24,7 @@ from app.push_notifications import (
     push_is_configured,
 )
 from app.routes.push import validate_endpoint
+from app.timeutils import utc_now
 
 
 class PushNotificationTests(unittest.TestCase):
@@ -93,7 +94,7 @@ class PushNotificationTests(unittest.TestCase):
         message = self.add_message()
         enqueue_message_pushes(self.db, message)
         self.db.commit()
-        before = datetime.utcnow()
+        before = utc_now()
 
         def fail(*_):
             raise RuntimeError("temporary")

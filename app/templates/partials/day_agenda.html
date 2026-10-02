@@ -1,0 +1,37 @@
+<section class="card" id="day-agenda">
+    <div class="section-header">
+        <div>
+            <h2>Dagens opgaver og målerskift</h2>
+            <p class="hint">Oversigt for {{ agenda_date.strftime('%d/%m/%Y') }}. Klik på en adresse eller opgave for at se detaljerne.{% if agenda|selectattr('is_draft')|list %} Udkast bliver gemt, når du godkender planen.{% endif %}</p>
+        </div>
+    </div>
+    {% if agenda %}
+        <div class="appointment-outline-grid">
+            {% for group, label in [('morning', 'Formiddag'), ('afternoon', 'Eftermiddag'), ('all_day', 'Hele dagen / Målerbrønd')] %}
+                <section class="appointment-outline-section">
+                    <h3>{{ label }}</h3>
+                    {% set items = agenda|selectattr('group', 'equalto', group)|list %}
+                    {% if items %}
+                        <ul class="appointment-outline-list">
+                            {% for item in items %}
+                                <li class="agenda-outline-item">
+                                    <a class="appointment-outline-link" href="{{ item.href }}">{% if item.address %}{{ item.address.street }} {{ item.address.house_no }}{% else %}VVS-opgave{% endif %}</a>
+                                    {% if item.is_done %}<span class="appointment-outline-done" aria-label="{{ item.status }}" title="{{ item.status }}">✓</span>{% endif %}
+                                    {% if item.is_meter_issue %}<span class="appointment-outline-issue" title="Fejl ved måler" aria-label="Fejl ved måler">!</span>{% endif %}
+                                    {% if item.is_draft %}<span class="chip">Udkast</span>{% endif %}
+                                    {% if item.kind == 'VVS-opgave' %}<div class="agenda-outline-meta">VVS-opgave · {{ item.time_label }} · {{ item.contractor }}</div>{% endif %}
+                                    {% if item.note %}<div class="agenda-outline-note">{% if item.kind != 'VVS-opgave' %}<strong>Note til VVS:</strong> {% endif %}{{ item.note }}</div>{% endif %}
+                                    {% if item.buffer_note %}<div class="agenda-outline-note"><strong>Målerbrønd:</strong> {{ item.buffer_note }}</div>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="hint">Ingen opgaver eller målerskift.</p>
+                    {% endif %}
+                </section>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="hint">Ingen opgaver eller målerskift på dagen.</p>
+    {% endif %}
+</section>

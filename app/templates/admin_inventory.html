@@ -15,6 +15,7 @@
     <div class="card is-hidden" data-panel="adjust-stock">
         <h2>Juster lager</h2>
         <form method="post" action="/admin/inventory/adjust" class="form-grid">
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <label>Antal<input type="number" name="quantity" min="1" required /></label>
             <label>Note<input type="text" name="note" placeholder="Årsag til justering" required /></label>
             <button type="submit" class="primary-button">Gem justering</button>
@@ -27,6 +28,7 @@
     <div class="card">
         <h2>Registrér indkøb</h2>
         <form method="post" action="/admin/inventory" class="form-grid">
+            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
             <label>Antal<input type="number" name="quantity" min="1" required /></label>
             <label>Reference<input type="text" name="reference" placeholder="fx Faktura 2026-01" /></label>
             <label>Vandmålertype<input type="text" name="meter_type" placeholder="Valgfrit" /></label>

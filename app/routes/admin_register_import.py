@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime
+
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
@@ -13,6 +13,7 @@ from starlette.responses import RedirectResponse
 from app import models
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/import/register", tags=["admin"])
 
@@ -42,7 +43,7 @@ def import_form(
     user: models.User = Depends(require_role(models.UserRole.ADMIN)),
 ):
     return request.app.state.templates.TemplateResponse(
-        "admin_register_import.html",
+        request, "admin_register_import.html",
         {
             "request": request,
             "current_user": user,
@@ -125,7 +126,7 @@ def import_register(
         address.register_closed = True
         if appointment:
             appointment.status = models.AppointmentStatus.CLOSED
-            appointment.changed_date = datetime.utcnow()
+            appointment.changed_date = utc_now()
             appointment.changed_by_user_id = user.id
         else:
             log_rows.append(
@@ -145,7 +146,7 @@ def import_register(
 
     log_filename = None
     if log_rows:
-        timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        timestamp = utc_now().strftime("%Y%m%d-%H%M%S")
         log_filename = f"register-import-{timestamp}.csv"
         log_path = LOG_DIR / log_filename
         with log_path.open("w", encoding="utf-8", newline="") as handle:

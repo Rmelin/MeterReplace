@@ -45,7 +45,7 @@ def street_priority_overview(
         .all()
     )
     return request.app.state.templates.TemplateResponse(
-        "admin_street_priority.html",
+        request, "admin_street_priority.html",
         {
             "request": request,
             "current_user": user,

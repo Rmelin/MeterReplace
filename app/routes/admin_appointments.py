@@ -7,12 +7,14 @@ import re
 import unicodedata
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
+from app.day_agenda import day_agenda
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
@@ -20,6 +22,7 @@ from app.planning_slots import (
     SLOT_OCCUPYING_STATUSES,
 )
 from app.workday_status import build_workday_status
+from app.timeutils import utc_now
 
 router = APIRouter(prefix="/admin/appointments", tags=["admin"])
 
@@ -30,12 +33,6 @@ PHOTO_LABELS = {
     "both": "Begge målere",
     "new": "Ny måler",
     "old": "Gammel måler",
-}
-
-PHOTO_FILENAME = {
-    "both": "begge",
-    "new": "ny",
-    "old": "gammel",
 }
 
 BLOCKED_REASON = "Fejl ved måler"
@@ -93,10 +90,6 @@ def photo_complete(photos: list[models.AppointmentPhoto]) -> bool:
     return "both" in types or ("new" in types and "old" in types)
 
 
-def ensure_image(file: UploadFile) -> bool:
-    return file.content_type is not None and file.content_type.startswith("image/")
-
-
 def slugify_address(address: models.Address) -> str:
     value = f"{address.street}{address.house_no}".strip().lower()
     value = value.replace("æ", "ae").replace("ø", "oe").replace("å", "aa")
@@ -105,25 +98,7 @@ def slugify_address(address: models.Address) -> str:
 
 
 def save_photo(address: models.Address, photo_type: str, file: UploadFile) -> str:
-    extension = Path(file.filename or "").suffix.lower() or ".jpg"
-    filename_slug = PHOTO_FILENAME.get(photo_type, "foto")
-    slug = slugify_address(address)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    counter = 1
-
-    folder = UPLOAD_DIR / slug
-    folder.mkdir(parents=True, exist_ok=True)
-
-    while True:
-        filename = f"{slug}-{filename_slug}-{timestamp}-{counter}{extension}"
-        path = folder / filename
-        if not path.exists():
-            break
-        counter += 1
-
-    with path.open("wb") as buffer:
-        buffer.write(file.file.read())
-    return str(path.relative_to(UPLOAD_DIR))
+    return save_image(file, UPLOAD_DIR / slugify_address(address), UPLOAD_DIR)
 
 
 def availability_dates(db: Session) -> list[date]:
@@ -164,6 +139,7 @@ def is_meter_issue_row(
 ) -> bool:
     return bool(
         address
+        and not appointment.is_manual_task
         and appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE
         and address.blocked_reason == BLOCKED_REASON
     )
@@ -208,6 +184,7 @@ def has_conflict(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -227,6 +204,7 @@ def has_conflict_for_user(
         .filter(
             models.Appointment.contractor_id == contractor_id,
             models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
         )
@@ -261,7 +239,7 @@ def appointment_overview(
     if selected_date:
         rows = (
             db.query(models.Appointment, models.Address, models.User)
-            .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+            .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
             .join(models.User, models.User.id == models.Appointment.contractor_id)
             .join(
                 models.VvsAvailability,
@@ -290,31 +268,6 @@ def appointment_overview(
     contractors = {row[0].id: row[2] for row in rows}
     photos = appointment_photos(db, [appointment.id for appointment in appointments])
     vvs_users = available_vvs_for_date(db, selected_date) if selected_date else []
-    morning_overview = []
-    afternoon_overview = []
-    buffer_overview = []
-    for appointment, address, _contractor in rows:
-        if not address:
-            continue
-        if appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE and not is_meter_issue_row(
-            appointment, address
-        ):
-            continue
-        entry = {
-            "appointment_id": appointment.id,
-            "street": address.street,
-            "house_no": address.house_no,
-            "buffer_note": address.buffer_note,
-            "is_done": is_done_for_day(appointment.status),
-            "is_meter_issue": is_meter_issue_row(appointment, address),
-            "has_note": bool((appointment.notes or "").strip()),
-        }
-        if address.buffer_flag:
-            buffer_overview.append(entry)
-        elif appointment.starts_at.time() < time(12, 0):
-            morning_overview.append(entry)
-        else:
-            afternoon_overview.append(entry)
     todo = [
         appt
         for appt in appointments
@@ -373,21 +326,20 @@ def appointment_overview(
     ]
 
     return request.app.state.templates.TemplateResponse(
-        "admin_appointments.html",
+        request, "admin_appointments.html",
         {
             "request": request,
             "current_user": user,
             "flashes": consume_flashes(request),
             "appointments": appointments,
+            "agenda": day_agenda(db, selected_date) if selected_date else [],
+            "agenda_date": selected_date,
             "addresses": addresses,
             "contractors": contractors,
             "photos": photos,
-            "morning_overview": morning_overview,
-            "afternoon_overview": afternoon_overview,
-            "buffer_overview": buffer_overview,
             "todo": todo,
             "remaining_address_count": sum(
-                1 for appointment in todo if addresses.get(appointment.id) is not None
+                1 for appointment in todo if addresses.get(appointment.id) is not None and not appointment.is_manual_task
             ),
             "needs_reschedule": needs_reschedule,
             "reschedule_responses": reschedule_responses,
@@ -395,6 +347,7 @@ def appointment_overview(
             "availability_dates": dates,
             "selected_date": selected_date,
             "vvs_users": vvs_users,
+            "task_addresses": db.query(models.Address).order_by(models.Address.street, models.Address.house_no).all(),
             "photo_labels": PHOTO_LABELS,
             "status_labels": STATUS_LABELS,
             "today_day_status": today_day_status,
@@ -412,6 +365,8 @@ def create_manual_task(
     contractor_id: int = Form(0),
     start_raw: str = Form(""),
     duration_minutes: int = Form(30),
+    time_window: str = Form("exact"),
+    address_id: int = Form(0),
     notes: str = Form(""),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
@@ -422,7 +377,6 @@ def create_manual_task(
 
     try:
         plan_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
-        start_time = parse_time(start_raw)
     except ValueError:
         flash(request, "Dato eller tid er ugyldig", "error")
         return RedirectResponse(
@@ -456,56 +410,60 @@ def create_manual_task(
             f"/admin/appointments?date_query={date_raw}", status_code=303
         )
 
-    if duration_minutes < 5 or duration_minutes > 480:
-        flash(request, "Planlagt varighed skal være mellem 5 og 480 minutter", "error")
+    if address_id:
+        address = db.query(models.Address).filter(models.Address.id == address_id).first()
+        if not address:
+            flash(request, "Vælg en gyldig adresse", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+
+    if time_window not in {"all_day", "morning", "afternoon", "exact"}:
+        flash(request, "Vælg et gyldigt tidspunkt", "error")
         return RedirectResponse(
             f"/admin/appointments?date_query={date_raw}", status_code=303
         )
-
-    slot_start = datetime.combine(plan_date, start_time)
-    slot_end = slot_start + timedelta(minutes=duration_minutes)
-    window_start = PLANNING_DAY_START
-    window_end = PLANNING_DAY_END
-
-    if not (window_start <= start_time < window_end):
-        flash(request, "Tid skal være mellem 06:00 og 20:00", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if slot_end.time() > window_end:
-        flash(request, "Sluttid skal være senest 20:00", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if not (availability.start_time <= start_time < availability.end_time):
-        flash(request, "Tid ligger udenfor arbejdsdag", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if slot_end.time() > availability.end_time:
-        flash(request, "Slot slutter udenfor arbejdsdag", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
-
-    if has_conflict_for_user(db, contractor_id, slot_start, slot_end):
-        flash(request, "VVS er allerede planlagt på dette tidspunkt", "error")
-        return RedirectResponse(
-            f"/admin/appointments?date_query={date_raw}", status_code=303
-        )
+    if time_window == "exact":
+        try:
+            start_time = parse_time(start_raw)
+        except ValueError:
+            flash(request, "Angiv et gyldigt klokkeslæt", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        if duration_minutes < 5 or duration_minutes > 480:
+            flash(request, "Planlagt varighed skal være mellem 5 og 480 minutter", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        slot_start = datetime.combine(plan_date, start_time)
+        slot_end = slot_start + timedelta(minutes=duration_minutes)
+        if not (max(availability.start_time, PLANNING_DAY_START) <= start_time < min(availability.end_time, PLANNING_DAY_END)) or slot_end.date() != plan_date or slot_end.time() > min(availability.end_time, PLANNING_DAY_END):
+            flash(request, "Tid ligger udenfor arbejdsdagen", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        if has_conflict_for_user(db, contractor_id, slot_start, slot_end):
+            flash(request, "VVS er allerede planlagt på dette tidspunkt", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+    else:
+        window_start = max(availability.start_time, PLANNING_DAY_START)
+        window_end = min(availability.end_time, PLANNING_DAY_END)
+        if time_window == "morning":
+            window_end = min(window_end, time(12, 0))
+        elif time_window == "afternoon":
+            window_start = max(window_start, time(12, 0))
+        if window_start >= window_end:
+            flash(request, "VVS arbejder ikke i den valgte del af dagen", "error")
+            return RedirectResponse(f"/admin/appointments?date_query={date_raw}", status_code=303)
+        slot_start = datetime.combine(plan_date, window_start)
+        slot_end = datetime.combine(plan_date, window_end)
 
     db.add(
         models.Appointment(
             address_id=None,
+            task_address_id=address_id or None,
             contractor_id=contractor.id,
             starts_at=slot_start,
             ends_at=slot_end,
             status=models.AppointmentStatus.SCHEDULED,
+            is_manual_task=True,
+            time_window=time_window,
+            letter_required=False,
             notes=note_value,
-            changed_date=datetime.utcnow(),
+            changed_date=utc_now(),
             changed_by_user_id=user.id,
         )
     )
@@ -571,7 +529,7 @@ def upload_photo(
             return RedirectResponse(redirect_target, status_code=303)
 
     if not ensure_image(file):
-        flash(request, "Kun billedfiler er tilladt", "error")
+        flash(request, "Vælg et gyldigt JPEG-, PNG- eller WebP-billede (højst 10 MiB)", "error")
         return RedirectResponse(redirect_target, status_code=303)
 
     address = db.query(models.Address).filter(models.Address.id == appointment.address_id).first()
@@ -580,25 +538,28 @@ def upload_photo(
         return RedirectResponse(redirect_target, status_code=303)
 
     file_path = save_photo(address, photo_type, file)
-    photo = models.AppointmentPhoto(
-        appointment_id=appointment.id,
-        address_id=appointment.address_id,
-        file_path=file_path,
-        photo_type=photo_type,
-        uploaded_by_user_id=user.id,
-    )
-    db.add(photo)
-    db.commit()
+    with upload_transaction(db, UPLOAD_DIR / file_path):
+        photo = models.AppointmentPhoto(
+            appointment_id=appointment.id,
+            address_id=appointment.address_id,
+            file_path=file_path,
+            photo_type=photo_type,
+            uploaded_by_user_id=user.id,
+        )
+        db.add(photo)
+        db.flush()
 
-    updated_photos = existing_photos + [photo]
-    if photo_complete(updated_photos):
-        appointment.status = models.AppointmentStatus.COMPLETED
-        appointment.changed_date = datetime.utcnow()
-        appointment.changed_by_user_id = user.id
-        db.commit()
-        flash(request, "Foto uploadet og status sat til skiftet", "success")
-    else:
-        flash(request, "Foto uploadet", "success")
+        updated_photos = existing_photos + [photo]
+        if photo_complete(updated_photos):
+            appointment.status = models.AppointmentStatus.COMPLETED
+            appointment.changed_date = utc_now()
+            appointment.changed_by_user_id = user.id
+            db.flush()
+            success_message = "Foto uploadet og status sat til skiftet"
+        else:
+            success_message = "Foto uploadet"
+
+    flash(request, success_message, "success")
 
     return RedirectResponse(redirect_target, status_code=303)
 
@@ -617,7 +578,7 @@ def update_appointment_note(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.notes = note.strip() or None
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -634,7 +595,7 @@ def appointment_edit_context(
 ) -> dict[str, object] | None:
     row = (
         db.query(models.Appointment, models.Address, models.User)
-        .outerjoin(models.Address, models.Address.id == models.Appointment.address_id)
+        .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .join(models.User, models.User.id == models.Appointment.contractor_id)
         .filter(models.Appointment.id == appointment_id)
         .first()
@@ -687,7 +648,7 @@ def edit_appointment(
         base_context["flashes"] = consume_flashes(request)
 
     return request.app.state.templates.TemplateResponse(
-        template_name,
+        request, template_name,
         base_context,
     )
 
@@ -719,7 +680,7 @@ def update_appointment(
         if not context:
             raise HTTPException(status_code=404, detail="Opgave ikke fundet")
         return request.app.state.templates.TemplateResponse(
-            "partials/admin_appointment_form.html",
+            request, "partials/admin_appointment_form.html",
             {
                 "request": request,
                 "appointment": context["appointment"],
@@ -751,6 +712,8 @@ def update_appointment(
     }
     if status not in status_map:
         return handle_error("Vælg en gyldig status")
+    if appointment.is_manual_task and status not in {"scheduled", "closed", "notscheduled"}:
+        return handle_error("Vælg en gyldig status for VVS-opgaven")
 
     contractor = db.query(models.User).filter(models.User.id == contractor_id).first()
     if not contractor or contractor.role != models.UserRole.VVS:
@@ -785,8 +748,9 @@ def update_appointment(
     if duration_minutes > 0 and calculated_minutes != duration_minutes:
         return handle_error("Sluttid matcher ikke planlagt varighed")
 
-    if calculated_minutes < 5 or calculated_minutes > 480:
-        return handle_error("Planlagt varighed skal være mellem 5 og 480 minutter")
+    max_minutes = 840 if appointment.is_manual_task and appointment.time_window != "exact" else 480
+    if calculated_minutes < 5 or calculated_minutes > max_minutes:
+        return handle_error(f"Planlagt varighed skal være mellem 5 og {max_minutes} minutter")
 
     if not (PLANNING_DAY_START <= start_time < PLANNING_DAY_END):
         return handle_error("Tid skal være mellem 06:00 og 20:00")
@@ -802,7 +766,7 @@ def update_appointment(
             return handle_error("Tid ligger udenfor arbejdsdag")
         if ends_at.time() > availability.end_time:
             return handle_error("Slot slutter udenfor arbejdsdag")
-        if has_conflict(db, appointment.id, contractor.id, starts_at, ends_at):
+        if (not appointment.is_manual_task or appointment.time_window == "exact") and has_conflict(db, appointment.id, contractor.id, starts_at, ends_at):
             return handle_error("VVS er allerede planlagt på dette tidspunkt")
 
     appointment.status = status_map[status]
@@ -812,7 +776,7 @@ def update_appointment(
     appointment.old_meter_no = old_meter_no.strip() or None
     appointment.new_meter_no = new_meter_no.strip() or None
     appointment.notes = notes.strip() or None
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -836,7 +800,7 @@ def close_appointment(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.CLOSED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -866,6 +830,7 @@ def complete_remaining(
         .filter(
             func.date(models.Appointment.starts_at) == selected_date,
             models.Appointment.address_id.isnot(None),
+            models.Appointment.is_manual_task.is_(False),
             models.Appointment.status.in_(
                 [
                     models.AppointmentStatus.SCHEDULED,
@@ -875,7 +840,7 @@ def complete_remaining(
         )
         .all()
     )
-    changed_at = datetime.utcnow()
+    changed_at = utc_now()
     for appointment in appointments:
         appointment.status = models.AppointmentStatus.COMPLETED
         appointment.changed_date = changed_at
@@ -909,13 +874,16 @@ def mark_completed(
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
+    if appointment.is_manual_task:
+        raise HTTPException(status_code=400, detail="VVS-opgaver kan ikke markeres som målerskift")
+
     photos = (
         db.query(models.AppointmentPhoto)
         .filter(models.AppointmentPhoto.appointment_id == appointment.id)
         .all()
     )
     appointment.status = models.AppointmentStatus.COMPLETED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -969,7 +937,7 @@ def keep_scheduled(
         return RedirectResponse(redirect_target, status_code=303)
 
     appointment.status = models.AppointmentStatus.SCHEDULED
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.add(
         models.StockMovement(
@@ -1016,7 +984,7 @@ def mark_not_home(
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
 
     appointment.status = models.AppointmentStatus.NOT_HOME
-    appointment.changed_date = datetime.utcnow()
+    appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
 
@@ -1064,14 +1032,14 @@ def mark_blocked(
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
                 letter_required=appointment.letter_required,
                 notes=note_value,
-                changed_date=datetime.utcnow(),
+                changed_date=utc_now(),
                 changed_by_user_id=user.id,
             )
         )
     else:
         appointment.status = models.AppointmentStatus.NEEDS_RESCHEDULE
         appointment.notes = note_value
-        appointment.changed_date = datetime.utcnow()
+        appointment.changed_date = utc_now()
         appointment.changed_by_user_id = user.id
     db.commit()
 

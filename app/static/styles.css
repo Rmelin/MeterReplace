@@ -37,6 +37,10 @@
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
+[hidden] { display: none !important; }
+
+#day-agenda { scroll-margin-top: 100px; }
+
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: #0f1115;
@@ -1295,6 +1299,10 @@ a.chip:hover {
 .appointment-outline-link:hover {
     color: var(--accent);
 }
+
+.agenda-outline-item { margin-bottom: 0.2rem; }
+.agenda-outline-meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
+.agenda-outline-note { color: var(--muted); font-size: 0.95rem; line-height: 1.5; margin-top: 0.3rem; white-space: pre-line; overflow-wrap: anywhere; }
 
 .appointment-outline-done {
     display: inline-flex;

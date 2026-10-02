@@ -3,6 +3,7 @@
 <section class="card narrow">
     <h1>Rediger adressefelter</h1>
     <form method="post" action="/admin/addresses/{{ address.id }}/edit/address" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
         <label>Vej<input type="text" name="street" value="{{ address.street }}" required /></label>
         <label>Husnr<input type="text" name="house_no" value="{{ address.house_no }}" required /></label>
         <label>Postnr<input type="text" name="zip" value="{{ address.zip }}" required /></label>
