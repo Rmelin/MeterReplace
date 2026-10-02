@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
+
+
+def copenhagen_today() -> date:
+    return datetime.now(ZoneInfo("Europe/Copenhagen")).date()
 
 
 def utc_now() -> datetime:

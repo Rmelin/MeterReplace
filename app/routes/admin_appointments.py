@@ -22,7 +22,7 @@ from app.planning_slots import (
     SLOT_OCCUPYING_STATUSES,
 )
 from app.workday_status import build_workday_status
-from app.timeutils import utc_now
+from app.timeutils import utc_now, copenhagen_today
 
 router = APIRouter(prefix="/admin/appointments", tags=["admin"])
 
@@ -108,7 +108,12 @@ def availability_dates(db: Session) -> list[date]:
         .order_by(models.VvsAvailability.date)
         .all()
     )
-    return [row[0] for row in rows]
+    completed_dates = db.query(models.Appointment.actual_changed_on).filter(
+        models.Appointment.status == models.AppointmentStatus.COMPLETED,
+        models.Appointment.actual_changed_on.isnot(None),
+        models.Appointment.is_manual_task.is_(False),
+    ).distinct().all()
+    return sorted({row[0] for row in rows + completed_dates})
 
 
 def closest_date(dates: list[date]) -> date | None:
@@ -241,10 +246,6 @@ def appointment_overview(
             db.query(models.Appointment, models.Address, models.User)
             .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
             .join(models.User, models.User.id == models.Appointment.contractor_id)
-            .join(
-                models.VvsAvailability,
-                models.VvsAvailability.user_id == models.Appointment.contractor_id,
-            )
             .filter(
                 models.Appointment.status.in_(
                     [
@@ -256,8 +257,12 @@ def appointment_overview(
                         models.AppointmentStatus.NEEDS_RESCHEDULE,
                     ]
                 ),
-                func.date(models.Appointment.starts_at) == models.VvsAvailability.date,
-                func.date(models.Appointment.starts_at) == selected_date,
+                or_(
+                    func.date(models.Appointment.starts_at) == selected_date,
+                    (models.Appointment.status == models.AppointmentStatus.COMPLETED)
+                    & (models.Appointment.actual_changed_on == selected_date)
+                    & models.Appointment.is_manual_task.is_(False),
+                ),
             )
             .order_by(models.Appointment.starts_at)
             .all()
@@ -346,6 +351,7 @@ def appointment_overview(
             "done": done,
             "availability_dates": dates,
             "selected_date": selected_date,
+            "today": copenhagen_today(),
             "vvs_users": vvs_users,
             "task_addresses": db.query(models.Address).order_by(models.Address.street, models.Address.house_no).all(),
             "photo_labels": PHOTO_LABELS,
@@ -658,6 +664,7 @@ def update_appointment(
     request: Request,
     appointment_id: int,
     status: str = Form(""),
+    actual_changed_on: str = Form(""),
     start_raw: str = Form(""),
     end_raw: str = Form(""),
     duration_minutes: int = Form(0),
@@ -715,6 +722,16 @@ def update_appointment(
     if appointment.is_manual_task and status not in {"scheduled", "closed", "notscheduled"}:
         return handle_error("Vælg en gyldig status for VVS-opgaven")
 
+    changed_on = None
+    if status == "completed":
+        raw_date = actual_changed_on if isinstance(actual_changed_on, str) else ""
+        try:
+            changed_on = date.fromisoformat(raw_date) if raw_date else appointment.meter_changed_on
+            if changed_on > copenhagen_today():
+                raise ValueError
+        except ValueError:
+            return handle_error("Vælg en gyldig skiftedato, som ikke ligger i fremtiden")
+
     contractor = db.query(models.User).filter(models.User.id == contractor_id).first()
     if not contractor or contractor.role != models.UserRole.VVS:
         return handle_error("Ugyldig VVS")
@@ -770,6 +787,7 @@ def update_appointment(
             return handle_error("VVS er allerede planlagt på dette tidspunkt")
 
     appointment.status = status_map[status]
+    appointment.actual_changed_on = changed_on
     appointment.contractor_id = contractor.id
     appointment.starts_at = starts_at
     appointment.ends_at = ends_at
@@ -825,6 +843,10 @@ def complete_remaining(
         flash(request, "Vælg en gyldig arbejdsdag", "error")
         return RedirectResponse("/admin/appointments", status_code=303)
 
+    if selected_date > copenhagen_today():
+        flash(request, "En fremtidig arbejdsdag kan ikke markeres som skiftet. Angiv faktisk skiftedato på hver opgave", "error")
+        return RedirectResponse(f"/admin/appointments?date_query={selected_date.isoformat()}", status_code=303)
+
     appointments = (
         db.query(models.Appointment)
         .filter(
@@ -843,6 +865,7 @@ def complete_remaining(
     changed_at = utc_now()
     for appointment in appointments:
         appointment.status = models.AppointmentStatus.COMPLETED
+        appointment.actual_changed_on = selected_date
         appointment.changed_date = changed_at
         appointment.changed_by_user_id = user.id
     db.commit()
@@ -869,6 +892,7 @@ def mark_completed(
     date_query: str | None = Form(None),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+    actual_changed_on: str = Form(""),
 ):
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
@@ -877,12 +901,23 @@ def mark_completed(
     if appointment.is_manual_task:
         raise HTTPException(status_code=400, detail="VVS-opgaver kan ikke markeres som målerskift")
 
+    # Keep compatibility with old forms; the new form always sends an explicit date.
+    raw_date = actual_changed_on if isinstance(actual_changed_on, str) else ""
+    try:
+        changed_on = date.fromisoformat(raw_date) if raw_date else appointment.meter_changed_on
+        if changed_on > copenhagen_today():
+            raise ValueError
+    except ValueError:
+        flash(request, "Vælg en gyldig skiftedato, som ikke ligger i fremtiden", "error")
+        return RedirectResponse(f"/admin/appointments?date_query={appointment.starts_at.date().isoformat()}", status_code=303)
+
     photos = (
         db.query(models.AppointmentPhoto)
         .filter(models.AppointmentPhoto.appointment_id == appointment.id)
         .all()
     )
     appointment.status = models.AppointmentStatus.COMPLETED
+    appointment.actual_changed_on = changed_on
     appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.commit()
@@ -891,7 +926,7 @@ def mark_completed(
     if date_query:
         redirect_target = f"/admin/appointments?date_query={date_query}"
 
-    message = "Opgave markeret som skiftet"
+    message = f"Måler markeret som skiftet {changed_on:%d/%m/%Y}"
     if not photo_complete(photos):
         message += " – opgaven mangler stadig fotos"
     flash(request, message, "success")

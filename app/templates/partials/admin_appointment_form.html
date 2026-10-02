@@ -36,6 +36,9 @@
                     <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>{% endif %}
                 </select>
             </label>
+            {% if not appointment.is_manual_task %}
+                <label>Faktisk skiftedato (bruges ved status Skiftet)<input type="date" name="actual_changed_on" value="{{ appointment.meter_changed_on.isoformat() }}" /></label>
+            {% endif %}
             <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
             <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
             <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="{{ 840 if appointment.is_manual_task and appointment.time_window != 'exact' else 480 }}" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>
@@ -87,6 +90,9 @@
                 <option value="needs_reschedule" {% if appointment.status.value|lower == 'needs_reschedule' %}selected{% endif %}>Behov for ny dato</option>{% endif %}
             </select>
         </label>
+        {% if not appointment.is_manual_task %}
+            <label>Faktisk skiftedato (bruges ved status Skiftet)<input type="date" name="actual_changed_on" value="{{ appointment.meter_changed_on.isoformat() }}" /></label>
+        {% endif %}
         <label>Start<input type="time" name="start_raw" value="{{ appointment.starts_at.strftime('%H:%M') }}" required data-duration-start /></label>
         <label>Slut<input type="time" name="end_raw" value="{{ appointment.ends_at.strftime('%H:%M') }}" required data-duration-end /></label>
         <label>Planlagt varighed (min.)<input type="number" name="duration_minutes" min="5" max="{{ 840 if appointment.is_manual_task and appointment.time_window != 'exact' else 480 }}" step="5" value="{{ duration_minutes }}" required data-duration-minutes /></label>

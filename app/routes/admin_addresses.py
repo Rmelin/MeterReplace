@@ -265,7 +265,7 @@ def status_label_and_key(
     if not appointment:
         return "Ikke planlagt", "unplanned"
     status = appointment.status
-    status_date = format_status_date(appointment.starts_at, current_year)
+    status_date = format_status_date(appointment.meter_changed_on if status == models.AppointmentStatus.COMPLETED else appointment.starts_at, current_year)
     if status == models.AppointmentStatus.COMPLETED:
         return "Skiftet " + status_date, "completed"
     if status == models.AppointmentStatus.CLOSED:
@@ -350,7 +350,7 @@ def list_addresses(
             if appointment.address_id in status_map:
                 continue
             status_status_map[appointment.address_id] = appointment.status
-            status_date = format_status_date(appointment.starts_at, current_year)
+            status_date = format_status_date(appointment.meter_changed_on if appointment.status == models.AppointmentStatus.COMPLETED else appointment.starts_at, current_year)
             if appointment.status == models.AppointmentStatus.COMPLETED:
                 status_map[appointment.address_id] = "Skiftet " + status_date
             elif appointment.status == models.AppointmentStatus.CLOSED:

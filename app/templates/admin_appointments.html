@@ -168,7 +168,7 @@
                 <p class="hint">{{ remaining_address_count }} adresse{% if remaining_address_count != 1 %}r{% endif %} mangler en status.</p>
             {% endif %}
         </div>
-        {% if remaining_address_count and selected_date %}
+        {% if remaining_address_count and selected_date and selected_date <= today %}
             <form method="post" action="/admin/appointments/complete-remaining" onsubmit="return confirm('Markér alle {{ remaining_address_count }} resterende adresser som skiftet? Opgaver med en anden status ændres ikke.');">
                 <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                 <input type="hidden" name="date_query" value="{{ selected_date.isoformat() }}" />
@@ -198,11 +198,10 @@
                     </form>
                 {% elif address %}
                     <div class="vvs-task-primary-actions">
-                        <form method="post" action="/admin/appointments/{{ appointment.id }}/complete" class="vvs-task-quick-form">
-                            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
-                            <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
-                            <button type="submit" class="primary-button vvs-task-action-button">Skiftet</button>
-                        </form>
+                        <details class="card">
+                            <summary>Skiftet · vælg skiftedato</summary>
+                            {% include "partials/meter_completion_form.html" %}
+                        </details>
                         <form method="post" action="/admin/appointments/{{ appointment.id }}/not-home" class="vvs-task-quick-form">
                             <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
                             <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
@@ -371,6 +370,13 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint">Status: {% if appointment.is_manual_task and appointment.status.value == 'CLOSED' %}Udført{% else %}{{ status_labels.get(appointment.status, appointment.status.value) }}{% endif %}</p>
+                {% if appointment.status.value == 'COMPLETED' and not appointment.is_manual_task %}
+                    <p><strong>Skiftet {{ appointment.meter_changed_on.strftime('%d/%m/%Y') }}</strong>{% if appointment.meter_changed_on != appointment.starts_at.date() %} · Planlagt {{ appointment.starts_at.strftime('%d/%m/%Y') }}{% endif %}</p>
+                    <details>
+                        <summary>Ret skiftedato</summary>
+                        {% include "partials/meter_completion_form.html" %}
+                    </details>
+                {% endif %}
                 {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave · {% if appointment.time_window == 'all_day' %}Hele dagen{% elif appointment.time_window == 'morning' %}Formiddag{% elif appointment.time_window == 'afternoon' %}Eftermiddag{% else %}Kl. {{ appointment.starts_at.strftime('%H:%M') }}{% endif %}</span>{% endif %}
                 {% if appointment.notes %}
                     <div class="task-note-banner">
