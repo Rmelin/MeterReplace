@@ -220,7 +220,7 @@ def export_completed(
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for appointment, address, vvs_user in rows:
-            changed_date = appointment.starts_at.date().isoformat()
+            changed_date = appointment.meter_changed_on.isoformat()
             photo_lists = photo_map.get(appointment.id, {"both": [], "new": [], "old": []})
             writer.writerow(
                 [

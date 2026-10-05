@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import models
@@ -31,8 +31,13 @@ def day_agenda(db: Session, day: date, drafts=()) -> list[dict]:
         .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .join(models.User, models.User.id == models.Appointment.contractor_id)
         .filter(
-            models.Appointment.starts_at >= start,
-            models.Appointment.starts_at < start + timedelta(days=1),
+            or_(
+                (models.Appointment.starts_at >= start)
+                & (models.Appointment.starts_at < start + timedelta(days=1)),
+                (models.Appointment.status == models.AppointmentStatus.COMPLETED)
+                & (models.Appointment.actual_changed_on == day)
+                & models.Appointment.is_manual_task.is_(False),
+            ),
             models.Appointment.status.in_(list(STATUS_LABELS)),
         )
         .all()
@@ -48,6 +53,8 @@ def day_agenda(db: Session, day: date, drafts=()) -> list[dict]:
             "kind": "VVS-opgave" if appointment.is_manual_task else "Målerskift",
             "description": appointment.notes if appointment.is_manual_task else None,
             "note": appointment.notes,
+            "changed_on": appointment.meter_changed_on if appointment.status == models.AppointmentStatus.COMPLETED and not appointment.is_manual_task else None,
+            "planned_on": appointment.starts_at.date(),
             "buffer_note": address.buffer_note if address and address.buffer_flag and not appointment.is_manual_task else None,
             "group": agenda_group(window, appointment.starts_at, bool(address and address.buffer_flag and not appointment.is_manual_task)),
             "is_done": appointment.status in {models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED, models.AppointmentStatus.NOT_HOME},
