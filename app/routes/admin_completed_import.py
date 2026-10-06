@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse, Response
 
 from app import models
+from app.meter_completion import cancel_future_meter_visits
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
 from app.timeutils import utc_now
@@ -393,6 +394,7 @@ def import_completed(
 
         if status_value == "closed":
             ensure_closed(appointment, user)
+        cancel_future_meter_visits(db, appointment, user.id)
         created += 1
 
     db.commit()

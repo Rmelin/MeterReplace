@@ -446,6 +446,9 @@
                     </div>
                 {% endif %}
                 <p class="hint">{{ period_labels.get(appointment.id) }}</p>
+                {% if not appointment.is_manual_task and appointment.status.value in ['COMPLETED', 'CLOSED'] %}
+                    <p class="hint">Skiftet {{ appointment.meter_changed_on.strftime('%d/%m/%Y') }}{% if appointment.meter_changed_on != appointment.starts_at.date() %} · Oprindeligt planlagt {{ appointment.starts_at.strftime('%d/%m/%Y') }}{% endif %}</p>
+                {% endif %}
                 <p class="hint"><strong>Status: {% if appointment.is_manual_task and appointment.status.value == 'CLOSED' %}Udført{% else %}{{ status_labels.get(appointment.status, appointment.status.value) }}{% endif %}</strong></p>
                 {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave</span>{% endif %}
                 {% if appointment.is_manual_task and address %}

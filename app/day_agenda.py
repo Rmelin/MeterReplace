@@ -1,9 +1,10 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import models
+from app.appointment_dates import work_date
 
 
 STATUS_LABELS = {
@@ -25,19 +26,12 @@ def agenda_group(window: str, starts_at: datetime, is_meter_pit: bool) -> str:
 
 
 def day_agenda(db: Session, day: date, drafts=()) -> list[dict]:
-    start = datetime.combine(day, time.min)
     rows = (
         db.query(models.Appointment, models.Address, models.User)
         .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
         .join(models.User, models.User.id == models.Appointment.contractor_id)
         .filter(
-            or_(
-                (models.Appointment.starts_at >= start)
-                & (models.Appointment.starts_at < start + timedelta(days=1)),
-                (models.Appointment.status == models.AppointmentStatus.COMPLETED)
-                & (models.Appointment.actual_changed_on == day)
-                & models.Appointment.is_manual_task.is_(False),
-            ),
+            work_date() == day.isoformat(),
             models.Appointment.status.in_(list(STATUS_LABELS)),
         )
         .all()
@@ -53,7 +47,7 @@ def day_agenda(db: Session, day: date, drafts=()) -> list[dict]:
             "kind": "VVS-opgave" if appointment.is_manual_task else "Målerskift",
             "description": appointment.notes if appointment.is_manual_task else None,
             "note": appointment.notes,
-            "changed_on": appointment.meter_changed_on if appointment.status == models.AppointmentStatus.COMPLETED and not appointment.is_manual_task else None,
+            "changed_on": appointment.meter_changed_on if appointment.status in {models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED} and not appointment.is_manual_task else None,
             "planned_on": appointment.starts_at.date(),
             "buffer_note": address.buffer_note if address and address.buffer_flag and not appointment.is_manual_task else None,
             "group": agenda_group(window, appointment.starts_at, bool(address and address.buffer_flag and not appointment.is_manual_task)),

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
-from sqlalchemy import or_
 
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import models
@@ -16,6 +16,17 @@ SLOT_OCCUPYING_STATUSES = {
     models.AppointmentStatus.CLOSED,
     models.AppointmentStatus.NOT_HOME,
 }
+
+
+def occupies_slot():
+    # A finished meter visit carried out on another date must not block its old
+    # planned time, including after the case is closed.
+    return models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES) & or_(
+        models.Appointment.is_manual_task.is_(True),
+        models.Appointment.status != models.AppointmentStatus.CLOSED,
+        models.Appointment.actual_changed_on.is_(None),
+        models.Appointment.actual_changed_on == func.date(models.Appointment.starts_at),
+    )
 
 
 def availability_slots(
@@ -58,7 +69,7 @@ def occupied_slots_by_contractor(
     appointments = (
         db.query(models.Appointment)
         .filter(
-            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            occupies_slot(),
             or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at <= day_end,
             models.Appointment.ends_at >= day_start,

@@ -17,7 +17,7 @@ from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
     PLANNING_DAY_START,
-    SLOT_OCCUPYING_STATUSES,
+    occupies_slot,
     availability_slots,
     build_slots,
 )
@@ -351,7 +351,7 @@ def has_conflict(db: Session, contractor_id: int, starts_at: datetime, ends_at: 
         db.query(models.Appointment)
         .filter(
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            occupies_slot(),
             or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
@@ -820,7 +820,7 @@ def manual_planning_form(
             .join(models.Address, models.Address.id == models.Appointment.address_id)
             .filter(
                 models.Appointment.contractor_id.in_([user.id for user in vvs_users]),
-                models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+                occupies_slot(),
                 models.Appointment.starts_at >= datetime.combine(plan_date, time.min),
                 models.Appointment.starts_at < datetime.combine(plan_date, time.max),
             )

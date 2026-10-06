@@ -15,6 +15,7 @@ Denne side beskriver de statusser og afledte tællinger systemet bruger.
 | `CLOSED` | Sagen er afsluttet |
 | `NOT_HOME` | Beboer var ikke hjemme |
 | `NEEDS_RESCHEDULE` | Der er behov for ny dato |
+| `CANCELLED` | Måleraftalen er bortfaldet, fordi måleren allerede er skiftet |
 
 ## Vigtige afgrænsninger
 
@@ -57,7 +58,12 @@ Vigtigt:
 
 ## Arbejdsdage status
 
-Dashboardet grupperer arbejdsdage ud fra `vvs_availability.date`.
+Dashboardet viser registrerede arbejdsdage samt faktiske skiftedage.
+Måleraftaler med `COMPLETED` eller `CLOSED` tælles på `actual_changed_on`,
+med den oprindelige plandato som fallback for ældre rækker uden skiftedato.
+Andre aftaler og manuelle VVS-opgaver tælles på deres planlagte dato.
+`CANCELLED` tælles ikke med i dagens arbejde. Oprindelige datoer og bortfaldne
+aftaler bevares i adressehistorikken.
 
 For hver dag beregnes blandt andet:
 

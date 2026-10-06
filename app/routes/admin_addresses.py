@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
@@ -23,7 +23,7 @@ from app.meter_completion import complete_meter
 from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
-from app.planning_slots import SLOT_OCCUPYING_STATUSES
+from app.planning_slots import occupies_slot
 from app.workday_status import build_workday_status
 from app.timeutils import copenhagen_today, utc_now
 
@@ -205,7 +205,7 @@ def has_appointment_conflict(
 ) -> bool:
     query = db.query(models.Appointment).filter(
         models.Appointment.contractor_id == contractor_id,
-        models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+        occupies_slot(),
         models.Appointment.starts_at < ends_at,
         models.Appointment.ends_at > starts_at,
     )
@@ -266,7 +266,7 @@ def status_label_and_key(
     if not appointment:
         return "Ikke planlagt", "unplanned"
     status = appointment.status
-    status_date = format_status_date(appointment.meter_changed_on if status == models.AppointmentStatus.COMPLETED else appointment.starts_at, current_year)
+    status_date = format_status_date(appointment.meter_changed_on if status in {models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED} else appointment.starts_at, current_year)
     if status == models.AppointmentStatus.COMPLETED:
         return "Skiftet " + status_date, "completed"
     if status == models.AppointmentStatus.CLOSED:
@@ -351,7 +351,7 @@ def list_addresses(
             if appointment.address_id in status_map:
                 continue
             status_status_map[appointment.address_id] = appointment.status
-            status_date = format_status_date(appointment.meter_changed_on if appointment.status == models.AppointmentStatus.COMPLETED else appointment.starts_at, current_year)
+            status_date = format_status_date(appointment.meter_changed_on if appointment.status in {models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED} else appointment.starts_at, current_year)
             if appointment.status == models.AppointmentStatus.COMPLETED:
                 status_map[appointment.address_id] = "Skiftet " + status_date
             elif appointment.status == models.AppointmentStatus.CLOSED:
@@ -674,6 +674,14 @@ def edit_address_form(
             "flashes": consume_flashes(request),
             "unavailable_periods": periods,
             "not_home_history": not_home_history,
+            "meter_history": db.query(models.Appointment).filter(
+                models.Appointment.address_id == address_id,
+                models.Appointment.is_manual_task.is_(False),
+                models.Appointment.status.in_([
+                    models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED,
+                    models.AppointmentStatus.CANCELLED,
+                ]),
+            ).order_by(models.Appointment.starts_at.desc()).all(),
             "letter_available": bool(letter_appointment),
             "photos": photos,
             "photo_labels": PHOTO_LABELS,
@@ -729,8 +737,11 @@ def complete_address(
     )
     appointment = (
         db.query(models.Appointment)
-        .filter(models.Appointment.address_id == address_id, models.Appointment.is_manual_task.is_(False))
-        .order_by(models.Appointment.starts_at.desc(), models.Appointment.id.desc())
+        .filter(models.Appointment.address_id == address_id, models.Appointment.is_manual_task.is_(False), models.Appointment.status != models.AppointmentStatus.CANCELLED)
+        .order_by(
+            case((models.Appointment.status.in_([models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED]), 0), else_=1),
+            models.Appointment.starts_at.desc(), models.Appointment.id.desc(),
+        )
         .first()
     )
     if appointment and appointment.status == models.AppointmentStatus.CLOSED:

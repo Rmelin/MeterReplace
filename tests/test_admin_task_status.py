@@ -72,7 +72,7 @@ class AdminTaskStatusTests(unittest.TestCase):
             }
         )
 
-    def test_actual_change_date_preserves_plan_and_appears_on_both_days(self) -> None:
+    def test_actual_change_date_preserves_history_but_only_appears_on_change_day(self) -> None:
         self.appointment.starts_at = datetime(2026, 10, 8, 8)
         self.appointment.ends_at = datetime(2026, 10, 8, 8, 30)
         self.db.commit()
@@ -86,17 +86,17 @@ class AdminTaskStatusTests(unittest.TestCase):
         self.assertEqual(self.appointment.starts_at.date(), date(2026, 10, 8))
         self.assertEqual(self.appointment.actual_changed_on, date(2026, 10, 1))
         self.assertEqual(status_label_and_key(self.appointment, 2026, False), ("Skiftet 01/10", "completed"))
-        for day in (date(2026, 10, 1), date(2026, 10, 8)):
-            agenda = day_agenda(self.db, day)
-            self.assertEqual(len(agenda), 1)
-            self.assertEqual(agenda[0]["changed_on"], date(2026, 10, 1))
-            self.assertEqual(agenda[0]["planned_on"], date(2026, 10, 8))
+        self.assertEqual(day_agenda(self.db, date(2026, 10, 8)), [])
+        agenda = day_agenda(self.db, date(2026, 10, 1))
+        self.assertEqual(len(agenda), 1)
+        self.assertEqual(agenda[0]["changed_on"], date(2026, 10, 1))
+        self.assertEqual(agenda[0]["planned_on"], date(2026, 10, 8))
         request = self.request("overview")
         request.scope["app"] = SimpleNamespace(state=SimpleNamespace(templates=Jinja2Templates(directory="app/templates")))
         rendered = appointment_overview(request, date_query="2026-10-01", db=self.db, user=self.admin)
         html = rendered.body.decode()
         self.assertIn("Skiftet 01/10/2026", html)
-        self.assertIn("Planlagt 08/10/2026", html)
+        self.assertIn("Oprindeligt planlagt 08/10/2026", html)
         self.assertIn("Ret skiftedato", html)
 
     def test_invalid_actual_date_does_not_complete_visit(self) -> None:

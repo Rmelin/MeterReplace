@@ -4,7 +4,11 @@
     <div>
         <h1>Besked til os</h1>
         <p class="hint">Adresse: {{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
-        {% if appointment %}
+        {% if appointment and appointment.status.value == 'CANCELLED' %}
+            <p class="hint">Aftalen er bortfaldet, fordi måleren allerede er skiftet. Du skal ikke afvente det planlagte besøg.</p>
+        {% elif appointment and appointment.status.value in ['COMPLETED', 'CLOSED'] and not appointment.is_manual_task %}
+            <p class="hint">Måleren er skiftet {{ appointment.meter_changed_on.strftime('%d/%m/%Y') }}.</p>
+        {% elif appointment %}
             <p class="hint">Planlagt tid: {% if appointment.starts_at.hour < 12 %}Formiddag (08:00-12:00){% else %}Eftermiddag (12:00-16:00){% endif %}</p>
         {% endif %}
     </div>

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.appointment_dates import work_date
 from app.meter_completion import complete_meter, has_reserved_meter
 from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
@@ -20,7 +21,7 @@ from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
     PLANNING_DAY_START,
-    SLOT_OCCUPYING_STATUSES,
+    occupies_slot,
 )
 from app.workday_status import build_workday_status
 from app.timeutils import utc_now, copenhagen_today
@@ -109,12 +110,12 @@ def availability_dates(db: Session) -> list[date]:
         .order_by(models.VvsAvailability.date)
         .all()
     )
-    completed_dates = db.query(models.Appointment.actual_changed_on).filter(
-        models.Appointment.status == models.AppointmentStatus.COMPLETED,
-        models.Appointment.actual_changed_on.isnot(None),
+    completed_dates = db.query(work_date()).filter(
+        models.Appointment.status.in_([models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED]),
         models.Appointment.is_manual_task.is_(False),
     ).distinct().all()
-    return sorted({row[0] for row in rows + completed_dates})
+    return sorted({row[0] for row in rows} | {date.fromisoformat(str(row[0])) for row in completed_dates})
+
 
 
 def closest_date(dates: list[date]) -> date | None:
@@ -189,7 +190,7 @@ def has_conflict(
         .filter(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            occupies_slot(),
             or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
@@ -209,7 +210,7 @@ def has_conflict_for_user(
         db.query(models.Appointment)
         .filter(
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            occupies_slot(),
             or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
@@ -258,12 +259,7 @@ def appointment_overview(
                         models.AppointmentStatus.NEEDS_RESCHEDULE,
                     ]
                 ),
-                or_(
-                    func.date(models.Appointment.starts_at) == selected_date,
-                    (models.Appointment.status == models.AppointmentStatus.COMPLETED)
-                    & (models.Appointment.actual_changed_on == selected_date)
-                    & models.Appointment.is_manual_task.is_(False),
-                ),
+                work_date() == selected_date.isoformat(),
             )
             .order_by(models.Appointment.starts_at)
             .all()
@@ -496,6 +492,8 @@ def upload_photo(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     redirect_target = "/admin/appointments"
     if redirect and redirect.startswith("/"):
@@ -591,6 +589,8 @@ def update_appointment_note(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     appointment.notes = note.strip() or None
     appointment.changed_date = utc_now()
@@ -688,6 +688,8 @@ def update_appointment(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     def inline_error(messages: list[str]):
         if not inline:
@@ -832,6 +834,8 @@ def close_appointment(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     appointment.status = models.AppointmentStatus.CLOSED
     appointment.changed_date = utc_now()
@@ -880,14 +884,15 @@ def complete_remaining(
     )
     try:
         for appointment in appointments:
-            complete_meter(db, appointment, user.id, selected_date)
+            if appointment.status != models.AppointmentStatus.CANCELLED:
+                complete_meter(db, appointment, user.id, selected_date)
     except ValueError as exc:
         db.rollback()
         flash(request, str(exc), "error")
         return RedirectResponse(f"/admin/appointments?date_query={selected_date.isoformat()}", status_code=303)
     db.commit()
 
-    count = len(appointments)
+    count = sum(appointment.status == models.AppointmentStatus.COMPLETED for appointment in appointments)
     if count:
         flash(
             request,
@@ -914,6 +919,8 @@ def mark_completed(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     if appointment.is_manual_task:
         raise HTTPException(status_code=400, detail="VVS-opgaver kan ikke markeres som målerskift")
@@ -970,6 +977,8 @@ def keep_scheduled(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
     if appointment.status != models.AppointmentStatus.NEEDS_RESCHEDULE:
         flash(request, "Opgaven afventer ikke en ny tid", "error")
         return RedirectResponse(redirect_target, status_code=303)
@@ -1036,6 +1045,8 @@ def mark_not_home(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     appointment.status = models.AppointmentStatus.NOT_HOME
     appointment.changed_date = utc_now()
@@ -1065,6 +1076,8 @@ def mark_blocked(
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
     if appointment.address_id is None:
         flash(request, "Opgave uden adresse kan ikke markeres som fejl ved måler", "error")
         return RedirectResponse(redirect_target, status_code=303)

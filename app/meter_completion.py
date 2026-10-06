@@ -59,6 +59,8 @@ def complete_meter(
 ) -> None:
     if appointment.is_manual_task or appointment.address_id is None:
         raise ValueError("Vælg en adresse for at registrere målerskift")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise ValueError("Aftalen er bortfaldet, fordi måleren allerede er skiftet")
     # Acquire SQLite's writer lock and reload before deciding whether to deduct.
     # A second request may have loaded this appointment before the first committed.
     db.flush()
@@ -67,22 +69,38 @@ def complete_meter(
         synchronize_session=False,
     )
     db.refresh(appointment)
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise ValueError("Aftalen er bortfaldet, fordi måleren allerede er skiftet")
     if not has_reserved_meter(appointment, db):
-        stock = db.query(
-            func.coalesce(func.sum(models.StockMovement.quantity), 0)
-        ).scalar()
-        if stock <= 0:
-            raise ValueError(
-                "Målerskift kan ikke registreres: der er ingen måler på lager"
-            )
-        db.add(
-            models.StockMovement(
-                movement_type=models.InventoryMovementType.RESERVE,
-                quantity=-1,
-                created_by_user_id=user_id,
-                note=f"Målerskift, aftale {appointment.id}",
-            )
+        reserved_visit = next(
+            (
+                visit
+                for visit in _pending_meter_visits(db, appointment, changed_on)
+                if has_reserved_meter(visit, db)
+            ),
+            None,
         )
+        if reserved_visit:
+            # Reuse the meter already reserved for this address, even if free
+            # stock is empty. This reservation is used, so cancellation must
+            # not release it back to stock.
+            reserved_visit.stock_reserved = False
+        else:
+            stock = db.query(
+                func.coalesce(func.sum(models.StockMovement.quantity), 0)
+            ).scalar()
+            if stock <= 0:
+                raise ValueError(
+                    "Målerskift kan ikke registreres: der er ingen måler på lager"
+                )
+            db.add(
+                models.StockMovement(
+                    movement_type=models.InventoryMovementType.RESERVE,
+                    quantity=-1,
+                    created_by_user_id=user_id,
+                    note=f"Målerskift, aftale {appointment.id}",
+                )
+            )
     appointment.stock_reserved = True
     appointment.status = models.AppointmentStatus.COMPLETED
     appointment.actual_changed_on = changed_on
@@ -90,3 +108,52 @@ def complete_meter(
     appointment.changed_by_user_id = user_id
     address = db.get(models.Address, appointment.address_id)
     address.blocked_reason = None
+    cancel_future_meter_visits(db, appointment, user_id)
+
+
+def cancel_future_meter_visits(
+    db: Session, completed: models.Appointment, user_id: int | None
+) -> None:
+    """Retain redundant plans as history and return their unused reservations."""
+    db.flush()
+    pending = _pending_meter_visits(db, completed, completed.meter_changed_on)
+    for appointment in pending:
+        if has_reserved_meter(appointment, db):
+            db.add(
+                models.StockMovement(
+                    movement_type=models.InventoryMovementType.RELEASE,
+                    quantity=1,
+                    created_by_user_id=user_id,
+                    note=f"Bortfaldet aftale {appointment.id}: måler skiftet, aftale {completed.id}",
+                )
+            )
+        appointment.stock_reserved = False
+        appointment.superseded_by_appointment_id = completed.id
+        appointment.status = models.AppointmentStatus.CANCELLED
+        appointment.letter_required = False
+        appointment.changed_date = utc_now()
+        appointment.changed_by_user_id = user_id
+
+
+def _pending_meter_visits(
+    db: Session, appointment: models.Appointment, changed_on: date
+):
+    return (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.address_id == appointment.address_id,
+            models.Appointment.id != appointment.id,
+            models.Appointment.is_manual_task.is_(False),
+            models.Appointment.status.in_(
+                [
+                    models.AppointmentStatus.SCHEDULED,
+                    models.AppointmentStatus.INFORMED,
+                    models.AppointmentStatus.NEEDS_RESCHEDULE,
+                    models.AppointmentStatus.NOT_SCHEDULED,
+                ]
+            ),
+            func.date(models.Appointment.starts_at) >= changed_on.isoformat(),
+        )
+        .populate_existing()
+        .all()
+    )

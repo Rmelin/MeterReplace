@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta
+from datetime import date, datetime
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import models
+from app.appointment_dates import work_date
 from app.planning_slots import availability_slots, build_slots
 
 COMPLETED_STATUSES = {models.AppointmentStatus.COMPLETED}
@@ -34,89 +35,54 @@ def build_workday_status(db: Session) -> dict[str, object]:
         .order_by(models.VvsAvailability.date.desc())
         .all()
     ]
+    changed_dates = (
+        db.query(work_date())
+        .filter(
+            models.Appointment.is_manual_task.is_(False),
+            models.Appointment.status.in_(
+                [models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED]
+            ),
+        )
+        .distinct()
+        .all()
+    )
+    availability_dates = sorted(
+        set(availability_dates)
+        | {date.fromisoformat(str(row[0])) for row in changed_dates},
+        reverse=True,
+    )
     today = datetime.now().date()
     day_status = []
     for day in availability_dates:
         slot_total = len(availability_slots(db, day))
         free_slot_count = len(build_slots(db, day))
-        day_start = datetime.combine(day, time.min)
-        day_end = day_start + timedelta(days=1)
-        total_count = (
-            db.query(func.count(models.Appointment.id))
+        counts = dict(
+            db.query(models.Appointment.status, func.count(models.Appointment.id))
             .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
+                work_date() == day.isoformat(),
+                models.Appointment.status != models.AppointmentStatus.CANCELLED,
             )
-            .scalar()
-            or 0
+            .group_by(models.Appointment.status)
+            .all()
         )
-        planned_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(PLANNED_STATUSES),
-            )
-            .scalar()
-            or 0
+        total_count = sum(counts.values())
+        planned_count = counts.get(models.AppointmentStatus.SCHEDULED, 0)
+        completed_count = counts.get(models.AppointmentStatus.COMPLETED, 0)
+        closed_count = counts.get(models.AppointmentStatus.CLOSED, 0)
+        informed_count = counts.get(models.AppointmentStatus.INFORMED, 0)
+        needs_reschedule_count = counts.get(
+            models.AppointmentStatus.NEEDS_RESCHEDULE, 0
         )
-        completed_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(COMPLETED_STATUSES),
-            )
-            .scalar()
-            or 0
-        )
-        closed_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(CLOSED_STATUSES),
-            )
-            .scalar()
-            or 0
-        )
-        informed_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status.in_(INFORMED_STATUSES),
-            )
-            .scalar()
-            or 0
-        )
-        needs_reschedule_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status == models.AppointmentStatus.NEEDS_RESCHEDULE,
-            )
-            .scalar()
-            or 0
-        )
-        day_not_home_count = (
-            db.query(func.count(models.Appointment.id))
-            .filter(
-                models.Appointment.starts_at >= day_start,
-                models.Appointment.starts_at < day_end,
-                models.Appointment.status == models.AppointmentStatus.NOT_HOME,
-            )
-            .scalar()
-            or 0
-        )
+        day_not_home_count = counts.get(models.AppointmentStatus.NOT_HOME, 0)
         done_count = completed_count + closed_count
         remaining_count = max(total_count - done_count, 0)
         completion_pct = round((done_count / total_count) * 100) if total_count else 0
         booked_count = planned_count + informed_count
         day_offset = (day - today).days
         display_total = slot_total if day_offset > 0 else total_count
-        display_free_slots = max(slot_total - booked_count, 0) if day_offset > 0 else free_slot_count
+        display_free_slots = (
+            max(slot_total - booked_count, 0) if day_offset > 0 else free_slot_count
+        )
         booking_pct = round((booked_count / slot_total) * 100) if slot_total else 0
         if day_offset > 0:
             state_key = "upcoming"

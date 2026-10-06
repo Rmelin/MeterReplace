@@ -118,7 +118,7 @@ def import_register(
 
         appointment = (
             db.query(models.Appointment)
-            .filter(models.Appointment.address_id == address.id)
+            .filter(models.Appointment.address_id == address.id, models.Appointment.status != models.AppointmentStatus.CANCELLED)
             .order_by(models.Appointment.starts_at.desc())
             .first()
         )
