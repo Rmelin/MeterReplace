@@ -190,6 +190,7 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m') }} · {% if appointment.is_manual_task and appointment.time_window == 'all_day' %}Hele dagen{% elif appointment.is_manual_task and appointment.time_window == 'morning' %}Formiddag{% elif appointment.is_manual_task and appointment.time_window == 'afternoon' %}Eftermiddag{% else %}{{ appointment.starts_at.strftime('%H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}{% endif %}</p>
                 {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave</span>{% endif %}
+                {% if appointment.is_manual_task and address %}<a class="ghost-button" href="/admin/addresses/{{ address.id }}/edit">Registrér målerskift på adressen</a>{% endif %}
                 {% if appointment.is_manual_task %}
                     <form method="post" action="/admin/appointments/{{ appointment.id }}/close" class="vvs-task-quick-form">
                         <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
@@ -318,6 +319,9 @@
                 </div>
                 <p class="hint">VVS: {{ contractor.username }} · {{ appointment.starts_at.strftime('%d/%m %H:%M') }} – {{ appointment.ends_at.strftime('%H:%M') }}</p>
                 <p class="hint">Status: {% if appointment.is_manual_task and appointment.status.value == 'CLOSED' %}Udført{% else %}{{ status_labels.get(appointment.status, appointment.status.value) }}{% endif %}</p>
+                {% if address and not appointment.is_manual_task %}
+                    {% include "partials/meter_completion_form.html" %}
+                {% endif %}
                 {% if resident_response %}
                     <div class="resident-reschedule-banner resident-reschedule-{% if resident_response.answer == 'same_day' %}same-day{% else %}new-day{% endif %}">
                         <strong>

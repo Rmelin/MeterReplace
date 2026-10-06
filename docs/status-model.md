@@ -98,6 +98,7 @@ Veje markeres som:
 | `SCHEDULED` | `INFORMED` | Brev/PDF genereres |
 | `SCHEDULED` eller `INFORMED` | `NEEDS_RESCHEDULE` | Beboer anmoder om ny dato |
 | `SCHEDULED` eller `INFORMED` | `COMPLETED` | Arbejde udføres og registreres |
+| `NOT_SCHEDULED` eller `NEEDS_RESCHEDULE` | `COMPLETED` | Måler skiftet uden ny planlægning; træk fra lager hvis der ikke allerede er en reservation |
 | `COMPLETED` | `CLOSED` | Sag afsluttes |
 | `SCHEDULED` eller `INFORMED` | `NOT_HOME` | Beboer var ikke hjemme |
 

@@ -286,6 +286,7 @@ def resident_submit(
                 .update(
                     {
                         "status": models.AppointmentStatus.NEEDS_RESCHEDULE,
+                        "stock_reserved": False,
                         "changed_date": utc_now(),
                         "changed_by_user_id": None,
                     },

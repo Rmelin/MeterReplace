@@ -8,7 +8,7 @@ import time
 import unicodedata
 import urllib.parse
 import urllib.request
-from datetime import datetime, time as datetime_time, timedelta
+from datetime import date, datetime, time as datetime_time, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
@@ -19,12 +19,13 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.meter_completion import complete_meter
 from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import SLOT_OCCUPYING_STATUSES
 from app.workday_status import build_workday_status
-from app.timeutils import utc_now
+from app.timeutils import copenhagen_today, utc_now
 
 PHOTO_LABELS = {
     "both": "Begge målere",
@@ -681,6 +682,7 @@ def edit_address_form(
             "status_label": status_label,
             "status_key": status_key,
             "has_appointment": bool(latest_appointment),
+            "today": copenhagen_today(),
             "latest_appointment": latest_appointment,
             "latest_appointment_duration_minutes": latest_appointment_duration_minutes,
             "photos_complete": photos_complete,
@@ -689,6 +691,75 @@ def edit_address_form(
             "missing_photos": missing_photos,
         },
     )
+
+
+@router.post("/{address_id}/complete")
+def complete_address(
+    request: Request,
+    address_id: int,
+    contractor_id: int = Form(...),
+    actual_changed_on: str = Form(...),
+    old_meter_no: str = Form(""),
+    new_meter_no: str = Form(""),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.ADMIN, models.UserRole.USER)),
+):
+    address = db.get(models.Address, address_id)
+    if not address:
+        raise HTTPException(status_code=404, detail="Adresse ikke fundet")
+    target = f"/admin/addresses/{address_id}/edit"
+    contractor = db.get(models.User, contractor_id)
+    if not contractor or contractor.role != models.UserRole.VVS:
+        flash(request, "Vælg en gyldig VVS", "error")
+        return RedirectResponse(target, status_code=303)
+    try:
+        changed_on = date.fromisoformat(actual_changed_on)
+        if changed_on > copenhagen_today():
+            raise ValueError
+    except ValueError:
+        flash(request, "Vælg en gyldig skiftedato, som ikke ligger i fremtiden", "error")
+        return RedirectResponse(target, status_code=303)
+    if address.register_closed:
+        flash(request, "Adressen er allerede afsluttet", "error")
+        return RedirectResponse(target, status_code=303)
+    # SQLite serializes writers here, before checking for an existing meter visit.
+    # Two simultaneous submissions must not create two unplanned replacements.
+    db.query(models.Address).filter(models.Address.id == address_id).update(
+        {models.Address.updated_at: models.Address.updated_at}, synchronize_session=False
+    )
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.address_id == address_id, models.Appointment.is_manual_task.is_(False))
+        .order_by(models.Appointment.starts_at.desc(), models.Appointment.id.desc())
+        .first()
+    )
+    if appointment and appointment.status == models.AppointmentStatus.CLOSED:
+        flash(request, "Adressen er allerede afsluttet", "error")
+        return RedirectResponse(target, status_code=303)
+    if not appointment:
+        starts_at = datetime.combine(changed_on, datetime_time(8))
+        appointment = models.Appointment(
+            address_id=address_id, contractor_id=contractor_id,
+            starts_at=starts_at, ends_at=starts_at + timedelta(minutes=30),
+            status=models.AppointmentStatus.NOT_SCHEDULED, stock_reserved=False,
+            letter_required=False,
+        )
+        db.add(appointment)
+        db.flush()
+    try:
+        complete_meter(db, appointment, user.id, changed_on)
+    except ValueError as exc:
+        db.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse(target, status_code=303)
+    appointment.contractor_id = contractor_id
+    appointment.old_meter_no = old_meter_no.strip() or appointment.old_meter_no or address.old_meter_no
+    appointment.new_meter_no = new_meter_no.strip() or appointment.new_meter_no or address.new_meter_no
+    address.old_meter_no = appointment.old_meter_no
+    address.new_meter_no = appointment.new_meter_no
+    db.commit()
+    flash(request, f"Måler markeret som skiftet {changed_on:%d/%m/%Y} – manglende fotos kan tilføjes senere", "success")
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/{address_id}/edit/address")
@@ -1207,8 +1278,6 @@ def upload_address_photo(
         .order_by(models.Appointment.starts_at.desc())
         .first()
     )
-    previous_status = appointment.status if appointment else None
-    created_appointment = appointment is None
 
     allowed_types = {"both", "new", "old"}
     if photo_type not in allowed_types:
@@ -1273,6 +1342,7 @@ def upload_address_photo(
             starts_at=starts_at,
             ends_at=ends_at,
             status=models.AppointmentStatus.SCHEDULED,
+            stock_reserved=False,
             letter_required=not address.buffer_flag,
             changed_date=utc_now(),
             changed_by_user_id=user.id,
@@ -1324,6 +1394,14 @@ def upload_address_photo(
         appointment.new_meter_no = new_meter_value
         address.new_meter_no = new_meter_value
 
+    if photo_type == "both" or len(existing_photos) == 1:
+        try:
+            complete_meter(db, appointment, user.id, appointment.actual_changed_on or appointment.starts_at.date())
+        except ValueError as exc:
+            db.rollback()
+            flash(request, str(exc), "error")
+            return RedirectResponse(f"/admin/addresses/{address_id}/edit", status_code=303)
+
     file_path = save_photo(address, photo_type, file)
     with upload_transaction(db, UPLOAD_DIR / file_path):
         photo = models.AppointmentPhoto(
@@ -1338,19 +1416,6 @@ def upload_address_photo(
 
         updated_photos = existing_photos + [photo]
         if photo_complete(updated_photos):
-            should_reserve_stock = created_appointment or previous_status == models.AppointmentStatus.NEEDS_RESCHEDULE
-            if should_reserve_stock:
-                db.add(
-                    models.StockMovement(
-                        movement_type=models.InventoryMovementType.RESERVE,
-                        quantity=-1,
-                        created_by_user_id=user.id,
-                        note=f"Adresse-upload {address.street} {address.house_no}",
-                    )
-                )
-            appointment.status = models.AppointmentStatus.COMPLETED
-            appointment.changed_date = utc_now()
-            appointment.changed_by_user_id = user.id
             db.flush()
             success_message = "Foto uploadet og status sat til skiftet"
         else:

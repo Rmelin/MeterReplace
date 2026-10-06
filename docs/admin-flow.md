@@ -140,6 +140,25 @@ Her kan admin blandt andet:
 - uploade fotos
 - afslutte sager
 
+Fra adressens detaljeside kan admin vælge **Registrér målerskift**, VVS og
+faktisk skiftedato samt eventuelle målernumre. Det virker også for **Ikke planlagt**
+og **Behov for ny dato**, fx når VVS reparerer en stophane og samtidig skifter måleren.
+En eksisterende måleraftale genbruges, og dens planlagte dato bevares. Hvis der
+ikke findes en måleraftale, oprettes en registrering uden krav om forudgående
+planlægning eller arbejdsdag. Status bliver **Skiftet**, og adresseblokeringen fjernes.
+
+På dagslisten kan admin registrere skift direkte under **Behov for ny dato**.
+En manuel VVS-opgave med adresse har et link til adressens registrering.
+VVS kan bruge **Skiftet** under **Fejl ved måler** eller **Måler også skiftet** på
+sin egen manuelle opgave med adresse. Sidstnævnte registrerer målerskiftet separat;
+reparationsopgaven afsluttes fortsat med **Udført**. VVS-knapperne bruger dags dato.
+
+Registreringen trækker én måler fra lager, hvis opgaven ikke allerede har en
+reservation. En reservation fra planlægning genbruges; en reservation frigivet
+ved beboerens ønske om ny tid skal trækkes igen. Gentagne indsendelser og senere
+foto-upload trækker ikke en ekstra måler. Hvis der mangler lager til et nyt træk,
+afvises registreringen uden at ændre status eller lager. Fotos kan tilføjes senere.
+
 VVS har tilsvarende et separat arbejdsflow i `/vvs/tasks`.
 VVS kan markere en opgave som skiftet uden først at uploade fotos. Manglende
 eller ufuldstændige fotos markeres på opgaven og vises på admins side
@@ -189,7 +208,7 @@ Admin vedligeholder også:
 - brugere i `/admin/users`
 - vejprioritet i `/admin/street-priority`
 
-Lageret påvirkes både af planlægning og manuelle justeringer.
+Lageret påvirkes af planlægning, målerskift uden reservation, frigivelse ved ny tid og manuelle justeringer.
 
 ## 12. Følg status på dashboardet
 

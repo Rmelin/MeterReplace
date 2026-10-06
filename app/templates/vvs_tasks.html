@@ -248,6 +248,12 @@
                     {% endif %}
                 </div>
                 {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave</span>{% endif %}
+                {% if appointment.is_manual_task and address %}
+                <form method="post" action="/vvs/tasks/{{ appointment.id }}/complete-address" class="vvs-task-quick-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+                    <button type="submit" class="primary-button">Måler også skiftet</button>
+                </form>
+                {% endif %}
                 {% if appointment.notes %}
                     <div class="task-note-banner">
                         <span class="task-note-label">NOTE</span>
@@ -382,6 +388,11 @@
             <p class="hint">{{ period_labels.get(appointment.id) }}</p>
             <p class="hint"><strong>Fejl ved måler</strong></p>
             <div class="vvs-task-primary-actions">
+                <form method="post" action="/vvs/tasks/{{ appointment.id }}/complete" class="vvs-task-quick-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+                    <input type="hidden" name="date_query" value="{{ selected_date.isoformat() if selected_date else '' }}" />
+                    <button type="submit" class="primary-button">Skiftet</button>
+                </form>
                 <a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>
                 <form method="post" action="/vvs/tasks/{{ appointment.id }}/blocked/undo" class="vvs-task-quick-form">
                     <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
@@ -437,6 +448,12 @@
                 <p class="hint">{{ period_labels.get(appointment.id) }}</p>
                 <p class="hint"><strong>Status: {% if appointment.is_manual_task and appointment.status.value == 'CLOSED' %}Udført{% else %}{{ status_labels.get(appointment.status, appointment.status.value) }}{% endif %}</strong></p>
                 {% if appointment.is_manual_task %}<span class="task-flag">VVS-opgave</span>{% endif %}
+                {% if appointment.is_manual_task and address %}
+                <form method="post" action="/vvs/tasks/{{ appointment.id }}/complete-address" class="vvs-task-quick-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+                    <button type="submit" class="primary-button">Måler også skiftet</button>
+                </form>
+                {% endif %}
                 <div class="vvs-task-primary-actions">
                     {% if not appointment.is_manual_task %}<a class="ghost-button vvs-task-action-button" href="/vvs/tasks/{{ appointment.id }}/edit" data-inline-edit-trigger="{{ appointment.id }}">Mere</a>{% endif %}
                     {% if address and not appointment.is_manual_task and not photos_complete %}

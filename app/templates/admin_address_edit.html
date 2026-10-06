@@ -23,6 +23,30 @@
     </div>
 </section>
 
+{% if not address.register_closed and (not latest_appointment or latest_appointment.status.value != "CLOSED") %}
+<section class="card">
+    <h2>Registrér målerskift</h2>
+    <p class="hint">Kan også bruges efter reparation af stophane eller på en adresse, der ikke var planlagt. En måler trækkes fra lager, hvis den ikke allerede er reserveret. Fotos kan tilføjes senere.</p>
+    <form method="post" action="/admin/addresses/{{ address.id }}/complete" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <label>VVS
+            <select name="contractor_id" required>
+                <option value="">Vælg VVS</option>
+                {% for vvs_user in vvs_users %}
+                    <option value="{{ vvs_user.id }}" {% if latest_appointment and latest_appointment.contractor_id == vvs_user.id %}selected{% endif %}>{{ vvs_user.username }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Faktisk skiftedato<input type="date" name="actual_changed_on" value="{{ (latest_appointment.meter_changed_on if latest_appointment and latest_appointment.status.value == 'COMPLETED' else today).isoformat() }}" max="{{ today.isoformat() }}" required /></label>
+        <label>Gammel måler nr<input name="old_meter_no" value="{{ (latest_appointment.old_meter_no if latest_appointment else '') or address.old_meter_no or '' }}" /></label>
+        <label>Ny måler nr<input name="new_meter_no" value="{{ (latest_appointment.new_meter_no if latest_appointment else '') or address.new_meter_no or '' }}" /></label>
+        </div>
+        <button type="submit" class="primary-button">{{ 'Gem målerskift' if latest_appointment and latest_appointment.status.value == 'COMPLETED' else 'Skiftet' }}</button>
+    </form>
+</section>
+{% endif %}
+
 <div class="grid">
     <!-- Hovedinformation & Kontakt -->
     <section class="card">
