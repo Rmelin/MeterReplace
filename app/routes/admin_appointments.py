@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.meter_completion import complete_meter, has_reserved_meter
 from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
 from app.day_agenda import day_agenda
@@ -543,6 +544,14 @@ def upload_photo(
         flash(request, "Adresse ikke fundet", "error")
         return RedirectResponse(redirect_target, status_code=303)
 
+    if photo_type == "both" or len(existing_photos) == 1:
+        try:
+            complete_meter(db, appointment, user.id, appointment.actual_changed_on or appointment.starts_at.date())
+        except ValueError as exc:
+            db.rollback()
+            flash(request, str(exc), "error")
+            return RedirectResponse(redirect_target, status_code=303)
+
     file_path = save_photo(address, photo_type, file)
     with upload_transaction(db, UPLOAD_DIR / file_path):
         photo = models.AppointmentPhoto(
@@ -786,6 +795,13 @@ def update_appointment(
         if (not appointment.is_manual_task or appointment.time_window == "exact") and has_conflict(db, appointment.id, contractor.id, starts_at, ends_at):
             return handle_error("VVS er allerede planlagt på dette tidspunkt")
 
+    if status_map[status] == models.AppointmentStatus.COMPLETED:
+        try:
+            complete_meter(db, appointment, user.id, changed_on)
+        except ValueError as exc:
+            return handle_error(str(exc))
+    else:
+        appointment.stock_reserved = has_reserved_meter(appointment, db)
     appointment.status = status_map[status]
     appointment.actual_changed_on = changed_on
     appointment.contractor_id = contractor.id
@@ -862,12 +878,13 @@ def complete_remaining(
         )
         .all()
     )
-    changed_at = utc_now()
-    for appointment in appointments:
-        appointment.status = models.AppointmentStatus.COMPLETED
-        appointment.actual_changed_on = selected_date
-        appointment.changed_date = changed_at
-        appointment.changed_by_user_id = user.id
+    try:
+        for appointment in appointments:
+            complete_meter(db, appointment, user.id, selected_date)
+    except ValueError as exc:
+        db.rollback()
+        flash(request, str(exc), "error")
+        return RedirectResponse(f"/admin/appointments?date_query={selected_date.isoformat()}", status_code=303)
     db.commit()
 
     count = len(appointments)
@@ -916,10 +933,11 @@ def mark_completed(
         .filter(models.AppointmentPhoto.appointment_id == appointment.id)
         .all()
     )
-    appointment.status = models.AppointmentStatus.COMPLETED
-    appointment.actual_changed_on = changed_on
-    appointment.changed_date = utc_now()
-    appointment.changed_by_user_id = user.id
+    try:
+        complete_meter(db, appointment, user.id, changed_on)
+    except ValueError as exc:
+        flash(request, str(exc), "error")
+        return RedirectResponse(f"/admin/appointments?date_query={appointment.starts_at.date().isoformat()}", status_code=303)
     db.commit()
 
     redirect_target = "/admin/appointments"
@@ -972,6 +990,7 @@ def keep_scheduled(
         return RedirectResponse(redirect_target, status_code=303)
 
     appointment.status = models.AppointmentStatus.SCHEDULED
+    appointment.stock_reserved = True
     appointment.changed_date = utc_now()
     appointment.changed_by_user_id = user.id
     db.add(
@@ -1055,6 +1074,7 @@ def mark_blocked(
         flash(request, "Adresse ikke fundet", "error")
         return RedirectResponse(redirect_target, status_code=303)
 
+    appointment.stock_reserved = has_reserved_meter(appointment, db)
     address.blocked_reason = BLOCKED_REASON
     note_value = appointment.notes or BLOCKED_REASON
     if appointment.status == models.AppointmentStatus.NOT_HOME:
@@ -1065,6 +1085,7 @@ def mark_blocked(
                 starts_at=appointment.starts_at + timedelta(seconds=1),
                 ends_at=appointment.ends_at + timedelta(seconds=1),
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
+                stock_reserved=appointment.stock_reserved,
                 letter_required=appointment.letter_required,
                 notes=note_value,
                 changed_date=utc_now(),

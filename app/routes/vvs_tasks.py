@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.meter_completion import complete_meter, has_reserved_meter
 from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
 from app.dependencies import consume_flashes, flash, require_role
@@ -20,7 +21,7 @@ from app.planning_slots import (
     PLANNING_DAY_START,
     SLOT_OCCUPYING_STATUSES,
 )
-from app.timeutils import utc_now
+from app.timeutils import copenhagen_today, utc_now
 
 router = APIRouter(prefix="/vvs/tasks", tags=["vvs"])
 
@@ -658,6 +659,14 @@ def upload_photo(
         flash(request, "Adresse ikke fundet", "error")
         return RedirectResponse(redirect_url, status_code=303)
 
+    if photo_type == "both" or len(existing_photos) == 1:
+        try:
+            complete_meter(db, appointment, user.id, appointment.actual_changed_on or appointment.starts_at.date())
+        except ValueError as exc:
+            db.rollback()
+            flash(request, str(exc), "error")
+            return RedirectResponse(redirect_url, status_code=303)
+
     file_path = save_photo(address, photo_type, file)
     with upload_transaction(db, UPLOAD_DIR / file_path):
         photo = models.AppointmentPhoto(
@@ -859,6 +868,13 @@ def update_task(
         if has_conflict(db, appointment.id, user.id, starts_at, ends_at):
             return handle_error("Du er allerede planlagt på dette tidspunkt")
 
+    if status_map[status] == models.AppointmentStatus.COMPLETED:
+        try:
+            complete_meter(db, appointment, user.id, copenhagen_today())
+        except ValueError as exc:
+            return handle_error(str(exc))
+    else:
+        appointment.stock_reserved = has_reserved_meter(appointment, db)
     appointment.status = status_map[status]
     appointment.starts_at = starts_at
     appointment.ends_at = ends_at
@@ -931,9 +947,11 @@ def mark_completed(
         .filter(models.AppointmentPhoto.appointment_id == appointment.id)
         .all()
     )
-    appointment.status = models.AppointmentStatus.COMPLETED
-    appointment.changed_date = utc_now()
-    appointment.changed_by_user_id = user.id
+    try:
+        complete_meter(db, appointment, user.id, copenhagen_today())
+    except ValueError as exc:
+        flash(request, str(exc), "error")
+        return RedirectResponse("/vvs/tasks", status_code=303)
     db.commit()
 
     redirect_target = "/vvs/tasks"
@@ -945,6 +963,30 @@ def mark_completed(
         message += " – opgaven mangler stadig fotos"
     flash(request, message, "success")
     return RedirectResponse(redirect_target, status_code=303)
+
+
+@router.post("/{appointment_id}/complete-address")
+def complete_task_address(
+    request: Request,
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_role(models.UserRole.VVS)),
+):
+    task = db.query(models.Appointment).filter(
+        models.Appointment.id == appointment_id,
+        models.Appointment.contractor_id == user.id,
+        models.Appointment.is_manual_task.is_(True),
+    ).first()
+    if not task or task.task_address_id is None:
+        raise HTTPException(status_code=404, detail="VVS-opgave med adresse ikke fundet")
+    # Reuse the address registration rules; ownership was checked above.
+    from app.routes.admin_addresses import complete_address
+    complete_address(
+        request=request, address_id=task.task_address_id, contractor_id=user.id,
+        actual_changed_on=copenhagen_today().isoformat(), old_meter_no="", new_meter_no="",
+        db=db, user=user,
+    )
+    return RedirectResponse("/vvs/tasks", status_code=303)
 
 
 @router.post("/{appointment_id}/not-home")
@@ -1010,6 +1052,7 @@ def mark_blocked(
         flash(request, "Adresse ikke fundet", "error")
         return RedirectResponse("/vvs/tasks", status_code=303)
 
+    appointment.stock_reserved = has_reserved_meter(appointment, db)
     address.blocked_reason = BLOCKED_REASON
     note_value = appointment.notes or BLOCKED_REASON
     if appointment.status == models.AppointmentStatus.NOT_HOME:
@@ -1020,6 +1063,7 @@ def mark_blocked(
                 starts_at=appointment.starts_at + timedelta(seconds=1),
                 ends_at=appointment.ends_at + timedelta(seconds=1),
                 status=models.AppointmentStatus.NEEDS_RESCHEDULE,
+                stock_reserved=appointment.stock_reserved,
                 letter_required=appointment.letter_required,
                 notes=note_value,
                 changed_date=utc_now(),
