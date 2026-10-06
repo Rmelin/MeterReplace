@@ -159,6 +159,20 @@ ved beboerens ønske om ny tid skal trækkes igen. Gentagne indsendelser og sene
 foto-upload trækker ikke en ekstra måler. Hvis der mangler lager til et nyt træk,
 afvises registreringen uden at ændre status eller lager. Fotos kan tilføjes senere.
 
+Når faktisk skiftedato afviger fra den oprindelige plan, vises og tælles
+målerskiftet kun på skiftedagen i dagslister, VVS-kort og arbejdsdagsstatistik.
+Det oprindelige tidspunkt bliver ledigt, også hvis sagen efterfølgende afsluttes.
+Den oprindelige plandato bevares under **Målerskift og planhistorik** på adressen.
+
+Separate, uafsluttede måleraftaler på samme adresse fra skiftedagen og frem
+markeres automatisk **Bortfaldet – måler allerede skiftet** (`CANCELLED`).
+Deres ubrugte lagerreservationer frigives én gang. Hvis selve skifteregistreringen
+mangler en reservation, genbruges først en reservation på en fremtidig måleraftale
+for samme adresse, også når det frie lager er tomt. Manuelle reparationsopgaver
+bevares. Bortfaldne aftaler kan ikke genåbnes fra gamle handlingslinks, og
+beboerlinket forklarer, at det planlagte besøg er bortfaldet.
+Migration `0032` retter også eksisterende aftaler efter samme regler.
+
 VVS har tilsvarende et separat arbejdsflow i `/vvs/tasks`.
 VVS kan markere en opgave som skiftet uden først at uploade fotos. Manglende
 eller ufuldstændige fotos markeres på opgaven og vises på admins side

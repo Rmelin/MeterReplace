@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse, RedirectResponse
 
 from app import models
+from app.appointment_dates import work_date
 from app.meter_completion import complete_meter, has_reserved_meter
 from app.image_uploads import ensure_image, save_image, upload_transaction
 from app.db import get_db
@@ -19,7 +20,7 @@ from app.dependencies import consume_flashes, flash, require_role
 from app.planning_slots import (
     PLANNING_DAY_END,
     PLANNING_DAY_START,
-    SLOT_OCCUPYING_STATUSES,
+    occupies_slot,
 )
 from app.timeutils import copenhagen_today, utc_now
 
@@ -94,7 +95,12 @@ def availability_dates(db: Session, user_id: int) -> list[date]:
         .order_by(models.VvsAvailability.date)
         .all()
     )
-    return [row[0] for row in rows]
+    changed_dates = db.query(work_date()).filter(
+        models.Appointment.contractor_id == user_id,
+        models.Appointment.is_manual_task.is_(False),
+        models.Appointment.status.in_([models.AppointmentStatus.COMPLETED, models.AppointmentStatus.CLOSED]),
+    ).distinct().all()
+    return sorted({row[0] for row in rows} | {date.fromisoformat(str(row[0])) for row in changed_dates})
 
 
 def closest_date(dates: list[date]) -> date | None:
@@ -184,7 +190,7 @@ def has_conflict(
         .filter(
             models.Appointment.id != appointment_id,
             models.Appointment.contractor_id == contractor_id,
-            models.Appointment.status.in_(SLOT_OCCUPYING_STATUSES),
+            occupies_slot(),
             or_(models.Appointment.is_manual_task.is_(False), models.Appointment.time_window == "exact"),
             models.Appointment.starts_at < ends_at,
             models.Appointment.ends_at > starts_at,
@@ -241,10 +247,6 @@ def task_rows_for_date(
     rows = (
         db.query(models.Appointment, models.Address)
         .outerjoin(models.Address, models.Address.id == func.coalesce(models.Appointment.task_address_id, models.Appointment.address_id))
-        .join(
-            models.VvsAvailability,
-            models.VvsAvailability.user_id == models.Appointment.contractor_id,
-        )
         .filter(
             models.Appointment.contractor_id == user_id,
             models.Appointment.status.in_(
@@ -257,8 +259,7 @@ def task_rows_for_date(
                     models.AppointmentStatus.NEEDS_RESCHEDULE,
                 ]
             ),
-            func.date(models.Appointment.starts_at) == models.VvsAvailability.date,
-            func.date(models.Appointment.starts_at) == selected_date,
+            work_date() == selected_date.isoformat(),
         )
         .order_by(models.Appointment.starts_at)
         .all()
@@ -518,7 +519,7 @@ def vvs_tasks_map_data(
                     models.AppointmentStatus.NEEDS_RESCHEDULE,
                 ]
             ),
-            func.date(models.Appointment.starts_at) == selected_date,
+            work_date() == selected_date.isoformat(),
         )
         .order_by(models.Appointment.starts_at)
     )
@@ -606,6 +607,8 @@ def upload_photo(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     old_meter_value = old_meter_no.strip() or None
     new_meter_value = new_meter_no.strip() or None
@@ -777,6 +780,8 @@ def update_task(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     def inline_error(messages: list[str]):
         if not inline:
@@ -907,6 +912,8 @@ def close_task(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     appointment.status = models.AppointmentStatus.CLOSED
     appointment.changed_date = utc_now()
@@ -939,6 +946,8 @@ def mark_completed(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
     if appointment.is_manual_task:
         raise HTTPException(status_code=400, detail="Brug Udført til VVS-opgaver")
 
@@ -1007,6 +1016,8 @@ def mark_not_home(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
 
     appointment.status = models.AppointmentStatus.NOT_HOME
     appointment.changed_date = utc_now()
@@ -1039,6 +1050,8 @@ def mark_blocked(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
     if appointment.address_id is None:
         flash(request, "Opgave uden adresse kan ikke markeres som fejl ved måler", "error")
         return RedirectResponse("/vvs/tasks", status_code=303)
@@ -1104,6 +1117,8 @@ def undo_blocked(
     )
     if not appointment:
         raise HTTPException(status_code=404, detail="Opgave ikke fundet")
+    if appointment.status == models.AppointmentStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Aftalen er bortfaldet: måleren er allerede skiftet")
     if appointment.address_id is None:
         flash(request, "Opgave uden adresse kan ikke fortrydes", "error")
         return RedirectResponse("/vvs/tasks", status_code=303)

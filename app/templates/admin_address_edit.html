@@ -188,6 +188,24 @@
 
     <!-- Højre Kolonne: Historik & Farezone -->
     <div style="display: grid; gap: 1.5rem;">
+    {% if meter_history %}
+    <section class="card">
+        <h2>Målerskift og planhistorik</h2>
+        {% for visit in meter_history %}
+            <div class="card">
+                {% if visit.status.value == 'CANCELLED' %}
+                    <strong>Bortfaldet – måler allerede skiftet</strong>
+                    <p class="hint">Oprindeligt planlagt {{ visit.starts_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                {% else %}
+                    <strong>Skiftet {{ visit.meter_changed_on.strftime('%d/%m/%Y') }}</strong>
+                    {% if visit.starts_at.date() != visit.meter_changed_on %}<p class="hint">Oprindeligt planlagt {{ visit.starts_at.strftime('%d/%m/%Y') }}</p>{% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+
         <section class="card">
             <div class="section-header">
                 <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Tidsbegrænsning</h2>

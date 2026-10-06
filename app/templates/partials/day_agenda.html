@@ -19,7 +19,7 @@
                                     {% if item.is_done %}<span class="appointment-outline-done" aria-label="{{ item.status }}" title="{{ item.status }}">✓</span>{% endif %}
                                     {% if item.is_meter_issue %}<span class="appointment-outline-issue" title="Fejl ved måler" aria-label="Fejl ved måler">!</span>{% endif %}
                                     {% if item.is_draft %}<span class="chip">Udkast</span>{% endif %}
-                                    {% if item.changed_on %}<div class="agenda-outline-meta">Skiftet {{ item.changed_on.strftime('%d/%m/%Y') }}{% if item.changed_on != item.planned_on %} · Planlagt {{ item.planned_on.strftime('%d/%m/%Y') }}{% endif %}</div>{% endif %}
+                                    {% if item.changed_on %}<div class="agenda-outline-meta">Skiftet {{ item.changed_on.strftime('%d/%m/%Y') }}{% if item.changed_on != item.planned_on %} · Oprindeligt planlagt {{ item.planned_on.strftime('%d/%m/%Y') }}{% endif %}</div>{% endif %}
                                     {% if item.kind == 'VVS-opgave' %}<div class="agenda-outline-meta">VVS-opgave · {{ item.time_label }} · {{ item.contractor }}</div>{% endif %}
                                     {% if item.note %}<div class="agenda-outline-note">{% if item.kind != 'VVS-opgave' %}<strong>Note til VVS:</strong> {% endif %}{{ item.note }}</div>{% endif %}
                                     {% if item.buffer_note %}<div class="agenda-outline-note"><strong>Målerbrønd:</strong> {{ item.buffer_note }}</div>{% endif %}
