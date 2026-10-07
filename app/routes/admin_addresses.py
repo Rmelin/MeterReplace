@@ -39,6 +39,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESPONSE_LABELS = {
     "reschedule_request": "Tidspunkt passer ikke",
     "buffer_note": "Målerbrønd angivet",
+    "combined": "Samlet beboersvar",
     "confirm_time": "Tidspunkt bekræftet",
 }
 

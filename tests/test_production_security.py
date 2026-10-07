@@ -408,7 +408,7 @@ class ProductionSecurityTests(unittest.TestCase):
         response = self.client.get("/r/resident-test-token")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["referrer-policy"], "no-referrer")
-        token = re.search(r'name="csrf_token" value="([^"]+)"', response.text)[1]
+        token = re.search(r'name="csrf_token"\s+value="([^"]+)"', response.text)[1]
         self.assertEqual(
             self.client.post(
                 "/r/resident-test-token", data={"csrf_token": "wrong"}
@@ -419,8 +419,9 @@ class ProductionSecurityTests(unittest.TestCase):
             "/r/resident-test-token",
             data={
                 "csrf_token": token,
-                "intent": "message",
+                "intent": "reply",
                 "message": "Test",
+                "email": "beboer@example.dk",
                 "request_id": "a" * 32,
             },
         )

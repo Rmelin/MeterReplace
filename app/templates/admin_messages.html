@@ -1,92 +1,65 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="page-header">
-    <div>
-        <h1>Beskeder</h1>
-        <p>Indkomne beskeder fra beboere via brevlink/QR.</p>
-    </div>
-</section>
-
-<section class="card">
-    <div class="filter-chips message-folders">
-        {% for item in folders %}
-            <a class="chip {% if selected_folder == item.value %}is-active{% endif %}" href="{{ item.href }}">
-                <span>{{ item.label }}</span><strong>{{ item.count }}</strong>
-            </a>
-        {% endfor %}
-    </div>
-
-    <p class="hint">Filtrér efter svartype</p>
-    <div class="filter-chips">
-        {% for item in filters %}
-            <a class="chip {% if selected_type == item.value %}is-active{% endif %}" href="{{ item.href }}">{{ item.label }}</a>
-        {% endfor %}
-    </div>
-
-    {% if messages %}
-        <div class="table-wrapper table-mobile-stacked">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Dato</th>
-                        <th>Kanal</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Besked</th>
-                        <th>Adresse</th>
-                        <th>Aftale</th>
-                        <th>Kontakt</th>
-                        <th>Handlinger</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in messages %}
-                        <tr class="message-status-{{ item.status.value|lower }}">
-                            <td data-label="Dato">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                            <td data-label="Kanal">{{ item.channel }}</td>
-                            <td data-label="Type">{{ item.type_label }}</td>
-                            <td data-label="Status"><span class="message-status-badge message-status-badge-{{ item.status.value|lower }}">{{ item.status_label }}</span></td>
-                            <td data-label="Besked">
-                                {% if item.answer %}
-                                    <strong>
-                                        {% if item.answer == 'yes' %}Dag og tidspunkt passer
-                                        {% elif item.answer == 'same_day' %}Samme dag, andet tidspunkt
-                                        {% elif item.answer == 'new_day' %}Ny dag ønskes
-                                        {% else %}Nej{% endif %}
-                                    </strong>{% if item.message %} - {% endif %}
-                                {% endif %}{{ item.message }}
-                            </td>
-                            <td data-label="Adresse">{{ item.address.street }} {{ item.address.house_no }}, {{ item.address.zip }} {{ item.address.city }}</td>
-                            <td data-label="Aftale">{{ item.appointment_label }}</td>
-                            <td data-label="Kontakt">
-                                {% if item.address.customer_name or item.address.customer_email or item.address.customer_phone %}
-                                    {{ item.address.customer_name or '-' }}
-                                    {% if item.address.customer_phone %}<br /><a href="tel:{{ item.address.customer_phone }}">{{ item.address.customer_phone }}</a>{% endif %}
-                                    {% if item.address.customer_email %}<br /><a href="mailto:{{ item.address.customer_email }}">{{ item.address.customer_email }}</a>{% endif %}
-                                {% else %}
-                                    <span class="hint">Ingen kontaktoplysninger</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Handlinger">
-                                <a class="ghost-button" href="/admin/addresses/{{ item.address.id }}/edit" style="font-size: 0.85rem; padding: 0.35rem 0.6rem;">Adresse</a>
-                                <form method="post" action="/admin/messages/{{ item.id }}/status" class="message-status-form">
-                                    <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
-                                    <input type="hidden" name="folder" value="{{ selected_folder }}" />
-                                    <input type="hidden" name="response_type" value="{{ selected_type }}" />
-                                    {% for status, label in statuses.items() %}
-                                        {% if status != item.status %}
-                                            <button type="submit" name="mailbox_status" value="{{ status.value }}" class="ghost-button message-status-action message-status-action-{{ status.value|lower }}">{{ label }}</button>
-                                        {% endif %}
-                                    {% endfor %}
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <div class="reply-page reply-admin">
+        <header class="page-header">
+            <div>
+                <h1>Beskeder</h1>
+                <p class="reply-intro">Indkomne svar fra beboere via brevlink/QR.</p>
+            </div>
+        </header>
+        <div class="filter-chips message-folders" style="margin-bottom:16px">
+            {% for item in folders %}<a class="chip {% if selected_folder == item.value %}is-active{% endif %}"
+   href="{{ item.href }}"><span>{{ item.label }}</span><strong>{{ item.count }}</strong></a>{% endfor %}
         </div>
-    {% else %}
-        <p class="hint">Ingen beskeder i denne mappe.</p>
-    {% endif %}
-</section>
+        <p class="hint">Filtrér efter svartype</p>
+        <div class="filter-chips" style="margin-bottom:20px">{% for item in filters %}<a class="chip {% if selected_type == item.value %}is-active{% endif %}"
+   href="{{ item.href }}">{{ item.label }}</a>{% endfor %}</div>
+        {% for item in messages %}
+            <article class="card message-status-{{ item.status.value|lower }}">
+                <div class="reply-status">
+                    <div>
+                        <h2>{{ item.address.street }} {{ item.address.house_no }}</h2>
+                        <p class="hint">{{ item.created_at.strftime("%d/%m/%Y %H:%M") }} · {{ item.channel }} · {{ item.type_label }}</p>
+                    </div>
+                    <span class="message-status-badge message-status-badge-{{ item.status.value|lower }}">{{ item.status_label }}</span>
+                </div>
+                <dl class="reply-summary">
+                    {% if item.meter_pit_answer %}<div><dt>Målerbrønd</dt><dd>{{ item.meter_pit_location if item.meter_pit_answer == 'yes' else 'Der er ingen målerbrønd' }}</dd></div>{% endif %}
+                    {% if item.answer %}<div><dt>Tidspunkt</dt><dd>{% if item.answer == "yes" %}Dag og tidspunkt passer{% elif item.answer == "same_day" %}Samme dag, andet tidspunkt{% elif item.answer == "new_day" %}Ny dag ønskes{% else %}Nej{% endif %}{% if item.time_preference %} · {{ item.time_preference }}{% endif %}</dd></div>{% endif %}
+                    {% if item.message %}<div><dt>Beboerens besked</dt><dd>{{ item.message }}</dd></div>{% endif %}
+                    <div>
+                        <dt>Aftale</dt>
+                        <dd>{{ item.appointment_label }}</dd>
+                    </div>
+                </dl>
+                <section style="border-top:1px solid var(--border);padding-top:16px">
+                    <h2 style="font-size:1rem">Kontakt beboeren{% if item.contact_name %} · {{ item.contact_name }}{% endif %}</h2>
+                    <div class="reply-contact-links">
+                        {% if item.phone %}<a class="ghost-button"
+   href="tel:{{ item.phone }}">Ring: {{ item.phone }}</a>{% endif %}
+                        {% if item.email %}<a class="ghost-button"
+   href="mailto:{{ item.email }}">Skriv: {{ item.email }}</a>{% endif %}
+                        {% if not item.phone and not item.email %}<span class="hint">Ingen kontaktoplysninger</span>{% endif %}
+                    </div>
+                </section>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
+                    <a class="ghost-button"
+                       href="/admin/addresses/{{ item.address.id }}/edit">Adresse</a>
+                    <form method="post"
+                          action="/admin/messages/{{ item.id }}/status"
+                          class="message-status-form">
+                        <input type="hidden"
+                               name="csrf_token"
+                               value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+                        <input type="hidden" name="folder" value="{{ selected_folder }}" />
+                        <input type="hidden" name="response_type" value="{{ selected_type }}" />
+                        {% for status, label in statuses.items() %}{% if status != item.status %}<button type="submit"
+        name="mailbox_status"
+        value="{{ status.value }}"
+        class="ghost-button message-status-action message-status-action-{{ status.value|lower }}">{{ label }}</button>{% endif %}{% endfor %}
+                    </form>
+                </div>
+            </article>
+{% else %}<section class="card"><p class="hint">Ingen beskeder i denne mappe.</p></section>{% endfor %}
+    </div>
 {% endblock %}

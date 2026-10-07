@@ -4,7 +4,7 @@ from __future__ import annotations
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
@@ -20,6 +20,7 @@ RESPONSE_LABELS = {
     "buffer_note": "Målerbrønd angivet",
     "confirm_time": "Tidspunkt bekræftet",
     "message": "Anden besked",
+    "combined": "Samlet svar",
 }
 
 FILTERS = [
@@ -55,6 +56,7 @@ APPOINTMENT_STATUS_LABELS = {
     models.AppointmentStatus.INFORMED: "Beboer/kunde informeret",
     models.AppointmentStatus.COMPLETED: "Skiftet",
     models.AppointmentStatus.CLOSED: "Afsluttet",
+    models.AppointmentStatus.CANCELLED: "Bortfaldet",
     models.AppointmentStatus.NOT_HOME: "Ikke hjemme",
     models.AppointmentStatus.NEEDS_RESCHEDULE: "Behov for ny dato",
 }
@@ -119,13 +121,29 @@ def message_dashboard(
         .filter(models.ResidentResponse.mailbox_status == folder_map[selected_folder])
     )
     if selected_type != "all":
-        query = query.filter(models.ResidentResponse.response_type == selected_type)
+        response = models.ResidentResponse
+        combined_match = {
+            "buffer_note": response.meter_pit_answer.is_not(None),
+            "confirm_time": response.answer == "yes",
+            "reschedule_request": response.answer.in_(("same_day", "new_day")),
+            "message": response.message.is_not(None),
+        }[selected_type]
+        query = query.filter(
+            or_(
+                response.response_type == selected_type,
+                (response.response_type == "combined") & combined_match,
+            )
+        )
 
     rows = query.order_by(models.ResidentResponse.created_at.desc()).all()
 
     # A response normally stores the appointment it relates to.  Older responses
     # may not, so use the latest appointment for that address as a useful fallback.
-    appointment_ids = {response.appointment_id for response, _address in rows if response.appointment_id}
+    appointment_ids = {
+        response.appointment_id
+        for response, _address in rows
+        if response.appointment_id
+    }
     appointments_by_id = {}
     if appointment_ids:
         appointments_by_id = {
@@ -136,19 +154,21 @@ def message_dashboard(
         }
 
     address_ids_without_appointment = {
-        address.id
-        for response, address in rows
-        if response.appointment_id is None
+        address.id for response, address in rows if response.appointment_id is None
     }
     latest_appointments_by_address = {}
     if address_ids_without_appointment:
         for appointment in (
             db.query(models.Appointment)
             .filter(models.Appointment.address_id.in_(address_ids_without_appointment))
-            .order_by(models.Appointment.address_id, models.Appointment.starts_at.desc())
+            .order_by(
+                models.Appointment.address_id, models.Appointment.starts_at.desc()
+            )
             .all()
         ):
-            latest_appointments_by_address.setdefault(appointment.address_id, appointment)
+            latest_appointments_by_address.setdefault(
+                appointment.address_id, appointment
+            )
 
     messages = []
     for response, address in rows:
@@ -159,15 +179,46 @@ def message_dashboard(
         if appointment:
             appointment_label = APPOINTMENT_STATUS_LABELS[appointment.status]
             if appointment.status != models.AppointmentStatus.NOT_SCHEDULED:
-                appointment_label += " · " + appointment.starts_at.strftime("%d/%m/%Y %H:%M")
+                appointment_label += " · " + appointment.starts_at.strftime(
+                    "%d/%m/%Y %H:%M"
+                )
         messages.append(
             {
                 "id": response.id,
                 "created_at": response.created_at,
                 "type": response.response_type,
-                "type_label": RESPONSE_LABELS.get(response.response_type, "Svar modtaget"),
-                "message": response.message or "",
-                "answer": response.answer,
+                "type_label": RESPONSE_LABELS.get(
+                    response.response_type, "Svar modtaget"
+                ),
+                "message": (
+                    (response.message or "")
+                    if response.response_type != "buffer_note"
+                    else ""
+                ),
+                "answer": (
+                    response.answer if response.response_type != "buffer_note" else None
+                ),
+                "meter_pit_answer": response.meter_pit_answer
+                or (
+                    response.answer if response.response_type == "buffer_note" else None
+                ),
+                "meter_pit_location": (
+                    response.meter_pit_location
+                    if response.response_type == "combined"
+                    else response.message
+                ),
+                "time_preference": response.time_preference,
+                "contact_name": response.contact_name or address.customer_name,
+                "phone": (
+                    response.phone
+                    if response.phone or response.email
+                    else address.customer_phone
+                ),
+                "email": (
+                    response.email
+                    if response.phone or response.email
+                    else address.customer_email
+                ),
                 "address": address,
                 "channel": "Brevlink/QR",
                 "status": response.mailbox_status,
@@ -177,7 +228,8 @@ def message_dashboard(
         )
 
     return request.app.state.templates.TemplateResponse(
-        request, "admin_messages.html",
+        request,
+        "admin_messages.html",
         {
             "request": request,
             "current_user": user,

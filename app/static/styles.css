@@ -2170,3 +2170,231 @@ input:focus { outline: none; border-color: var(--accent); }
 .footer { border-top: 1px solid var(--border); padding: 2rem; color: var(--muted); text-align: center; }
 .hint { color: var(--muted); font-size: 0.85rem; }
 .is-hidden { display: none; }
+
+/* Combined resident replies and inbox cards. */
+.reply-page {
+    max-width:760px;
+    margin:0 auto;
+}
+
+.reply-page .page-header {
+    margin-bottom:20px;
+}
+
+.reply-intro {
+    margin:10px 0;
+    color:var(--muted);
+}
+
+.reply-page h1 {
+    font-size:2rem;
+    margin:0 0 8px;
+}
+
+.reply-page h2 {
+    font-size:1.18rem;
+    margin:0 0 6px;
+}
+
+.reply-page .card {
+    padding:24px;
+    margin-bottom:16px;
+}
+
+.reply-page .hint {
+    margin:0 0 14px;
+    line-height:1.5;
+}
+
+.reply-page label {
+    display:grid;
+    gap:7px;
+}
+
+.reply-page input,.reply-page textarea,.reply-page select {
+    width:100%;
+    box-sizing:border-box;
+}
+
+.reply-page textarea {
+    resize:vertical;
+}
+
+.reply-section-title {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+}
+
+.reply-step {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:27px;
+    height:27px;
+    border:1px solid var(--border);
+    border-radius:50%;
+    font-size:.85rem;
+    color:var(--muted);
+}
+
+.reply-choice {
+    display:flex;
+    gap:10px;
+    margin-bottom:14px;
+}
+
+.reply-choice label {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:12px 22px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    cursor:pointer;
+    flex:1;
+}
+
+.reply-choice input {
+    width:18px;
+    height:18px;
+}
+
+.reply-choice label:has(input:checked) {
+    border-color:var(--accent);
+    background:rgba(var(--accent-rgb),.06);
+}
+
+.reply-two {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+}
+
+.reply-contact {
+    border-color:var(--accent);
+}
+
+.reply-rule {
+    border-left:3px solid var(--accent);
+    padding-left:12px;
+    line-height:1.5;
+    color:var(--muted);
+}
+
+.reply-error {
+    color:#fb7185;
+    background:rgba(244,63,94,.08);
+    border-radius:8px;
+    padding:12px;
+    line-height:1.4;
+    margin:12px 0;
+}
+
+.reply-send {
+    width:100%;
+    padding:15px;
+    font-size:1rem;
+}
+
+.reply-note {
+    text-align:center;
+    color:var(--muted);
+    font-size:.88rem;
+    margin:12px 0 0;
+}
+
+.reply-plan {
+    display:inline-flex;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:9px 13px;
+    margin-top:8px;
+    font-size:.9rem;
+}
+
+.reply-page [hidden] {
+    display:none!important;
+}
+
+.reply-success {
+    border-left:4px solid var(--accent);
+}
+
+.reply-summary {
+    display:grid;
+    gap:12px;
+}
+
+.reply-summary dt {
+    color:var(--muted);
+    font-size:.86rem;
+}
+
+.reply-summary dd {
+    overflow-wrap: anywhere;
+    margin:4px 0 0;
+    white-space:pre-wrap;
+}
+
+.reply-required {
+    color:var(--accent);
+    font-size:.86rem;
+    font-weight:400;
+}
+
+.reply-admin {
+    max-width:900px;
+}
+
+.reply-status {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+}
+
+.reply-chip {
+    border:1px solid var(--accent);
+    color:var(--accent);
+    border-radius:20px;
+    padding:5px 12px;
+    font-size:.86rem;
+}
+
+.reply-contact-links {
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.reply-contact-links a {
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+@media(max-width:600px) {
+    .reply-page h1 {
+        font-size:1.55rem;
+    }
+
+    .reply-page .card {
+        padding:20px;
+    }
+
+    .reply-two {
+        grid-template-columns:1fr;
+    }
+
+    .reply-plan {
+        font-size:.82rem;
+    }
+
+    .reply-page .page-header {
+        margin-top:0;
+    }
+
+}
