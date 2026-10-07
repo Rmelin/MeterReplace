@@ -117,7 +117,17 @@ Typiske resultater:
 
 - beboer oplyser eller opdaterer placering af målerbrønd
 - beboer bekræfter tidspunkt eller anmoder om en ny dato
-- beboer sender en separat besked uden at ændre de øvrige svar
+- beboer sender en besked uden at ændre de øvrige svar
+
+Formularen har én **Send svar**-knap. Målerbrønd, tidssvar og besked gemmes samlet
+som én henvendelse i admins indbakke og udløser én push-hændelse. Admin kan stadig
+filtrere det samlede svar efter de enkelte svartyper og flytte det mellem mapper.
+Telefon **eller** e-mail er påkrævet ved beskeder/spørgsmål og ønsker om en anden
+tid eller dag. Målerbrønd og en ren bekræftelse af tidspunkt kan sendes uden kontakt.
+Kontaktoplysninger gemmes på både henvendelsen og adressen; admin ser de oplysninger,
+som blev angivet ved afsendelsen. Tomme felter sletter ikke eksisterende kontakt.
+Gentaget afsendelse af samme formular opretter ikke flere henvendelser. Et bevidst
+nyt svar gemmes fortsat som en ny historikpost. Valideringsfejl bevarer de indtastede svar.
 
 En anmodning om ny dato kan føre til status `NEEDS_RESCHEDULE`.
 Beboerlinket forbliver tilknyttet den konkrete aftale, så beboeren kan se og

@@ -1,160 +1,149 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="page-header narrow">
-    <div>
-        <h1>Besked til os</h1>
-        <p class="hint">Adresse: {{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>
-        {% if appointment and appointment.status.value == 'CANCELLED' %}
+    <div class="reply-page">
+        <header class="page-header"><div><h1>Svar om dit målerskift</h1><p class="reply-intro">{{ address.street }} {{ address.house_no }}, {{ address.zip }} {{ address.city }}</p>{% if appointment and appointment.status.value == "CANCELLED" %}
             <p class="hint">Aftalen er bortfaldet, fordi måleren allerede er skiftet. Du skal ikke afvente det planlagte besøg.</p>
-        {% elif appointment and appointment.status.value in ['COMPLETED', 'CLOSED'] and not appointment.is_manual_task %}
-            <p class="hint">Måleren er skiftet {{ appointment.meter_changed_on.strftime('%d/%m/%Y') }}.</p>
-        {% elif appointment %}
-            <p class="hint">Planlagt tid: {% if appointment.starts_at.hour < 12 %}Formiddag (08:00-12:00){% else %}Eftermiddag (12:00-16:00){% endif %}</p>
-        {% endif %}
-    </div>
-</section>
-
-{% if saved %}
-<section class="card narrow">
-    <p role="status" style="color: var(--success);"><strong>Tak! Dit svar er gemt.</strong> Du kan se og opdatere oplysningerne nedenfor.</p>
-</section>
+{% elif appointment and appointment.status.value in ["COMPLETED", "CLOSED"] and not appointment.is_manual_task %}
+    <p class="hint">Måleren er skiftet {{ appointment.meter_changed_on.strftime("%d/%m/%Y") }}.</p>
+{% elif appointment and can_answer_time %}
+    <span class="reply-plan">Planlagt besøg: {{ appointment.starts_at.strftime("%d/%m/%Y") }} · {% if appointment.starts_at.hour < 12 %}kl. 08–12{% else %}kl. 12–16{% endif %}</span>
 {% endif %}
-
-<section class="card narrow resident-response">
-    <h2>Kontaktoplysninger</h2>
-    <p class="hint">Kontroller oplysningerne, så vi kan kontakte dig om aftalen.</p>
-    <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
-        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
-        <input type="hidden" name="intent" value="contact" />
-        <input type="hidden" name="request_id" value="{{ contact_request_id }}" />
-        <label>Navn<input type="text" name="name" maxlength="200" value="{{ address.customer_name or '' }}" autocomplete="name" /></label>
-        <label>Telefon<input type="tel" name="phone" maxlength="50" value="{{ address.customer_phone or '' }}" autocomplete="tel" /></label>
-        <label>E-mail<input type="email" name="email" maxlength="200" value="{{ address.customer_email or '' }}" autocomplete="email" /></label>
-        <button type="submit" class="primary-button">Gem kontaktoplysninger</button>
-    </form>
-</section>
-
-<section class="card narrow resident-response">
-    <h2>Målerbrønd</h2>
-    <p class="hint">Oplysningen kan sendes eller opdateres uafhængigt af tidspunktet.</p>
-    {% if meter_pit_response %}
-        <p><strong>Seneste svar:</strong> {% if meter_pit_response.answer == 'yes' %}Ja{% else %}Nej{% endif %}{% if meter_pit_response.message %} - {{ meter_pit_response.message }}{% endif %}</p>
-    {% endif %}
-    <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
-        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
-        <input type="hidden" name="intent" value="meter_pit" />
-        <input type="hidden" name="request_id" value="{{ meter_pit_request_id }}" />
-        <fieldset class="form-fieldset">
-            <legend>Er der målerbrønd på adressen?</legend>
-            <div class="option-buttons">
-                <label class="option-button">
-                    <input type="radio" name="answer" value="yes" required {% if meter_pit_response and meter_pit_response.answer == 'yes' %}checked{% endif %} style="display: none;" />
-                    <span>Ja</span>
-                </label>
-                <label class="option-button">
-                    <input type="radio" name="answer" value="no" {% if meter_pit_response and meter_pit_response.answer == 'no' %}checked{% endif %} style="display: none;" />
-                    <span>Nej</span>
+</div>
+</header>
+{% if saved %}
+    <section class="card reply-success">
+        <h2 role="status">Tak, dit svar er sendt</h2>
+        <p class="hint">Vi har modtaget dine oplysninger samlet. Du kan sende et nyt svar nedenfor.</p>
+    </section>
+{% endif %}
+<p class="reply-intro">Du kan svare på det, der er relevant for dig, og sende det hele samlet.</p>
+{% if error %}<div class="reply-error" role="alert">{{ error }}</div>{% endif %}
+<form method="post" action="/r/{{ token }}" id="reply-form">
+    <input type="hidden"
+           name="csrf_token"
+           value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
+    <input type="hidden" name="intent" value="reply" />
+    <input type="hidden" name="request_id" value="{{ request_id }}" />
+    <section class="card">
+        <div class="reply-section-title">
+            <span class="reply-step">1</span>
+            <h2>Målerbrønd</h2>
+        </div>
+        <p class="hint">Du kan nøjes med at oplyse placeringen. Det kræver ikke kontaktoplysninger.</p>
+        {% if meter_pit_response %}<p class="hint"><strong>Seneste svar:</strong> {% if meter_pit_response.response_type == "combined" %}{{ meter_pit_response.meter_pit_location if meter_pit_response.meter_pit_answer == 'yes' else 'Der er ingen målerbrønd' }}{% else %}{{ meter_pit_response.message if meter_pit_response.answer == 'yes' else 'Der er ingen målerbrønd' }}{% endif %}</p>{% endif %}
+        <div class="reply-choice"><label><input type="radio"
+       name="pit"
+       value="yes"
+       {% if values.get('pit') == 'yes' %}checked{% endif %} />Ja, der er en målerbrønd</label><label><input type="radio"
+       name="pit"
+       value="no"
+       {% if values.get('pit') == 'no' %}checked{% endif %} />Nej</label></div>
+        <label id="pit-location">
+            Hvor er den placeret?<textarea name="location"
+          rows="2"
+          maxlength="255"
+          placeholder="Fx ved hækken til venstre for indkørslen">{{ values.get('location','') }}</textarea>
+        </label>
+    </section>
+    <section class="card">
+        <div class="reply-section-title">
+            <span class="reply-step">2</span>
+            <h2>Tidspunkt</h2>
+        </div>
+        {% if time_response %}<p class="hint"><strong>Seneste svar:</strong> {{ time_labels.get(time_response.answer, 'Ny dag ønskes') }}{% if time_response.time_preference %} · {{ time_response.time_preference }}{% elif time_response.message and time_response.response_type != "combined" %} · {{ time_response.message }}{% endif %}</p>{% endif %}
+        {% if can_answer_time %}
+            <label>Passer det planlagte besøg?<select name="time"><option value="">Jeg svarer ikke på tidspunktet nu</option>{% for key,label in time_labels.items() %}<option value="{{ key }}"
+        {% if values.get('time') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <label id="time-preference" style="margin-top:14px">
+                Hvornår kan du være hjemme?<textarea name="preference"
+          rows="2"
+          maxlength="4000"
+          placeholder="Fx hjemme efter kl. 14">{{ values.get('preference','') }}</textarea>
+            </label>
+        {% else %}<p class="hint">Der er ikke en aktiv aftale, som kan besvares via dette link.</p>{% endif %}
+    </section>
+    <section class="card">
+        <div class="reply-section-title">
+            <span class="reply-step">3</span>
+            <h2>Har du en besked eller et spørgsmål?</h2>
+        </div>
+        <p class="hint">Når du skriver til os, skal du oplyse telefon eller e-mail, så vi kan svare dig.</p>
+        <label>
+            Besked <span style="font-weight:400;color:var(--muted);font-size:.86rem">Valgfrit</span><textarea name="message"
+          rows="3"
+          maxlength="4000"
+          placeholder="Skriv din besked eller dit spørgsmål">{{ values.get('message','') }}</textarea>
+        </label>
+    </section>
+    <section class="card reply-contact" id="contact-section">
+        <h2>Sådan kan vi kontakte dig <span class="reply-required">Påkrævet ved besked eller ønske om ny tid</span></h2>
+        <p class="hint">Angiv mindst én kontaktmulighed: telefon eller e-mail.</p>
+        <label style="margin-bottom:16px">
+            Navn <span style="font-weight:400;color:var(--muted);font-size:.86rem">Valgfrit</span><input name="name"
+       autocomplete="name"
+       value="{{ values.get('name', '') }}"
+       placeholder="Dit navn"
+       maxlength="200" />
+        </label>
+        <div class="reply-two">
+            <label>
+                Telefon<input type="tel"
+       name="phone"
+       autocomplete="tel"
+       inputmode="tel"
+       value="{{ values.get('phone', '') }}"
+       placeholder="Fx 12 34 56 78"
+       maxlength="50" /></label><label>E-mail<input type="email"
+       name="email"
+       autocomplete="email"
+       value="{{ values.get('email', '') }}"
+       placeholder="Fx navn@eksempel.dk"
+       maxlength="200" />
                 </label>
             </div>
-        </fieldset>
-        <label>
-            Hvis ja, hvor er målerbrønden placeret?
-            <textarea name="message" rows="3" maxlength="255" class="textarea" placeholder="Angiv placering">{{ meter_pit_response.message if meter_pit_response and meter_pit_response.answer == 'yes' else '' }}</textarea>
-        </label>
-        <button type="submit" class="primary-button">Gem målerbrøndssvar</button>
+            <p class="reply-error"
+               id="contact-error"
+               role="alert"
+               hidden>Angiv telefon eller e-mail, så vi kan svare på din henvendelse.</p>
+        </section>
+        <button type="submit" class="primary-button reply-send">Send svar</button>
+        <p class="reply-note">Målerbrønd, tidssvar og besked sendes samlet.</p>
     </form>
-</section>
+    <script>
+    const form = document.querySelector('#reply-form');
+    const phone = form.elements.phone;
+    const email = form.elements.email;
+    const contact = document.querySelector('#contact-section');
+    const error = document.querySelector('#contact-error');
 
-<section class="card narrow resident-response">
-    <h2>Tidspunkt</h2>
-    {% if time_response %}
-        <p><strong>Seneste svar:</strong>
-            {% if time_response.answer == 'yes' %}Den planlagte dag og tidspunktet passer
-            {% elif time_response.answer == 'same_day' %}Dagen passer, men tidspunktet passer ikke
-            {% else %}Der er behov for en ny planlagt dag{% endif %}
-            {% if time_response.message %} - {{ time_response.message }}{% endif %}
-        </p>
-    {% endif %}
-    {% if appointment and can_answer_time %}
-        <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form data-time-form>
-            <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
-            <input type="hidden" name="intent" value="time" />
-            <input type="hidden" name="request_id" value="{{ time_request_id }}" />
-            <fieldset class="form-fieldset">
-                <legend>Passer det planlagte tidspunkt?</legend>
-                <div class="option-buttons">
-                    <label class="option-button time-choice time-choice-success">
-                        <input type="radio" name="answer" value="yes" required {% if time_response and time_response.answer == 'yes' %}checked{% endif %} style="display: none;" />
-                        <span>Den planlagte dag og tidspunktet passer</span>
-                    </label>
-                    <label class="option-button time-choice time-choice-warning">
-                        <input type="radio" name="answer" value="same_day" {% if time_response and time_response.answer == 'same_day' %}checked{% endif %} style="display: none;" />
-                        <span>Den planlagte dag passer, men tidspunktet passer ikke</span>
-                    </label>
-                    <label class="option-button time-choice time-choice-danger">
-                        <input type="radio" name="answer" value="new_day" {% if time_response and time_response.answer == 'new_day' %}checked{% endif %} style="display: none;" />
-                        <span>Der er behov for en ny planlagt dag</span>
-                    </label>
-                </div>
-            </fieldset>
-            <fieldset class="form-fieldset" data-time-preference {% if not time_response or time_response.answer != 'same_day' %}hidden{% endif %}>
-                <legend>Hvornår passer det samme dag?</legend>
-                <p class="hint">Beskriv fx “ikke hjemme mellem 10:00 og 12:00” eller “kan være hjemme fra kl. 14:00”. Vi kontakter dig for at bekræfte tiden.</p>
-                <label>
-                    Beskrivelse
-                    <textarea name="message" rows="3" maxlength="4000" class="textarea" data-time-description placeholder="Fx ikke hjemme kl. 10:00–12:00 eller kan være hjemme fra kl. 14:00"></textarea>
-                </label>
-            </fieldset>
-            <button type="submit" class="primary-button">Gem tidssvar</button>
-        </form>
-        {% if appointment.status.value == 'NEEDS_RESCHEDULE' %}
-            <p class="hint">Dit ønske om en anden tid eller dag er registreret. Vi gennemgår svaret og kontakter dig for at bekræfte aftalen.</p>
-        {% endif %}
-    {% else %}
-        <p class="hint">Der er ikke en aktiv aftale, som kan besvares via dette link.</p>
-    {% endif %}
-</section>
+    function updateReplyFields() {
+        const pit = form.querySelector('input[name="pit"]:checked')?.value;
+        document.querySelector('#pit-location').hidden = pit !== 'yes';
+        form.elements.location.required = pit === 'yes';
+        const time = form.elements.time?.value;
+        const preference = document.querySelector('#time-preference');
+        if (preference) {
+            preference.hidden = !['same_day', 'new_day'].includes(time);
+            form.elements.preference.required = time === 'same_day';
+        }
+        contact.hidden = !(form.elements.message.value.trim() || ['same_day', 'new_day'].includes(time));
+        if (contact.hidden || phone.value.trim() || email.value.trim()) error.hidden = true;
+    }
 
-<section class="card narrow resident-response">
-    <h2>Anden besked</h2>
-    <p class="hint">Send en besked uden at ændre svar om målerbrønd eller tidspunkt.</p>
-    <form method="post" action="/r/{{ token }}" class="form-grid" data-resident-form>
-        <input type="hidden" name="csrf_token" value="{{ request.scope.get('session', {}).get('csrf_token', '') }}" />
-        <input type="hidden" name="intent" value="message" />
-        <input type="hidden" name="request_id" value="{{ message_request_id }}" />
-        <label>Besked<textarea name="message" rows="4" maxlength="4000" class="textarea" required placeholder="Skriv din besked"></textarea></label>
-        <button type="submit" class="primary-button">Send besked</button>
-    </form>
-    {% if messages %}
-        <h3>Tidligere beskeder</h3>
-        <ul class="list">
-            {% for item in messages %}
-                <li><strong>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</strong><br />{{ item.message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-</section>
-
-<script>
-    const updateTimePreference = () => {
-        const form = document.querySelector('[data-time-form]');
-        const selected = form?.querySelector('input[name="answer"]:checked');
-        const details = form?.querySelector('[data-time-preference]');
-        const description = form?.querySelector('[data-time-description]');
-        const needsDescription = selected?.value === 'same_day';
-        if (details) details.hidden = !needsDescription;
-        if (description) description.required = needsDescription;
-    };
-    document.querySelectorAll('[data-time-form] input[name="answer"]').forEach((input) => {
-        input.addEventListener('change', updateTimePreference);
+    form.addEventListener('input', updateReplyFields);
+    form.addEventListener('change', updateReplyFields);
+    updateReplyFields();
+    form.addEventListener('submit', (event) => {
+        if (!contact.hidden && !phone.value.trim() && !email.value.trim()) {
+            event.preventDefault();
+            error.hidden = false;
+            contact.scrollIntoView({behavior: 'smooth', block: 'center'});
+            phone.focus({preventScroll: true});
+            return;
+        }
+        form.querySelector('button[type="submit"]').disabled = true;
     });
-    updateTimePreference();
-
-    document.addEventListener("submit", (event) => {
-        const form = event.target.closest("[data-resident-form]");
-        if (!form) return;
-        const button = form.querySelector('button[type="submit"]');
-        if (button) button.disabled = true;
-    });
-</script>
+    </script>
+    {% if messages %}<section class="card" style="margin-top:24px"><h2>Tidligere beskeder</h2><ul class="list">{% for item in messages %}<li><strong>{{ item.created_at.strftime("%d/%m/%Y %H:%M") }}</strong><p style="white-space:pre-wrap">{{ item.message }}</p></li>{% endfor %}</ul></section>{% endif %}
+</div>
 {% endblock %}
